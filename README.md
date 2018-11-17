@@ -6,7 +6,7 @@ For more information please contact Ben Ryan (ben_ryan@gallup.com).
 ## Approach
 We first ingest natural language expert queries drawn from scientific literature and instantiate them as formalized computational models through the application of syntactic and semantic parsing and mapping tokens to model components. We confirm the system can execute these queries and produce desired results from the relevant models. We then use this ontology as well as live human expert input, to iteratively train a GAN to produce novel, well-formed and reasonable expert queries.
 
-![alt text](https://github.gallup.com/ben-ryan/multivac/blob/master/images/multivac_concept.png "MULTIVAC Concept Graphic")
+![alt text](https://github.com/GallupGovt/multivac/blob/master/images/multivac_concept.png "MULTIVAC Concept Graphic")
 
 ## Context
 Even with state of the art computational modeling and simulation systems, experts have to translate their own queries into parameters and models by hand. Similarly, evaluation of existing models is laborious and time consuming. There is no systematic mechanism for assessment of model validity by independent users of the modeling code, and new hypotheses are always limited by human biases. Additionally, associated modeling code exhibits wide variation in structure, format and ease of access, and formulating hypotheses as parameter sets and program executions requires input from the original researchers.
