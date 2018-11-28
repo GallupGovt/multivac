@@ -17,8 +17,8 @@ Training a system to understand “natural language” queries delivers two prim
 Ultimately, the MULTIVAC approach results in a “virtual scientist” system, capable of learning from the existing literature and generating queries that humans might not think of, greatly expanding the search space of possible model phenomena and potentially leading to discovery of many unknown unknowns.
 
 ## Resources
-- MULTIVAC Slack: https://aske-multivac.slack.com/
-- BioRxiv: https://arxiv.org/archive/q-bio
+- Quantitative Bio @ arXiv: https://arxiv.org/archive/q-bio
+- BioRxiv: https://www.biorxiv.org/
 - Stanford CoreNLP: https://github.com/dasmith/stanford-corenlp-python
 - Generative Adversarial Network (GAN) implementations using Keras: https://github.com/eriklindernoren/Keras-GAN
 
