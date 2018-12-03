@@ -42,11 +42,11 @@ A Markov network is a set of random variables having a Markov property (where th
 ### Ontology Construction
 MULTIVAC translates all sentences and formulas in our corpus into first-order logic forms, and integrates  them into a unified ontology. This integration is done by finding the parse that maximizes the a posteriori distributions of the network. To construct the domain’s model ontology, we cluster together semantically interchangeable formulas into more generalized versions, identified as formulas which can be combined to improve the log-likelihood of observing the given set of formulas, determined by the sum of the weights. For example, in the above sentence the formula for “bills were submitted by Brownback” (passive voice):
 
-<p align='center'> _&#955;x1&#955;x2.submitted(n1)/\agent(n1,Brownback)/\nsubjpass(n1,bills)_ </p>
+<p align='center'> <i> &#955;x1&#955;x2.submitted(n1)/\agent(n1,Brownback)/\nsubjpass(n1,bills) </i> </p>
 
 is semantically the same as the formula for “Brownback submitted bills” (active voice): 
 
-<p align='center'> _&#955;x1&#955;x2.submitted(n1)/\nsubj(n1,Brownback)/\dobj(n1,bills)_ </p>
+<p align='center'> <i> &#955;x1&#955;x2.submitted(n1)/\nsubj(n1,Brownback)/\dobj(n1,bills) </i> </p>
 
 and these formulas would then be merged into one formula cluster for the concept “&#955;x1&#955;x2.submitted” that abstracts away the active/passive voice distinction. 
 
@@ -78,7 +78,7 @@ Above, we describe how we will build a library of queries (extracted and expert-
 
 The discriminator network will be trained using these queries as our labeled training data. Meanwhile, the generator ingests models, parameters, factors and relationships and returns a “query” constructed from them. We will prime the generator network by having it compile the queries from the formulas in our MLN ontology using Markov-Chains to mimic the semantic query grammars embedded there, along with a random component to ensure novel combinations and variations. This fills out a meta-process model structure with models, parameters and factors taken from the accumulated ontology, and then sends this query to the generator network. This novel query is fed to the discriminator along with the existing set of curated expert queries. The discriminator considers both these real and generated queries and assigns probabilities of their authenticity, gradually learning to assign higher probabilities to “authentic” queries and lower ones to inauthentic queries.
 
-<img src="https://github.com/GallupGovt/multivac/blob/master/images/gan.png" alt="GAN Design Graphic" width="600">
+<p align='center'><img src="https://github.com/GallupGovt/multivac/blob/master/images/gan.png" alt="GAN Design Graphic" width="600"></p>
 
 This GAN architecture will be trained dialectically, first training the discriminator on the existing ontology and query library, then training the generator against a static discriminator. The discriminator will then be trained again, accounting for examples on which it failed, and so on. The discriminator will also be augmented by a “real-world” feedback loop; when the generator produces a query, the discriminator scores it, but the query is also submitted against the computational model simulation. If it produces results, the query is added to the discriminator training set as a valid expert query, regardless of the initial score given by the discriminator. Thus, new queries and query types can be added to the training library from successful novel queries. In the final iteration, the system will include a hypothesis evaluation loop looking at the explanatory power of a given machine-generated hypothesis and weighting up those that are novel, have a potentially high explanatory power and are plausible in the current context. This GAN implementaiton will be written in Python leveraging the Keras API with a TensorFlow backend.
 
