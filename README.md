@@ -5,7 +5,7 @@ Gallup’s Meta-model Unification Learned Through Inquiry Vectorization and Auto
 
 For more information please contact Ben Ryan (ben_ryan@gallup.com).
 
-# MULTIVAC Initial System Design Report
+# Initial System Design
 ## Phase I - Formal Representation/Interpretation of Queries
 ### Data Acquisition
 The MULTIVAC prototype will operate on an Amazon Web Services (AWS) commercial EC2 instance with GPU capabilities and will scale as MULTIVAC’s complexity increases. MULTIVAC’s initial source data will comprise 2,000 articles with total data storage needs (including metadata) of approximately 500GB. We build our source dataset by utilizing a variety of means, including APIs, scraping, and bulk download options for tapping into epidemiological research articles from online sources such as arXiv’s Quantitative Biology repository. The use of arXiv is purposeful; the research is current and constantly updating; moreover, articles tend to be technical in nature, allowing for plentiful source material to train MULTIVAC.
