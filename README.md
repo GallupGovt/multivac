@@ -1,7 +1,7 @@
 # MULTIVAC
 Gallup’s Meta-model Unification Learned Through Inquiry Vectorization and Automated Comprehension (MULTIVAC) will consist of an expert query generator trained on a corpus of historical expert queries and tuned dialectically with the use of a Generative Adversarial Network (GAN) architecture.
 
-![alt text](https://github.com/GallupGovt/multivac/blob/master/images/multivac_concept.png "MULTIVAC Concept Graphic")
+![alt text](https://github.com/GallupGovt/multivac/images/multivac_concept.png "MULTIVAC Concept Graphic")
 
 For more information please contact Ben Ryan (ben_ryan@gallup.com).
 
@@ -15,12 +15,12 @@ Once the data has been acquired and stored, we perform some basic pre-processing
 
 We then read in and parse all sentences and formulas in the texts into Stanford Universal Dependency trees using both the Stanford Parser toolset for natural language sentences and custom rule-based systems for formulas. Dependency trees represent grammatical relations between words in a sentence using triples – name of the relation, governor, and dependent. An example parse of a natural language sentence is reproduced below.<sup>[2](#2)</sup> This parsing system will be written in Python leveraging Stanford’s official `corenlp` module, which acts as a wrapper to a Java backend implementation.<sup>[3](#3)</sup>
 
-| “Bills on ports and immigration were<br> submitted by Senator Brownback,<br> Republican of Kansas.” | ![alt text](https://github.com/GallupGovt/multivac/blob/master/images/stanford_dependencies.png "Stanford sentence dependencies tree example") |
+| “Bills on ports and immigration were<br> submitted by Senator Brownback,<br> Republican of Kansas.” | ![alt text](https://github.com/GallupGovt/multivac/images/stanford_dependencies.png "Stanford sentence dependencies tree example") |
 |:--------------:|:----:|
 
 Formulas are identified by LaTeX formatting codes for inline (“`\( \), $ $` or `\begin{math} \end{math}`”) or display (“`\[ \], $$ $$, \begin{displaymath} \end{displaymath}` or `\begin{equation} \end{equation}`”) equation representations or `<math>` XML tags, depending on the raw format of the text being parsed. For PDF files, we leverage recent work in formula identification and extraction.<sup>[4](#4)</sup>
 
-| ![alt text](https://github.com/GallupGovt/multivac/blob/master/images/formula.png "Example formula") | ![alt text](https://github.com/GallupGovt/multivac/blob/master/images/formula_dependencies.png "Formula dependencies tree example") |
+| ![alt text](https://github.com/GallupGovt/multivac/images/formula.png "Example formula") | ![alt text](https://github.com/GallupGovt/multivac/images/formula_dependencies.png "Formula dependencies tree example") |
 |:--------------:|:----:|
 
 These parse trees are then translated into first-order logic formulas. First-order logic, also known as first-order predicate calculus or first-order functional calculus, is a system in which each sentence, or statement, is broken down into a subject and a predicate. The predicate modifies or defines the properties of the subject. This system naturally mirrors the dependency tree parsing we perform in the previous step. These first-order logic formulas are then assigned weights according to the frequency of their occurrence in the corpus and placed in a Markov network structure to create a Markov Logic Network (MLN). Conversion to an MLN and subsequent ontology creation and manipulation will be written in Python, leveraging the `pracmln` module.<sup>[5](#5)</sup>
@@ -78,7 +78,7 @@ Above, we describe how we will build a library of queries (extracted and expert-
 
 The discriminator network will be trained using these queries as our labeled training data. Meanwhile, the generator ingests models, parameters, factors and relationships and returns a “query” constructed from them. We will prime the generator network by having it compile the queries from the formulas in our MLN ontology using Markov-Chains to mimic the semantic query grammars embedded there, along with a random component to ensure novel combinations and variations. This fills out a meta-process model structure with models, parameters and factors taken from the accumulated ontology, and then sends this query to the generator network. This novel query is fed to the discriminator along with the existing set of curated expert queries. The discriminator considers both these real and generated queries and assigns probabilities of their authenticity, gradually learning to assign higher probabilities to “authentic” queries and lower ones to inauthentic queries.
 
-![alt text](https://github.com/GallupGovt/multivac/blob/master/images/gan.png "GAN Design Graphic")
+![alt text](https://github.com/GallupGovt/multivac/images/gan.png "GAN Design Graphic")
 
 This GAN architecture will be trained dialectically, first training the discriminator on the existing ontology and query library, then training the generator against a static discriminator. The discriminator will then be trained again, accounting for examples on which it failed, and so on. The discriminator will also be augmented by a “real-world” feedback loop; when the generator produces a query, the discriminator scores it, but the query is also submitted against the computational model simulation. If it produces results, the query is added to the discriminator training set as a valid expert query, regardless of the initial score given by the discriminator. Thus, new queries and query types can be added to the training library from successful novel queries. In the final iteration, the system will include a hypothesis evaluation loop looking at the explanatory power of a given machine-generated hypothesis and weighting up those that are novel, have a potentially high explanatory power and are plausible in the current context. This GAN implementaiton will be written in Python leveraging the Keras API with a TensorFlow backend.
 
