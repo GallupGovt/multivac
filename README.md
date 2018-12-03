@@ -15,7 +15,7 @@ Once the data has been acquired and stored, we perform some basic pre-processing
 
 We then read in and parse all sentences and formulas in the texts into Stanford Universal Dependency trees using both the Stanford Parser toolset for natural language sentences and custom rule-based systems for formulas. Dependency trees represent grammatical relations between words in a sentence using triples – name of the relation, governor, and dependent. An example parse of a natural language sentence is reproduced below.<sup>[2](#2)</sup> This parsing system will be written in Python leveraging Stanford’s official `corenlp` module, which acts as a wrapper to a Java backend implementation.<sup>[3](#3)</sup>
 
-| “Bills on ports and immigration were<br> submitted by Senator Brownback,<br> Republican of Kansas.” | ![alt text](https://github.com/GallupGovt/multivac/images/stanford_dependecies.png "Stanford sentence dependencies tree example") |
+| “Bills on ports and immigration were<br> submitted by Senator Brownback,<br> Republican of Kansas.” | ![alt text](https://github.com/GallupGovt/multivac/blob/master/images/stanford_dependecies.png "Stanford sentence dependencies tree example") |
 |:--------------:|:----:|
 
 Formulas are identified by LaTeX formatting codes for inline (“`\( \), $ $` or `\begin{math} \end{math}`”) or display (“`\[ \], $$ $$, \begin{displaymath} \end{displaymath}` or `\begin{equation} \end{equation}`”) equation representations or `<math>` XML tags, depending on the raw format of the text being parsed. For PDF files, we leverage recent work in formula identification and extraction.<sup>[4](#4)</sup>
