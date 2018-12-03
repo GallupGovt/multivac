@@ -8,7 +8,7 @@ For more information please contact Ben Ryan (ben_ryan@gallup.com).
 # MULTIVAC Initial System Design Report
 ## Phase I - Formal Representation/Interpretation of Queries
 ### Data Acquisition
-The MULTIVAC prototype will operate on an Amazon Web Services (AWS) commercial EC2 instance with GPU capabilities and will scale as MULTIVAC’s complexity increases. MULTIVAC’s initial source data will comprise 2,000 articles totaling approximately 500GB of data. We build our source dataset by utilizing a variety of means, including APIs, scraping, and bulk download options for tapping into epidemiological research articles from online sources such as arXiv’s Quantitative Biology repository. The use of arXiv is purposeful; the research is current and constantly updating; moreover, articles tend to be technical in nature, allowing for plentiful source material to train MULTIVAC.
+The MULTIVAC prototype will operate on an Amazon Web Services (AWS) commercial EC2 instance with GPU capabilities and will scale as MULTIVAC’s complexity increases. MULTIVAC’s initial source data will comprise 2,000 articles with total data storage needs (including metadata) of approximately 500GB. We build our source dataset by utilizing a variety of means, including APIs, scraping, and bulk download options for tapping into epidemiological research articles from online sources such as arXiv’s Quantitative Biology repository. The use of arXiv is purposeful; the research is current and constantly updating; moreover, articles tend to be technical in nature, allowing for plentiful source material to train MULTIVAC.
 
 ### Parsing Article Data
 Once the data has been acquired and stored, we perform some basic pre-processing and meta-data generation procedures. We calculate a term-frequency/inverse-document-frequency matrix for all the words in the vocabulary of the corpus of articles. We also train a domain-adapted GloVe word-embeddings model on the corpus.<sup>[1](#1)</sup>
@@ -32,7 +32,7 @@ These parse trees are then translated into first-order logic formulas. First-ord
 </tr>
 <tr>
 	<td nowrap>nsubjpass(submitted, Bills) <br> auxpass(submitted, were) <br> agent(submitted, Brownback) <br> nn(Brownback, Senator) <br> appos(Brownback, Republican) <br> prep_of(Republican, Kansas) <br> prep_on(Bills, ports) <br> conj_and(ports, immigration) <br> prep_on(Bills, immigration)</td>
-	<td>&#955;x1&#955;x2.submitted(n1)/\agent(n1,x1)/\nsubjpass(n1,x2) <br>  &#955;x1&#955;x3.hasProperty(n2)/\nn(n2,x1)/\property(n2,x3) <br> &#955;x1&#955;x4.isA(n3)/\appos(n3,x1)/\category(n3,x4) <br> &#955;x1&#955;x5.belongsTo(n4)/\prep_of(n4,x1)/\category(n4,x5) <br> &#955;x2&#955;x6.hasProperty(n5)/\nn(n5,x2)/\property(n5,x6) <br> &#955;x2&#955;x7.hasProperty(n5)/\nn(n5,x2)/\property(n5,x7) <br> (x1=Brownback; x2=Bills; x3=Senator; x4=Republican; x5=Kansas; x6=ports; x7=immigration)</td>
+	<td>&#955;x1&#955;x2.submitted(n1)/\agent(n1,x1)/\nsubjpass(n1,x2) <br>  &#955;x1&#955;x3.hasProperty(n2)/\nn(n2,x1)/\property(n2,x3) <br> &#955;x1&#955;x4.isA(n3)/\appos(n3,x1)/\category(n3,x4) <br> &#955;x1&#955;x5.belongsTo(n4)/\prep_of(n4,x1)/\category(n4,x5) <br> &#955;x2&#955;x6.hasProperty(n5)/\nn(n5,x2)/\property(n5,x6) <br> &#955;x2&#955;x7.hasProperty(n5)/\nn(n5,x2)/\property(n5,x7) <br><br> (x1=Brownback; x2=Bills; x3=Senator; x4=Republican; x5=Kansas; x6=ports; x7=immigration)</td>
 </tr>
 </table>
 
