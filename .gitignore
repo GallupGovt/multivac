@@ -1,3 +1,6 @@
+# directories
+data/
+
 # environment
 .env
 
@@ -8,3 +11,6 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# workspaces
+.code-workspace
