@@ -2,4 +2,4 @@ requests
 xmljson
 beautifulsoup4
 lxml
-dotenv
+python-dotenv
