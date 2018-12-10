@@ -3,3 +3,5 @@ xmljson
 beautifulsoup4
 lxml
 python-dotenv
+-e git://github.com/titipata/pubmed_parser.git#egg=pubmed_parser
+-e git://github.com/pgr-gallup/slate.git#egg=slate
