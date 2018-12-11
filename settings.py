@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 import os
 
 # define search terms
-terms = ['sir model', 'susceptible-infected-recovered', 'irSIR model']
+terms = ['sir model', 'susceptible-infected-recovered', 'irSIR model'
+        ,'susceptible-infected', 'seir model'
+        ,'susceptible-exposed-infected-recovered']
 
 # define data directories
 data_dir = Path('.') /'data'
