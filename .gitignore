@@ -16,5 +16,5 @@ __pycache__/
 # workspaces
 .code-workspace
 
-#system files
+# system files
 .DS_Store
