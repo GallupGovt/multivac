@@ -1,6 +1,6 @@
 # directories
 /data/
-models/
+/models/
 
 # environment
 .env
