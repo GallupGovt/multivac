@@ -1,0 +1,20 @@
+# directories
+/data/
+/models/
+
+# environment
+.env
+
+# juypter notebook
+.ipynb_checkpoints
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# workspaces
+.code-workspace
+
+# system files
+.DS_Store
