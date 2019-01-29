@@ -169,7 +169,7 @@ def main():
     arxiv_drops = [x.split()[0] for x in settings.arxiv_drops]
     filtered_output = filter_arxiv(output, arxiv_drops)
     save_outputs(filtered_output)
-    return filtered_output
+    return True
 
 
 if __name__ == '__main__':
