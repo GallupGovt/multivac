@@ -1,5 +1,5 @@
 # pymln
-Python implementation of unsupervised semantic parsing and markov logic network knowledgebase induction. This work is funded through DARPA’s <a href='https://www.darpa.mil/program/automating-scientific-knowledge-extraction'>ASKE</a> program () as part of Gallup's <a href='https://github.com/GallupGovt/multivac'>MULTIVAC</a> project.
+Python implementation of unsupervised semantic parsing and markov logic network knowledgebase induction. This work is funded through DARPA’s <a href='https://www.darpa.mil/program/automating-scientific-knowledge-extraction'>ASKE</a> program (Automating Scientific Knowledge Extraction) as part of Gallup's <a href='https://github.com/GallupGovt/multivac'>MULTIVAC</a> project.
 
 ## This is a work in progress. 
 
