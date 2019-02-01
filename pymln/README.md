@@ -11,7 +11,7 @@ A Markov network is a set of random variables having a Markov property (where th
 
 First-order logic (FOL), also known as first-order predicate calculus or first-order functional calculus, is a system in which each sentence, or statement, is broken down into a subject and a predicate. The predicate modifies or defines the properties of the subject. This system naturally mirrors the dependency tree parsing performed in the previous step.
 
-Each formula is considered to be a clique (a subset of nodes in the graph such that every pair of nodes in the clique are connected), and the Markov blanket (the set of other nodes containing all the information necessary to determine the value of a given node) is the set of larger formulas in which a given atom appears. A “grounded atom” is an atomic formula with actual constants/values supplied to give the formula a “grounded” meaning. MLNs associate a weight with each formula, designated by the frequency with which that formula is “true” given its groundings in the available evidence (such as our corpus). Unlike in first-order logic knowledge bases, in a MLN when one clique or formula is violated (e.g., “Senators from Kansas are Republican”) the “world” described by that grounding is simply less probable, rather than impossible.<sup>[5](#5)</sup>
+Each formula is considered to be a clique (a subset of nodes in the graph such that every pair of nodes in the clique are connected), and the Markov blanket (the set of other nodes containing all the information necessary to determine the value of a given node) is the set of larger formulas in which a given atom appears. A “grounded atom” is an atomic formula with actual constants/values supplied to give the formula a “grounded” meaning. MLNs associate a weight with each formula, designated by the frequency with which that formula is “true” given its groundings in the available evidence (such as our corpus). Unlike in first-order logic knowledge bases, in a MLN when one clique or formula is violated (e.g., “Senators from Kansas are Republican”) the “world” described by that grounding is simply less probable, rather than impossible.<sup>[1](#1)</sup>
 
 To finalize the domain’s model ontology, MULTIVAC clusters together semantically interchangeable formulas into more generalized versions, identified as formulas which can be combined to improve the log-likelihood of observing the given set of formulas, determined by the sum of the weights. For example, in the sentence “Glucocorticoid resistance in the squirrel monkey is associated with overexpression of the immunophilin fkbp51,” the formula for the component “resistance is associated with overexpression” (passive voice):
 
@@ -30,6 +30,10 @@ Another important element of our integration is the co-occurrence of formula par
 
 The result is a domain ontology represented as a Markov Logic Network grounded on the models found in our domain’s scientific literature. The MLN represents a meta-model ontology architecture that can be queried not just for facts but for cause and effect inference, counter-factual explorations and uncertainty quantification across the domain.
 
+### End Notes
+<sup><a name='1'>1</a></sup> https://homes.cs.washington.edu/~pedrod/papers/mlj05.pdf <br>
+
+<hr>
 
 ### This software is derived from the USP (Beta Version) Software by the University of Washington, available here: http://alchemy.cs.washington.edu/usp/ 
 
