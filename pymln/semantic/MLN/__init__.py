@@ -182,9 +182,6 @@ class Part(object):
     def getClustPartRootNodeIds():
         return Part.clustIdx_partRootNodeIds
 
-    def getParArgIdx(self):
-        return self._parArgIdx
-
     def getPairPartRootNodeIds(parClustIdx=None, chdClustIdx=None):
         if parClustIdx is None or chdClustIdx is None:
             return Part.pairClustIdxs_pairPartRootNodeIds
@@ -413,7 +410,6 @@ class Clust(object):
     relTypeIdx_clustIdx = {}
 
     def __init__(self):
-        self._isDebug = False
         self._isStop = False
         self._clustIdx = -1
         self._ttlCnt = 0

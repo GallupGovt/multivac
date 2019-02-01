@@ -12,6 +12,8 @@ def mkdir(directory):
 
 
 def dict_str(my_dict, results=''):
+	'''Poor man's version of a pretty-ish print function for dictionaries to
+	   expose the basic structure without printing all the values. '''
 	results += '{'
 	results += ', '.join(['{}: {}'.format(k,type(v)) if not isinstance(v, dict) else '{}:\n \t {} \n'.format(k, dict_str(v)) for k, v in my_dict.items()])
 

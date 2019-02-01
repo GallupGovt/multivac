@@ -21,7 +21,7 @@ class RelType(object):
             s = RelType.genTypeStr(target)
 
             try:
-                _ = _relTypeStr_idx[s]
+                _ = RelType._relTypeStr_idx[s]
             except KeyError:
                 t = RelType()
                 t._str = s
@@ -136,23 +136,23 @@ class ArgType(object):
 
             if s not in ArgType.argTypeStr_idx:
                 t = ArgType()
-                t._dep  = p.getDep()
-                t._dep2 = p.getDep2()
+                t._dep  = target.getDep()
+                t._dep2 = target.getDep2()
                 t._relTypeIdx = -1
 
-                if p.getTreeRoot() is not None:
-                    t._relTypeIdx = RelType.getRelType(p.getTreeRoot())
+                if target.getTreeRoot() is not None:
+                    t._relTypeIdx = RelType.getRelType(target.getTreeRoot())
 
                 ArgType.argTypes.append(t)
                 ati = len(ArgType.argTypes) - 1
                 ArgType.argTypeStr_idx[s] = ati
 
-                if p.getTreeRoot() is None:
-                    if p.getDep() == 'nsubj':
+                if target.getTreeRoot() is None:
+                    if target.getDep() == 'nsubj':
                         ARGTYPEIDX_SUBJ = ati
-                    elif p.getDep() == 'dobj':
+                    elif target.getDep() == 'dobj':
                         ARGTYPEIDX_OBJ = ati
-                    elif p.getDep() == 'prep_in':
+                    elif target.getDep() == 'prep_in':
                         ARGTYPEIDX_IN = ati
 
             result = ArgType.argTypeStr_idx[s]
