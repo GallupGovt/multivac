@@ -35,3 +35,11 @@ The outputs of this translation process are three sets of files: Dependency file
 </table>
 
 These files are organized as such to facilitate insertion into the unsupervised semantic parsing algorithm that induces a MLN knowledge base from the source data. This algorithm is codified in a 2009 paper by University of Washington researchers Dr. Hoifung Poon and Dr. Pedro Domingos entitled “Unsupervised Semantic Parsing,” and the original mechanism was created in Java.<sup>[4](#4)</sup> Gallup has refactored this software into Python for use in MULTIVAC both to ensure compatibility and maintainability of the code but also to introduce improvements and optimizations, leveraging advances in natural language processing and data management in the intervening years. This refactored system is named <a href='https://github.com/GallupGovt/multivac/tree/mln/pymln'>`pymln`</a>.
+
+### End Notes
+- <sup><a name='1'>1</a></sup> Jeffrey Pennington, Richard Socher, and Christopher D. Manning. 2014. “GloVe: Global Vectors for Word Representation.” Full text available at https://nlp.stanford.edu/pubs/glove.pdf <br>
+- <sup><a name='2'>2</a></sup> See http://commoncrawl.org/connect/blog/ for up to date statistics on the corpus. As of this report the total is now 3.1 billion pages, though this has varied over time since project inception, and not simply increased monotonically. When the pre-trained GloVe model was created the corpus was closer to 2 billion pages in size. <br>
+- <sup><a name='3'>3</a></sup> Prathusha K Sarma, YIngyu Liang, William A Sethares, “Domain Adapted Word Embeddings for Improved Sentiment Classification,” Submitted on 11 May 2018. arXiv:1805.04576 [cs.CL] Full text available at: https://arxiv.org/pdf/1805.04576 <br>
+- <sup><a name='4'>4</a></sup> Hoifung Poon and Pedro Domingos. “Unsupervised Semantic Parsing.” In Proceedings of the 2009 Conference on Empirical Methods in Natural Language Processing, pages 1–10, Singapore, 2009. ACL. Full text available at: http://alchemy.cs.washington.edu/usp/poon09.pdf <br>
+
+
