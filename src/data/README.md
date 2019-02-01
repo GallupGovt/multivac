@@ -13,7 +13,9 @@ Once the source data has been acquired and stored, some basic pre-processing and
 
 MULTIVAC also trains a 300-dimensional domain-adapted Global Vectors (GloVe) word-embeddings model on the corpus and saves this file in the same folder. GloVe embeddings derive multi-dimensional vector spaces describing word associations based on calculations of word co-occurrences in a large corpus.<sup>[1](#1)</sup> We leverage a pre-trained 300-dimensional GloVe model incorporating 2 million terms found in the Common Crawl corpus, a collection of over 2 billion webpages scraped monthly.<sup>[2](#2)</sup> This model represents a best-in-class embedding model for generic English language text. However, given the specific and highly technical domain we are attempting to understand and model, much domain-specific semantic knowledge – not to mention domain-specific vocabulary – are not accounted for in this generic model. MULTIVAC augments this model by training a domain-specific model on our corpus, and combining embeddings using a nonlinear Kernel Canonical Correctional Analysis (KCCA).<sup>[3](#3)</sup> This method aligns every pair of vector word representations (one domain specific, one generic) using a Gaussian kernel function on each set of weights in the vectors, i.e., 
 
-![alt text](https://github.com/GallupGovt/multivac/blob/master/images/KCCA_equation.png 'KCCA equation')
+<center>
+<img src="https://github.com/GallupGovt/multivac/blob/master/images/KCCA_equation.png" alt="KCCA equation" width="200"/>
+</center>
 
 This alignment occurs on words that exist in the generic model vocabulary, but for terms that are entirely domain-specific the vector representations are passed as is, resulting in a domain-adapted model that encompasses all relevant terms and combines semantic meaning from both the domain and wider global context. 
 
