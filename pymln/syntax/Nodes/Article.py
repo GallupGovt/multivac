@@ -1,5 +1,5 @@
 
-from . import Sentence
+from syntax.Nodes import Sentence
 
 class Article(object):
     '''

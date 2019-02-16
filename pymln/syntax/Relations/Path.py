@@ -1,5 +1,5 @@
 
-from . import RelType
+from syntax.Relations import RelType
 
 class Path(object):
     def __init__(self, dep, treeRoot=None, argNode=None, dep2=None):

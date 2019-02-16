@@ -13,8 +13,7 @@ import os
 
 from multivac import settings
 
-from semantic import Parse
-from semantic.MLN import MLN
+from semantic import Parse, MLN
 
 def read_input_files(DIR):
     '''Read files given by list of names '''

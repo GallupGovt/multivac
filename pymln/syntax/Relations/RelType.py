@@ -1,5 +1,5 @@
 
-from . import Token, TreeNode
+from syntax.Nodes import Token, TreeNode
 
 class RelType(object):
     _relTypes = []

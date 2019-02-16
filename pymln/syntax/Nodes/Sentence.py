@@ -4,7 +4,7 @@
 # Sentence class
 # 
 
-from . import Token
+from syntax.Nodes import Token
 
 class Sentence(object):
     def __init__(self):

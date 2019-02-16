@@ -4,7 +4,7 @@
 # Part class
 # 
 
-from semantic import Argument, Clust
+from semantic import Argument, Clust, ArgClust
 from syntax.Relations import RelType
 
 class Part(object):
@@ -139,6 +139,17 @@ class Part(object):
 
         return None
 
+    def destroy(self):
+        tid = self.getRelTreeRoot().getId()
+        Part.clustIdx_partRootNodeIds[self._clustIdx].remove(tid)
+
+        if len(Part.clustIdx_partRootNodeIds[self._clustIdx]) == 0:
+            del Part.clustIdx_partRootNodeIds[self._clustIdx]
+
+        del Part.rootNodeId_part[tid]
+
+        return None
+
     def getArgument(self, argIdx):
         return self._args[argIdx]
 
@@ -167,8 +178,11 @@ class Part(object):
         if parClustIdx is None or chdClustIdx is None:
             return Part.pairClustIdxs_pairPartRootNodeIds
         else:
-            return Part.pairClustIdxs_pairPartRootNodeIds[(parClustIdx,
-                                                            chdClustIdx)]
+            if (parClustIdx, chdClustIdx) in Part.pairClustIdxs_pairPartRootNodeIds:
+                return Part.pairClustIdxs_pairPartRootNodeIds[(parClustIdx,
+                                                               chdClustIdx)]
+            else:
+                return None
 
     def getParPart(self):
         return self._parPart

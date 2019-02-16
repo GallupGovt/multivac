@@ -1,5 +1,4 @@
 
-
 class Token(object):
     def __init__(self, pos, lemma, form=None):
         self._pos = pos
@@ -12,14 +11,14 @@ class Token(object):
 
         self._tkn_cnt = dict()
 
-    def __repr__(self):
-        return self.toString()
+        super().__init__()
 
+    def __str__(self):
+        return self.toString()
 
     def getForm(self):
         return self._form
 
-    
     def getPOS(self):
         return self._pos
 

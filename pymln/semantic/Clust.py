@@ -25,7 +25,6 @@ class Clust(object):
     relTypeIdx_clustIdx = {}
 
     def __init__(self):
-        self._isDebug = False
         self._isStop = False
         self._clustIdx = -1
         self._ttlCnt = 0
@@ -38,6 +37,9 @@ class Clust(object):
         self._argTypeIdx_argClustIdxs = {}
         # Dictionary mapping {int: ArgClust}
         self._argClusts = {}
+
+    def __str__(self):
+        return self.toString()
 
     def incRootCnt(self):
         Clust.ttlRootCnt += 1
@@ -138,7 +140,10 @@ class Clust(object):
         return None
 
     def getClust(idx):
-        return Clust.clusts[idx]
+        if idx in Clust.clusts:
+            return Clust.clusts[idx]
+        else:
+            return None
 
     def incRootCnt(self):
         Clust.ttlRootCnt += 1

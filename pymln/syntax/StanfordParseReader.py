@@ -1,7 +1,7 @@
 
 import os
 
-from .Nodes import Article, Sentence, Token
+from syntax.Nodes import Article, Sentence, Token
 
 
 class StanfordParseReader(object):
