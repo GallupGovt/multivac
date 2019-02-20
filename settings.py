@@ -8,15 +8,14 @@ from multivac.src import utilities
 
 
 cfg = configparser.ConfigParser()
+cfgDIR = Path(__file__).resolve().parent
 
 try:
-    cfg.read(Path('.') / config_file_name)
+    cfg.read(cfgDIR / config_file_name)
 except NameError:
-    cfg.read(Path('.') / 'multivac.cfg')
+    cfg.read(cfgDIR / 'multivac.cfg')
 
-
-# Get path settings, or use default directory paths
-root_dir = cfg['PATHS'].get('root_dir', Path('.') / 'multivac')
+root_dir = cfg['PATHS'].get('root_dir', cfgDIR / 'multivac')
 data_dir = cfg['PATHS'].get('data_dir', root_dir / 'data')
 raw_dir = cfg['PATHS'].get('raw_dir', data_dir/'raw')
 interim_dir = cfg['PATHS'].get('interim_dir', data_dir/'interim')

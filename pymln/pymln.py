@@ -39,13 +39,16 @@ def run(params):
     priorNumParam = params['priorNumParam']
     priorNumConj = params['priorNumConj']
 
-    parser = Parse.Parse()
+    parser = Parse(priorNumParam, priorNumConj)
 
     # Get files
     input_files = read_input_files(data_dir)
 
     # Parse files into MLN knowledge base
-    parser.parse(input_files)
+    parser.parse(input_files, data_dir, verbose=True)
+
+    MLN.saveMLN(data_dir)
+    MLN.saveParse(data_dir)
 
     # Save knowledge base files to disk
     MLN.printModel(results_dir)

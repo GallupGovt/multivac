@@ -4,7 +4,7 @@
 # Sentence class
 # 
 
-from syntax.Nodes import Token
+from syntax.Nodes.Token import Token
 
 class Sentence(object):
     def __init__(self):
@@ -39,6 +39,8 @@ class Sentence(object):
             return self._tokens
         elif isinstance(idx, list):
             return [self._tokens[i] for i in idx]
+        elif isinstance(idx, int):
+            return self.get_token(idx)
         else:
             raise ValueError
 

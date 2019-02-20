@@ -3,6 +3,7 @@ from semantic import Clust, ArgClust, Part
 from syntax.Relations import ArgType
 
 import json
+import pickle
 import os
 
 class MLN(object):
@@ -48,11 +49,19 @@ class MLN(object):
         if path is not None:
             dst = "{}/{}.mln.json".format(path, 
                                      os.path.basename(os.path.dirname(path)))
-            with open(dst, 'w') as f:
+            with open(dst, 'wb') as f:
                 pickle.dump(Clust.clusts,f)
 
         return None
 
+    def saveParse(path=None):
+        if path is not None:
+            dst = "{}/{}.parse.json".format(path, 
+                                     os.path.basename(os.path.dirname(path)))
+            with open(dst, 'wb') as f:
+                pickle.dump(Part.rootNodeId_part, f)
+
+        return None
 
     def printMLN(path=None):
         out_str = ""
@@ -89,7 +98,7 @@ class MLN(object):
     def printParse(path=None):
         out_str = "=== Parse ===\n"
 
-        for rnid, pt in Part._rootNodeId_part.items():
+        for rnid, pt in Part.rootNodeId_part.items():
             out_str += "{}\t{}\n".format(rnid, pt._relTreeRoot.getTreeStr())
             out_str += "\t{}: {}\n".format(pt._clustIdx,
                                            Clust.getClust(pt._clustIdx).toString())

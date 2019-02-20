@@ -66,7 +66,7 @@ class Executor(object):
 
         Clust.removeClust(clx2)
 
-    return nci
+        return nci
 
     def execCompose(self, op):
         parClustIdx = op._parClustIdx
@@ -98,7 +98,7 @@ class Executor(object):
                 if Clust.getClustsWithRelType(nrti) is None:
                     ncl = Clust.getClust(Clust.createClust(nrti))
                 elif len(Clust.getClustsWithRelType(nrti)) > 1:
-                    raise MultipleClustersSameRelType Exception
+                    raise Exception
                 else:
                     ncl = Clust.getClust(Clust.getClustsWithRelType(nrti).next())
 

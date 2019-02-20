@@ -15,12 +15,13 @@ class Agenda(object):
 		self._inactiveAgenda_score = dict()
 		self._activeAgenda_score = dict()
 		self._scoreActiveAgenda = OrderedDict()
-		self._minAbsCntObserved =  ParseParams._minAbsCnt \
-								 * (ParseParams._minAbsCnt-1)/2
+		self._minAbsCntObserved =  ParseParams.minAbsCnt \
+								 * (ParseParams.minAbsCnt-1)/2
 
 	def createAgenda(self):
-		for clustIdx, clust in Part.getClustPartRootNodeIds().items():
-			if clust.getType() == 'C' and not clust.isStop():
+		for clustIdx in Part.getClustPartRootNodeIds():
+			cl = Clust.getClust(clustIdx)
+			if cl.getType() == 'C' and not cl.isStop():
 				self.addAgendaForNewClust(clustIdx)
 				
 		return None
@@ -115,7 +116,7 @@ class Agenda(object):
 			if type1 == type2 and type1 == 'C':
 				op = SearchOp()
 				op._clustIdx1 = min((c1, c2))
-				op._clustIdx2 = max((c1, c2))k
+				op._clustIdx2 = max((c1, c2))
 
 				if not self.moveAgendaToScore(op):
 					if op not in self._mc_neighs:

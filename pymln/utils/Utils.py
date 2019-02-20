@@ -4,6 +4,7 @@
 # Utility functions for pymln parsing
 # 
 
+import math
 
 def inc_key(d, key, inc=1):
     if key not in d:
@@ -68,3 +69,7 @@ def compareStr(s, t):
 
         return result
 
+def xlogx(x):
+    x = x * math.log(x)
+
+    return x

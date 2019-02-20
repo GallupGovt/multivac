@@ -1,11 +1,14 @@
 
-from semantic.Agenda import Agenda
-from semantic.Argument import Argument
-from semantic.Clust import Clust, ArgClust
-from semantic.Executor import Executor
-from semantic.MLN import MLN
-from semantic.Parse import Parse
-from semantic.ParseParams import ParseParams
-from semantic.Part import Part
-from semantic.Scorer import Scorer
-from semantic.SearchOp import SearchOp
+from . parseparams import ParseParams
+from . argument import Argument
+from . argclust import ArgClust
+
+from . clust import Clust
+from . searchop import SearchOp
+from . part import Part
+from . agenda import Agenda
+from . scorer import Scorer as Scorer
+from . executor import Executor
+from . mln import MLN
+
+from . parse import Parse

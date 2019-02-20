@@ -1,17 +1,17 @@
 
 from semantic import SearchOp, Clust, ParseParams
 from syntax import RelType
-from utils import inc_key, dec_key, xlogx, java_iter
+from utils.Utils import inc_key, dec_key, xlogx, java_iter
 from math import log
 
 class Scorer(object):
-    def __init__(self, prs):
-        self._parse = prs
+    def __init__(self):
+        return None
 
     def scoreOp(self, op):
-        if SearchOp.OP_MERGE_CLUST:
+        if op._op == SearchOp.OP_MERGE_CLUST:
             return self.scoreOpMC(op)
-        elif: SearchOp.OP_COMPOSE:
+        elif op._op == SearchOp.OP_COMPOSE:
             return self.scoreOpCompose(op._parClustIdx,op._chdClustIdx)
         else:
             return -100
@@ -402,7 +402,7 @@ class Scorer(object):
                     score += xlogx(cnt)
                     score -= ParseParams.priorNumParam
 
-    return score
+        return score
 
     def scoreOpComposePart(self, pp, cp):
         score = 0
@@ -481,7 +481,7 @@ class Scorer(object):
         finalScore = 0
 
         acIdxs1, acIdxs2 = [x._argClusts for x in (clx1, clx2)]
-        tc1, tc2 = = [x._ttlCnt for x in (clx1, clx2)]
+        tc1, tc2 = [x._ttlCnt for x in (clx1, clx2)]
 
         denom  = xlogx(tc1+tc2)
         denom1 = xlogx(tc1)

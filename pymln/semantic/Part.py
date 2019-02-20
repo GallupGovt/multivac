@@ -4,7 +4,7 @@
 # Part class
 # 
 
-from semantic import Argument, Clust, ArgClust
+from semantic import Clust, Argument, ArgClust
 from syntax.Relations import RelType
 
 class Part(object):
