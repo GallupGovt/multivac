@@ -8,13 +8,15 @@ from utils import genTreeNodeID
 
 class Parse(object):
     def __init__(self, priorNumParam=None, priorNumConj=None):
+        self.priorNumConj = priorNumConj
+        self.priorNumParam = priorNumParam
         self.numSents = 0
         self.numTkns = 0
 
         self.id_article = {}
 
         self.rootTreeNodeIds = set()
-        self.parseReader = StanfordParseReader()
+#        self.parseReader = StanfordParseReader()
         self.scorer = Scorer()
         self.agenda = Agenda(self)
         self.executor = Executor(self)
@@ -67,22 +69,21 @@ class Parse(object):
             self.id_article[art.uid] = art
             self.numSents += len(art.sentences)
 
-            for j, sent in enumerate(art.sentences):
-                self.initializeSent(art.uid, j, sent)
+            for i, sent in art.sentences.items():
+                self.initializeSent(art.uid, i, sent)
 
         return None
 
     def initializeSent(self, ai, sj, sent):
-        self.numTkns += len(sent.get_tokens())
+        self.numTkns += len(sent.get_tokens())-1
 
-        if len(sent.get_children()) < 1:
+        if len(sent.get_children()) < 1 or len(sent.get_children(0)) < 1:
             return None
 
-        for k, tok in enumerate(sent.get_tokens()):
+        for k in range(1,len(sent.get_tokens())):
             if Parse.isIgnore(sent, k):
                 continue
 
-            # from utils
             part, clustIdx = Parse.part_from_node(ai, sj, sent, k)
 
             part.setClust(clustIdx)
@@ -90,11 +91,9 @@ class Parse(object):
         roots = sent.get_children(0)
         
         if len(roots) == 1:
-            for k, v in roots.items():
-                dep_idx = (k, v)
-                idx = v
+            for idx, child in roots:
                 sub_node_id = genTreeNodeID(ai, sj, idx)
-                rootTreeNodeIds.add(sub_node_id)
+                self.rootTreeNodeIds.add(sub_node_id)
                 node_part = Part.getPartByRootNodeId(sub_node_id)
                 if node_part is None:
                     continue
@@ -121,9 +120,9 @@ class Parse(object):
 
     def isIgnore(sent, k):
         while True:
-            try:
-                parent = sent.get_parent(k)
-            except KeyError:
+            parent = sent.get_parent(k)
+            
+            if parent is None:
                 break
             else:
                 k = parent[1]
@@ -175,7 +174,7 @@ class Parse(object):
         articles = []
 
         for file in files:
-            a = self.parseReader.readParse(file, DIR)
+            a = StanfordParseReader.readParse(file, DIR)
             articles.append(a)
 
         self.initialize(articles)

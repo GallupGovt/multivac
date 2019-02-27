@@ -28,8 +28,7 @@ class Sentence(object):
 
 
     def __repr__(self):
-        return ('Tokens: ' + str(self._tokens) + '\n' + 'Parents: ' + 
-            str(self._tkn_par) + '\n' + 'Children: ' + str(self._tkn_children))
+        return ('Tokens: ' + str([str(x) for x in self._tokens]))
 
     def get_tokens(self, idx=None):
         '''
@@ -43,6 +42,7 @@ class Sentence(object):
             return self.get_token(idx)
         else:
             raise ValueError
+
 
     def get_token(self, idx):
         '''
@@ -96,7 +96,10 @@ class Sentence(object):
         '''
         Return the parent of the child specified by the given key.
         '''
-        return self._tkn_par[kid]
+        if kid in self._tkn_par:
+            return self._tkn_par[kid]
+        else:
+            return None
 
     def set_parent(self, kid, parent):
         '''

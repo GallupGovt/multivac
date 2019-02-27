@@ -1,5 +1,18 @@
 
 class Token(object):
+
+    tkn_cnt = dict()
+
+    def isContent(t):
+        return t._pos in ['J','R','V','N']
+
+    def isVerb(t):
+        return t._pos[0] == 'V'
+
+    def isNoun(t):
+        return (t._pos[0] == 'N') | (self._pos.startswith('PRP'))
+
+
     def __init__(self, pos, lemma, form=None):
         self._pos = pos
         self._lemma = lemma
@@ -9,9 +22,10 @@ class Token(object):
         else:
             self._form = form
 
-        self._tkn_cnt = dict()
-
-        super().__init__()
+        if self.hashCode in Token.tkn_cnt:
+            Token.tkn_cnt[self.hashCode] += 1
+        else:
+            Token.tkn_cnt[self.hashCode] = 1
 
     def __str__(self):
         return self.toString()
@@ -22,27 +36,8 @@ class Token(object):
     def getPOS(self):
         return self._pos
 
-    
     def getLemma(self):
         return self._lemma
-
-
-    def isContent(pos=None):
-        if pos is None:
-            pos = self._pos
-        
-        result = pos in ['J','R','V','N']
-
-        return result
-
-
-    def isVerb(self):
-        return self._pos[0] == 'V'
-
-
-    def isNoun(self):
-        return (self._pos[0] == 'N') | (self._pos.startswith('PRP'))
-
 
     def compareTo(self, t):
         this = sum([ord(x) for x in self._lemma])
@@ -55,14 +50,11 @@ class Token(object):
             result = this - that
         return result
 
-
     def equals(self, t):
         return (self._pos == t.getPOS()) & (self._lemma == t.getLemma())
 
-
     def hashCode(self):
         return hash(self)
-
 
     def toString(self):
         return (self._pos + ":" + self._lemma)
