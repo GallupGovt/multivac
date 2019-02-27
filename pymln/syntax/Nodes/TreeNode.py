@@ -1,5 +1,5 @@
 
-from . import Token
+from syntax.Nodes import Token
 
 class TreeNode(object):
     # dictionary mapping {str: TreeNode}

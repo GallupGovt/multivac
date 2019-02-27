@@ -1,7 +1,7 @@
 
 import os
 
-from .Nodes import Article, Sentence, Token
+from syntax.Nodes import Article, Sentence, Token
 
 
 class StanfordParseReader(object):
@@ -13,27 +13,28 @@ class StanfordParseReader(object):
     documents, this compiles lists of tokens and dictionary mappings defining
     the dependency relationships in the sentences in a given document.
     '''
+    ignored_deps = set()
+    ignored_deps.add("aux")
+    ignored_deps.add("auxpass")
+    ignored_deps.add("det")
+    ignored_deps.add("cop")
+    ignored_deps.add("complm")
+    ignored_deps.add("num")
+    ignored_deps.add("number")
+    ignored_deps.add("preconj")
+    ignored_deps.add("predet")
+    ignored_deps.add("punct")
+    ignored_deps.add("quantmod")
+    
+    ignored_deps.add("expl")
+    ignored_deps.add("mark")
+    ignored_deps.add("parataxis")
+
     def __init__(self): 
-        self._isDebug=False
-        self._ignored_deps = set()
-        self._ignored_deps.add("aux")
-        self._ignored_deps.add("auxpass")
-        self._ignored_deps.add("det")
-        self._ignored_deps.add("cop")
-        self._ignored_deps.add("complm")
-#       self._ignored_deps.add("num")
-#       self._ignored_deps.add("number")
-        self._ignored_deps.add("preconj")
-        self._ignored_deps.add("predet")
-        self._ignored_deps.add("punct")
-#       self._ignored_deps.add("quantmod")
-        
-        self._ignored_deps.add("expl")
-        self._ignored_deps.add("mark")
-#       self._ignored_deps.add("parataxis")
+        return None
 
 
-    def readParse(self, fileName, data_dir, ignoreDep=True):
+    def readParse(fileName, data_dir, ignoreDep=True):
         '''
         Given a filename of the type "$FILENAME.dep" gets the file and 
         corresponding *.morph and *.input files and reads the Tokens and 
@@ -48,20 +49,22 @@ class StanfordParseReader(object):
         dep_file = os.path.join(data_dir, fileName)
 
         doc = Article(file)
-        doc = self.readTokens(doc, morph_file, input_file)
-        doc = self.readDeps(doc, dep_file, ignoreDep)
+        doc = StanfordParseReader.readTokens(doc, morph_file, input_file)
+        doc = StanfordParseReader.readDeps(doc, dep_file, ignoreDep)
 
         return doc
 
 
-    def readTokens(self, doc, morph_file, input_file):
+    def readTokens(this_doc, morph_file, input_file):
         '''
-        Reads a morphology and input (POS tagged lemmas) file simultaneously, 
-        parsing single tokens from each line into a Token() object and 
-        appending each Token to its respective Sentence() object, which 
-        are collected in an Article() object "doc" and returned.
+        Reads a morphology (lemmas) and input (POS tagged words) file
+        simultaneously, parsing single tokens from each line into a Token() 
+        object and appending each Token to its respective Sentence() object, 
+        which are collected in an Article() object "this_doc" and returned.
         '''
-        isNew=True
+        isNew = True
+        sents = {}
+        currSent = Sentence()
 
         with open(morph_file, 'r') as mor, open(input_file, 'r') as inp:
             for mline in mor.readlines():
@@ -72,24 +75,29 @@ class StanfordParseReader(object):
                     isNew = True
                     continue
 
+                # MIGHT NEED TO CHANGE THIS TO FIRST INDEX OF '_'
+
                 ts = iline.split('_')
 
                 if isNew:
-                    sent = Sentence()
-                    sent.add_token(Token('ROOT','ROOT'))
-                    doc.sentences.append(sent)
+                    if len(currSent.get_tokens()) > 0:
+                        sents[len(sents)] = currSent
+                        currSent = Sentence()
+
+                    currSent.add_token(Token('ROOT','ROOT'))
                     isNew = False
 
-                pos = ts[1]
+                pos, form = ts[1], ts[0].lower()
                 lemma = mline.replace(':','.').lower()
-                form = iline[0]
 
-                doc.sentences[-1].add_token(Token(pos,lemma,form))
+                currSent.add_token(Token(pos,lemma,form))
 
-        return doc
+        this_doc.sentences = sents
+
+        return this_doc
 
 
-    def readDeps(self, doc, deps_file, ignoreDep):
+    def readDeps(this_doc, deps_file, ignoreDep):
         '''
         Reads a dependency relationships file and adds these relationships to 
         their respective Sentence() objects in an Article() in the form of 
@@ -99,7 +107,7 @@ class StanfordParseReader(object):
         blank = False
         senId = 0
 
-        currSent = doc.sentences[senId]
+        currSent = this_doc.sentences[senId]
         currNonRoots = set()
         currRoots = set()
 
@@ -119,7 +127,7 @@ class StanfordParseReader(object):
                             dep_chds.add((i, 'ROOT'))
                             currSent.set_parent(i, ('ROOT', 0))
                         currSent.set_children(0, dep_chds)
-                        doc.sentences[senId] = currSent
+                        this_doc.sentences[senId-1] = currSent
 
                         currSent = None
                         currNonRoots = None
@@ -129,14 +137,13 @@ class StanfordParseReader(object):
                 else:
                     if blank:
                         blank = False
-                        currSent = doc.sentences[senId]
+                        currSent = this_doc.sentences[senId]
                         currNonRoots = set()
                         currRoots = set()
 
                     rel = line[:line.index("(")]
                     items = line[line.index('('):].replace('(','').replace(')','')
-                    items = items.split(', ')
-                    gov, dep = items[0], items[1]
+                    gov, dep = items.split(', ')
                     gov = (int(gov[gov.rfind('-')+1:]), gov[:gov.rfind('-')])
                     dep = (int(dep[dep.rfind('-')+1:]), dep[:dep.rfind('-')])
 
@@ -149,7 +156,7 @@ class StanfordParseReader(object):
                     if gov[0] not in currNonRoots:
                         currRoots.add(gov[0])
 
-                    if ignoreDep & (rel in self._ignored_deps):
+                    if ignoreDep & (rel in StanfordParseReader.ignored_deps):
                         continue
 
                     currSent.set_parent(dep[0], (rel, gov[0]))
@@ -166,13 +173,13 @@ class StanfordParseReader(object):
                     dep_chds.add((i, 'ROOT'))
                     currSent.set_parent(i, ('ROOT', 0))
                 currSent.set_children(0, dep_chds)
-                doc.sentences[senId] = currSent
+                this_doc.sentences[senId-1] = currSent
 
                 currSent = None
                 currNonRoots = None
                 currRoots = None
 
-        return doc
+        return this_doc
 
 
 

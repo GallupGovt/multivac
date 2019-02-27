@@ -1,5 +1,5 @@
 
-from . import RelType
+from syntax.Relations import RelType
 
 class ArgType(object):
     argTypes = []

@@ -1,9 +1,9 @@
 
-from . import Token, TreeNode
+from syntax.Nodes import Token, TreeNode
 
 class RelType(object):
-    _relTypes = []
-    _relTypeStr_idx = {}
+    relTypes = []
+    relTypeStr_idx = {}
 
     def __init__(self):
         self._str = None
@@ -16,13 +16,11 @@ class RelType(object):
         if target is None:
             return None
         elif isinstance(target,int):
-            return RelType.relTypes[idx]
+            return RelType.relTypes[target]
         else:
             s = RelType.genTypeStr(target)
 
-            try:
-                _ = _relTypeStr_idx[s]
-            except KeyError:
+            if s not in RelType.relTypeStr_idx:
                 t = RelType()
                 t._str = s
                 

@@ -4,6 +4,9 @@
 # Clust
 # 
 
+from semantic import ArgClust
+from syntax.Relations import RelType
+
 class Clust(object):
     whereasClustIdx = -1
     nxtClustIdx = 1
@@ -25,7 +28,6 @@ class Clust(object):
     relTypeIdx_clustIdx = {}
 
     def __init__(self):
-        self._isDebug = False
         self._isStop = False
         self._clustIdx = -1
         self._ttlCnt = 0
@@ -38,6 +40,9 @@ class Clust(object):
         self._argTypeIdx_argClustIdxs = {}
         # Dictionary mapping {int: ArgClust}
         self._argClusts = {}
+
+    def __str__(self):
+        return self.toString()
 
     def incRootCnt(self):
         Clust.ttlRootCnt += 1
@@ -126,10 +131,11 @@ class Clust(object):
             Clust.whereasClustIdx = cl._clustIdx
 
         Clust.clusts[cl._clustIdx] = cl
-        if relTypeIdx in Clust.relTypeIdx_clustIdx:
-            Clust.relTypeIdx_clustIdx[relTypeIdx].add(cl._clustIdx)
-        else:
-            Clust.relTypeIdx_clustIdx[relTypeIdx] = set(cl._clustIdx)
+        
+        if relTypeIdx not in Clust.relTypeIdx_clustIdx:
+            Clust.relTypeIdx_clustIdx[relTypeIdx] = set()
+
+        Clust.relTypeIdx_clustIdx[relTypeIdx].add(cl._clustIdx)
 
         return cl._clustIdx
 
@@ -138,7 +144,10 @@ class Clust(object):
         return None
 
     def getClust(idx):
-        return Clust.clusts[idx]
+        if idx in Clust.clusts:
+            return Clust.clusts[idx]
+        else:
+            return None
 
     def incRootCnt(self):
         Clust.ttlRootCnt += 1
@@ -349,39 +358,12 @@ class Clust(object):
         return None
 
     def toString(self):
-        rts = ['{}:{}'.format(RelType.getRelType(rti).toString(), cnt) 
+        rts = ['{}:{}'.format(RelType.getRelType(x).toString(), y) 
                 for x, y in self._relTypeIdx_cnt.items()]
         s = ',\t'.join(rts)
         s = '[' + s + ']'
 
         return s
-
-
-'''
-    End Clust class definitions
-'''
-
-class ArgClust(object):
-    def __init__(self):
-        # Dictionary mapping {int: int}
-        self._argTypeIdx_cnt = {}
-        # Dictionary mapping {int: int}
-        self._chdClustIdx_cnt = {}
-        # Dictionary mapping {int: int}
-        self._argNum_cnt = {}
-        self._ttlArgCnt = 0
-        self._partRootTreeNodeIds = set()
-
-    def toString(self):
-        s = ''
-        for k, v in self._argTypeIdx_cnt.items():
-            if len(s) > 0:
-                s += ' '
-            s += '{}:{}'.format(ArgType.getArgType(k), c)
-
-        return s
-
-
 
 
 
