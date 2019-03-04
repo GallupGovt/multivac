@@ -2,24 +2,26 @@
 import argparse
 import os
 import re
+import spacy
+nlp = spacy.load('en')
 
 from collections import OrderedDict 
 
-from multivac import settings
-from multivac.pymln.utils import Utils
-from multivac.pymln.syntax import Article, Sentence, Token
+import settings
+from utils import Utils
+from syntax.Nodes import Article, Sentence, Token
+from semantic import MLN, Part, Clust
 
 
 class USP(object):
-    vowels = set('a','e','i','o','u')
-    allowedDeps = set('nn','amod','prep_of','num','appos')
+    allowedDeps = set(['nn','amod','prep_of','num','appos'])
+    five_ws_and_h = ['who','what','where','when','why','how']
     evalDir = ''
     resultDir = ''
     dataDir = ''
     
     qas = dict() # {Question: set(Answers)}
     rel_qs = OrderedDict() # {str: list(Questions)}
-    rel_clustIdx = dict() # {str: int}
     
     # Library of tokens
     qForms = set()
@@ -34,28 +36,37 @@ class USP(object):
     ptId_clustIdxStr = dict() # {str: (int, str)}
     ptId_aciChdIds = dict() # {str: {int: set(str)}}
     ptId_parDep = dict() # {str: str}
-    clustIdx_ptIds = dict() # {int: set(str)}
     
     id_sent = dict() # {str: str}
     id_article = dict() # {str: Article}
 
     def readQuestions():
-        filename = USP.evalDir + "/questions.sbj.txt"
+        filename = USP.evalDir + "/questions.txt"
 
         with open(filename, "r") as f:
-            line = f.readline()
+            questions = f.read()
 
-            while line:
-                line = line.trim()
+        questions = nlp(questions)
+        question_parses = parse_questions(questions)
 
-                if len(line) == 0:
-                    continue
+        # Get nsubj, dobjs
+        # Get question sub-tree:
+            # Find question word token, follow it up to ROOT
+            # If dobj in question sub-tree: qu = Question(v, q, 'nsubj')
+            # If nsubj/nsubjpass in question sub-tree: qu = Question(v, q, 'dobj')
+            # if one or both don't exist, it's a question of being/description... look for "nmod" sub-tree
+
+
+
 
                 v = line[line.rfind(' ')+1:]
-                q = line[len("What does "),line.rfind(' ')].trim().lower()
+                q = line[len("What does "):line.rfind(' ')].trim().lower()
 
                 if v not in USP.rel_qs:
                     USP.rel_qs[v] = list()
+
+                # each Question is a dependency relationship here - verb, subject, looking for object
+                # other version does reverse - verb, object, subject. Need more generalized version of this
 
                 qu = Question(v, q, 'nsubj')
                 USP.rel_qs[v].append(qu)
@@ -64,9 +75,17 @@ class USP(object):
         return None
 
     def readMorph(aid=None, mfilename=None, ifilename=None):
+        '''
+            Get a mapping of form-lemma for all words in our questions
+        '''
         return None
 
     def readSents(aid=None, filename=None):
+        '''
+            Read in the actual text of the sentences in each article.
+            Ensure that the old Parse.id_article dictionary is loaded/
+            recreated. However, this time don't ignore any dependencies?
+        '''
         idx = 0
         with open(filename, "r") as f:
             line = f.readline()
@@ -83,39 +102,65 @@ class USP(object):
 
         return None
 
-    def readPart(filename):
+    def readPart(filename=None):
+        Part.clustIdx_partRootNodeIds = Part.clustIdx_partRootNodeIds
+        USP.ptId_clustIdxStr = {k: (p.getClustIdx(), 
+                                    p.getRelTreeRoot().getTreeStr()) 
+                                for k, p in Part.rootNodeId_part.items()}
+
+        for pid, part in Part.rootNodeId_part.items():
+            USP.ptId_clustIdxStr[pid] = (part.getClustIdx(), 
+                                         part.getRelTreeRoot().getTreeStr())
+
+            if part._parPart is not None:
+                par = part._parPart._relTreeRoot.getId()
+                arg = part._parPart.getArgument(part._parArgIdx)
+                aci = part._parPart.getArgClust(part._parArgIdx)
+                dep = ArgType.getArgType(arg._path.getArgType()).toString()[1:-1]
+                USP.ptId_parDep[pid] = dep
+
+                if par not in USP.ptId_aciChdIds:
+                    USP.ptId_aciChdIds[par] = {aci: set()}
+                elif aci not in USP.ptId_aciChdIds[par]:
+                    USP.ptId_aciChdIds[par][aci] = set()
+
+                cids = USP.ptId_aciChdIds[par][aci]
+                cids.add(pid)
+                USP.ptId_aciChdIds[par][aci] = cids
+
         return None
 
     def procRelType(clustIdx, pos, relType):
         if relType in USP.rel_qs and pos == 'V':
-            USP.rel_clustIdx[relType] = clustIdx
+            Clust.relTypeIdx_clustIdx[relType] = clustIdx
 
-        if relType in USP.qLemmas:
-            if relType not in USP.lemma_clustIdxs:
-                USP.lemma_clustIdxs[relType] = set()
+        # lemma_clustIdxs never seems to get called in the question parsing/
+        # answering, so I don't think this is necessary
 
-            USP.lemma_clustIdxs[relType].add(str(clustIdx))
+        # if relType in USP.qLemmas:
+        #     if relType not in USP.lemma_clustIdxs:
+        #         USP.lemma_clustIdxs[relType] = set()
+
+        #     USP.lemma_clustIdxs[relType].add(str(clustIdx))
 
         return None
 
-    def readClust(filename):
-        currCi = -1
-        dep_aci = dict()
+    def readClust(filename=None):
 
-        with open(filename, 'r') as f:
-            line = f.readline()
+        USP.clustIdx_depArgClustIdx = {} # ci int: {dep str: aci int}
 
-            while line:
-                if not line[0].isdigit():
-                    #do stuff
-                else:
-                    line = re.split("\W+", line)
-                    ci = int(line[0])
-                    pos, rt = line[1:3]
-                    USP.procRelType(ci, pos, rt)
+        for cid, clust in Clust.clusts.items():
+            USP.clustIdx_depArgClustIdx[cid] = {}
 
+            for arg_clust_id, arg_clust in clust._argClusts.items():                
+                for ati in arg_clust._argTypeIdx_cnt:
+                    USP.clustIdx_depArgClustIdx[cid][ati] = arg_clust_id
 
-
+            for relType in clust._relTypeIdx_cnt:
+                rel_str = RelType.getRelType(relType).toString()
+                POS = rel_str[rel_str.index('(')+1:rel_str.index(':')]
+                rel = rel_str[rel_str.index(':')+1:rel_str.rfind(")")]
+                USP.procRelType(cid, POS, rel)
 
         return None
 
@@ -239,30 +284,38 @@ class USP(object):
         return False
 
     def match():
+        '''
+            For each question set, get the cluster ID for the verb/relation, and 
+            the associated Parts for that cluster. 
+            For each question in the set, get the argument cluster for the type
+            specified by getDep() and the one specified by getDep2()
+                for each part associated with the question, check for a match 
+                with those argument clusters
+        '''
         for rel, qs in USP.rel_qs.items():
-            ci = USP.rel_clustIdx[rel]
-            pids = USP.clustIdx_ptIds[ci]
+            ci = Clust.relTypeIdx_clustIdx[rel]
+            pids = Part.clustIdx_partRootNodeIds[ci]
 
             for q in qs:
+                dep2 = 'nsubj'
+
                 if q.getDep() == 'nsubj':
                     dep2 = 'dobj'
-                else:
-                    dep2 = 'nsubj'
 
                 aci  = USP.clustIdx_depArgClustIdx[ci][q.getDep()]
                 aci2 = USP.clustIdx_depArgClustIdx[ci][dep2]
 
                 for pid in pids:
+                    if pid not in USP.ptId_aciChdIds:
+                        continue
+                    elif any([x not in USP.ptId_aciChdIds[pid] for x in (aci, aci2)]):
+                        continue
+
                     USP.match_q(q, pid, aci, aci2)
 
         return None
 
     def match_q(q, pid, aci, aci2):
-        if pid not in USP.ptId_aciChdIds:
-            return None
-        elif: any([x not in USP.ptId_aciChdIds[pid] for x in (aci, aci2)]):
-            return None
-
         for x, cids in USP.ptId_aciChdIds[pid].items():
             if x == aci or x == aci2:
                 continue
@@ -406,6 +459,11 @@ class USP(object):
         return ans
 
     def preprocArgs():
+        '''
+            For each verb and associated set of questions, 
+                for each question, get known argument if not already processed
+                get the lemma for that argument, get the list of ... NOT SURE
+        '''
         for r, qs in USP.rel_qs.items():
             ignoredQs = set()
 
@@ -413,8 +471,8 @@ class USP(object):
                 if q.getArg() in USP.arg_cis:
                     continue
 
-                cis = list()
-                x = list()
+                cis = []
+                x = []
                 ts = q.getArg().split()
                 isIgnored = False
 
@@ -422,18 +480,14 @@ class USP(object):
                     if f in ['the','of','in']:
                         continue
 
-                    z = OrderedDict()
-
                     if f not in USP.form_lemma:
                         isIgnored = True
                         break
 
-                    for l in USP.form_lemma[f]:
-                        if l in USP.lemma_clustIdxs:
-                            z = z.update(USP.lemma_clustIdxs[l])
+                    # lemma_clustIdxs never gets used that I can see.
 
-                    s = ' '.join(z)
-                    x.append(s)
+                    # x.append(' '.join([l for l in USP.form_lemma[f] 
+                    #                      if l in USP.lemma_clustIdxs]))
 
                 if isIgnored:
                     ignoredQs.add(q)
@@ -474,9 +528,11 @@ class USP(object):
 
 
 def run():
-    fid = os.path.basename(os.path.dirname(USP.dataDir))
-    cl_file = "{}/{}.mln".format(USP.results_dir, fid)
-    pr_file = "{}/{}.parse".format(USP.results_dir, fid)
+#    fid = os.path.basename(os.path.dirname(USP.dataDir))
+#    cl_file = "{}/{}.mln".format(USP.results_dir, fid)
+#    pr_file = "{}/{}.parse".format(USP.results_dir, fid)
+
+    MLN.load_mln("{}/mln.pkl".format(USP.results_dir))
 
     USP.readQuestions()
     USP.readMorph()
@@ -535,4 +591,57 @@ if __name__ == '__main__':
         USP.evalDir = os.path.join(os.getcwd(), params['eval_dir'])
 
     run()
+
+
+
+
+def parse_questions(qtext):
+    """ 
+    Parse questions using the same method for parsing our original texts.
+    """
+
+    questions = {}
+
+    l_depSentences = {} # for dependencies
+    l_posSentences = {} # for POS tagging
+    l_morSentences = {} # for morphology/lemmatization 
+    
+    for i, question in enumerate(list(qtext.sents)):
+        
+        l_depTokens=[]
+        l_posTokens=[]
+        l_morTokens=[]
+        
+        for token in question:
+            
+            ## For dependency trees
+            child_pos = token.i - question.start  + 1
+            head_pos =  token.head.i - question.start +1 
+
+            if token.dep_ not in ['ROOT','punct']:
+                l_depTokens.append("{0}({1}-{2}, {3}-{4})".format(token.dep_, 
+                                                                  token.head.text, 
+                                                                  head_pos, 
+                                                                  token.text, 
+                                                                  child_pos))
+
+            ## For POS
+            l_posTokens.append("{0}_{1}".format(token, token.tag_))  
+            #print(token.tag_)
+
+            ## For Morphologies
+            l_morTokens.append(token.lemma_)
+
+
+        l_depSentences[i] = "\n".join(l_depTokens)
+        l_posSentences[i] = "\n".join(l_posTokens)
+        l_morSentences[i] = "\n".join(l_morTokens)
+
+    questions['depData'] = l_depSentences
+    questions['posData'] = l_posSentences
+    questions['morData'] = l_morSentences
+
+    return questions
+
+
 

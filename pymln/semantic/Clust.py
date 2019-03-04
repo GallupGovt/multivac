@@ -8,9 +8,7 @@ from semantic import ArgClust
 from syntax.Relations import RelType
 
 class Clust(object):
-    whereasClustIdx = -1
     nxtClustIdx = 1
-    ttlRootCnt = 0
 
     # Dictionary mapping 
     pairClustIdx_conjCnt = {}
@@ -22,169 +20,11 @@ class Clust(object):
     argComb_cnt = {}
     # Dictionary mapping {int: set(str)}
     clustIdx_argCombs = {}
-    # Dictionary mapping {int: Clust}
+    # Dictionary mapping {int: Clust} tracking all clusters
     clusts = {}
-    # Dictionary mapping {int: set(int)}
+    # Dictionary mapping {int: set(int)} tracking which RelTypes (keys) are
+    # associated with which clusters (values)
     relTypeIdx_clustIdx = {}
-
-    def __init__(self):
-        self._isStop = False
-        self._clustIdx = -1
-        self._ttlCnt = 0
-        self._nxtArgClustIdx = 0
-        self._type = ''
-
-        # Dictionary mapping {int: int}
-        self._relTypeIdx_cnt = {}
-        # Dictionary mapping {int: set(int)}
-        self._argTypeIdx_argClustIdxs = {}
-        # Dictionary mapping {int: ArgClust}
-        self._argClusts = {}
-
-    def __str__(self):
-        return self.toString()
-
-    def incRootCnt(self):
-        Clust.ttlRootCnt += 1
-
-        if self.getId() not in Clust.clustIdx_rootCnt:
-            Clust.clustIdx_rootCnt[self.getId()] = 1
-        else:
-            Clust.clustIdx_rootCnt[self.getId()] += 1
-
-        return None
-
-    def decRootCnt(self):
-        Clust.ttlRootCnt -= 1
-
-        Clust.clustIdx_rootCnt[self.getId()] -= 1
-
-        if Clust.clustIdx_rootCnt[self.getId()] == 0:
-            del Clust.clustIdx_rootCnt[self.getId()]
-
-        return None
-
-    def onPartUnsetRelTypeIdx(self, oldRelTypeIdx):
-        self._relTypeIdx_cnt[oldRelTypeIdx] -= 1
-        return None
-
-    def onPartSetRelTypeIdx(self, newRelTypeIdx):
-        if newRelTypeIdx not in self._relTypeIdx_cnt:
-            self._relTypeIdx_cnt[newRelTypeIdx] = 1
-        else:
-            self._relTypeIdx_cnt[newRelTypeIdx] += 1
-
-        return None
-
-    def onPartSetClust(self, part):
-        self._ttlCnt += 1
-        ridx = part.getRelTypeIdx()
-        self.onPartSetRelTypeIdx(ridx)
-
-        return None
-
-    def onPartUnsetClust(self, part):
-        self._ttlCnt -= 1
-        ridx = part.getRelTypeIdx()
-        self.onPartUnsetRelTypeIdx(ridx)
-
-        return None
-
-    def createArgClust(self, argTypeIdx):
-        assert argTypeIdx not in self._argTypeIdx_argClustIdxs
-        argClustIdx = self._nxtArgClustIdx
-        self._nxtArgClustIdx += 1
-        ac = ArgClust()
-        self._argClusts[argClustIdx] = ac
-        acs = set()
-        acs.add(argClustIdx)
-        self._argTypeIdx_argClustIdxs[argTypeIdx] = acs
-
-        return argClustIdx
-
-    def getType(self):
-        return self._type
-
-    def isStop(self):
-        return self._isStop
-
-
-    def getClustsWithRelType(relTypeIdx):
-        if relTypeIdx in Clust.relTypeIdx_clustIdx:
-            return Clust.relTypeIdx_clustIdx[relTypeIdx]
-        else:
-            return None
-
-    def createClust(relTypeIdx):
-        cl = Clust()
-        cl._clustIdx = Clust.nxtClustIdx
-        Clust.nxtClustIdx += 1
-
-        rt = RelType.getRelType(relTypeIdx)
-        cl._type = rt.getType()
-        rts = rt.toString()
-
-        if rts in ['(V:be)', '(N:%)', '(V:say)', '($:$)']:
-            cl._isStop = True
-
-        if Clust.whereasClustIdx == -1 and rts == '(IN:whereas)':
-            Clust.whereasClustIdx = cl._clustIdx
-
-        Clust.clusts[cl._clustIdx] = cl
-        
-        if relTypeIdx not in Clust.relTypeIdx_clustIdx:
-            Clust.relTypeIdx_clustIdx[relTypeIdx] = set()
-
-        Clust.relTypeIdx_clustIdx[relTypeIdx].add(cl._clustIdx)
-
-        return cl._clustIdx
-
-    def removeClust(clust):
-        del Clust.clusts[clust._clustIdx]
-        return None
-
-    def getClust(idx):
-        if idx in Clust.clusts:
-            return Clust.clusts[idx]
-        else:
-            return None
-
-    def incRootCnt(self):
-        Clust.ttlRootCnt += 1
-        if self.getId() in Clust.clustIdx_rootCnt:
-            Clust.clustIdx_rootCnt[self.getId()] += 1
-        else:
-            Clust.clustIdx_rootCnt[self.getId()] = 1
-
-    def onPartSetClust(self, part):
-        self._ttlCnt += 1
-        ridx = part.getRelTypeIdx()
-        if ridx in self._relTypeIdx_cnt:
-            self._relTypeIdx_cnt[ridx] += 1
-        else:
-            self._relTypeIdx_cnt[ridx] = 1
-
-        return None
-
-    def onPartSetRelTypeIdx(self, newRelTypeIdx):
-        if newRelTypeIdx in self._relTypeIdx_cnt:
-            self._relTypeIdx_cnt[newRelTypeIdx] += 1
-        else:
-            self._relTypeIdx_cnt[newRelTypeIdx] = 1
-
-        return None
-
-    def removeArgClust(self, argClustIdx):
-        del self._argClusts[argClustIdx]
-        toDel = set()
-
-        for ati in self._argTypeIdx_argClustIdxs:
-            self._argTypeIdx_argClustIdxs[ati].remove(argClustIdx)
-
-            if len(self._argTypeIdx_argClustIdxs[ati]) == 0:
-                del self._argTypeIdx_argClustIdxs[ati]
-
-        return None
 
     def addArgComb(clustIdx, chdClustIdxs, chdClustIdx2=None):
         if chdClustIdx2 is not None:
@@ -210,10 +50,125 @@ class Clust(object):
 
         return None
 
+    def createClust(relTypeIdx):
+        # Should this all go in __init__()? 
+        cl = Clust(relTypeIdx)
+
+        return cl.getId()
+
     def genArgCombStr(clustIdx, clustIdxs):
         s = ':'.join([str(x) for x in [clustIdx] + clustIdxs])
 
         return s
+
+    def getClust(idx):
+        if idx in Clust.clusts:
+            return Clust.clusts[idx]
+        else:
+            return None
+
+    def getClustsWithRelType(relTypeIdx):
+        if relTypeIdx in Clust.relTypeIdx_clustIdx:
+            return Clust.relTypeIdx_clustIdx[relTypeIdx]
+        else:
+            return None
+
+    def removeClust(clust):
+        del Clust.clusts[clust._clustIdx]
+        return None
+
+    def removePartAndUpdateStat(nid_part):
+        for nid, p in nid_part.items():
+            cl = Clust.getClust(p.getClustIdx())
+
+            if p.getParPart() is None:
+                cl.decRootCnt()
+
+        for nid, p in nid_part.items():
+            for ai, a in p._args.items():
+                p.removeArgument(ai)
+                cp = a._argPart
+                cp.unsetParent()
+
+            p.unsetRelType()
+
+        for nid, p in nid_part.items():
+            pclust = getClustIdx()
+            Part.clustIdx_partRootNodeIds[pclust].remove(p.getRelTreeRoot().getId())
+
+            if len(Part.clustIdx_partRootNodeIds[pclust]) == 0:
+                del Part.clustIdx_partRootNodeIds[pclust]
+
+        return None
+
+    def updatePartStat(nid_part):
+        for nid, p in nid_part.items():
+            cl = Clust.getClust(p.getClustIdx())
+            cl.onPartSetClust(p)
+
+            if p.getParPart() is None:
+                cl.incRootCnt()
+
+            for ai, arg in p._args:
+                aci = p._argTypeIdx_argClustIdxs[ai]
+                cl.onPartSetArg(p, arg, aci)
+
+        return None
+
+# Non-class functions
+
+    def __init__(self, relTypeIdx):
+        self._clustIdx = Clust.nxtClustIdx
+        Clust.nxtClustIdx += 1
+
+        rt = RelType.getRelType(relTypeIdx)
+        self._type = rt.getType()
+
+        if rt.toString() in ['(V:be)', '(N:%)', '(V:say)', '($:$)']:
+            self._isStop = True
+        else:
+            self._isStop = False
+
+        if relTypeIdx not in Clust.relTypeIdx_clustIdx:
+            Clust.relTypeIdx_clustIdx[relTypeIdx] = set()
+
+        Clust.relTypeIdx_clustIdx[relTypeIdx].add(self._clustIdx)
+
+        self._ttlCnt = 0
+        self._nxtArgClustIdx = 0
+
+        # Dictionary mapping {int: int}
+        self._relTypeIdx_cnt = {}
+        # Dictionary mapping {int: set(int)}
+        self._argTypeIdx_argClustIdxs = {}
+        # Dictionary mapping {int: ArgClust}
+        self._argClusts = {}
+
+        Clust.clusts[self._clustIdx] = self
+
+        
+    def __str__(self):
+        return self.toString()
+
+    def createArgClust(self, argTypeIdx):
+        assert argTypeIdx not in self._argTypeIdx_argClustIdxs
+        argClustIdx = self._nxtArgClustIdx
+        self._nxtArgClustIdx += 1
+        ac = ArgClust()
+        self._argClusts[argClustIdx] = ac
+        acs = set()
+        acs.add(argClustIdx)
+        self._argTypeIdx_argClustIdxs[argTypeIdx] = acs
+
+        return argClustIdx
+
+    def decRootCnt(self):
+        Clust.clustIdx_rootCnt[self.getId()] -= 1
+
+        if Clust.clustIdx_rootCnt[self.getId()] == 0:
+            del Clust.clustIdx_rootCnt[self.getId()]
+
+        return None
 
     def getArgClustIdxs(self, argTypeIdx):
         if argTypeIdx in self._argTypeIdx_argClustIdxs:
@@ -221,9 +176,26 @@ class Clust(object):
         else:
             return None
 
+    def getId(self):
+        return self._clustIdx
+
+    def getType(self):
+        return self._type
+
+    def incRootCnt(self):
+        if self.getId() not in Clust.clustIdx_rootCnt:
+            Clust.clustIdx_rootCnt[self.getId()] = 1
+        else:
+            Clust.clustIdx_rootCnt[self.getId()] += 1
+
+        return None
+
+    def isStop(self):
+        return self._isStop
+
     def onPartSetArg(self, part, arg, argClustIdx, oldArgClustIdx=-1):
-        argTypeIdx = arg._path.getArgType()
-        chdClustIdx = arg._artPart.getClusterIdx()
+        argTypeIdx = arg.getPath().getArgType()
+        chdClustIdx = arg.getPart().getClustIdx()
         ac = self._argClusts[argClustIdx]
 
         if argTypeIdx in ac._argTypeIdx_cnt:
@@ -268,18 +240,37 @@ class Clust(object):
 
         return None
 
-    def getId(self):
-        return self._clustIdx
+    def onPartSetClust(self, part):
+        self._ttlCnt += 1
+        ridx = part.getRelTypeIdx()
+        self.onPartSetRelTypeIdx(ridx)
+
+        return None
+
+    def onPartSetRelTypeIdx(self, newRelTypeIdx):
+        if newRelTypeIdx not in self._relTypeIdx_cnt:
+            self._relTypeIdx_cnt[newRelTypeIdx] = 1
+        else:
+            self._relTypeIdx_cnt[newRelTypeIdx] += 1
+
+        return None
 
     def onPartUnsetArg(self, part, arg, argClustIdx):
         argTypeIdx = arg.getPath().getArgType()
         chdClustIdx = arg.getPart().getClustIdx()
         ac = self._argClusts[argClustIdx]
 
-        if ac._argTypeIdx_cnt[argTypeIdx] == 1:
-            del ac._argTypeIdx_cnt[argTypeIdx]
-        else:
-            ac._argTypeIdx_cnt[argTypeIdx] -= 1
+        try:
+            if ac._argTypeIdx_cnt[argTypeIdx] == 1:
+                del ac._argTypeIdx_cnt[argTypeIdx]
+            else:
+                ac._argTypeIdx_cnt[argTypeIdx] -= 1
+        except KeyError:
+            print("{}".format(ac.__dict__))
+            print("{}".format(arg.__dict__))
+            print("{}".format(arg.getPath().__dict__))
+            print("{}".format(argClustIdx))
+            raise KeyError
 
         if ac._chdClustIdx_cnt[chdClustIdx] == 1:
             del ac._chdClustIdx_cnt[chdClustIdx]
@@ -319,41 +310,26 @@ class Clust(object):
             else:
                 ac._argNum_cnt[oldArgNum+1] -= 1
 
-    def removePartAndUpdateStat(nid_part):
-        for nid, p in nid_part.items():
-            cl = Clust.getClust(p.getClustIdx())
-
-            if p.getParPart() is None:
-                cl.decRootCnt()
-
-        for nid, p in nid_part.items():
-            for ai, a in p._args.items():
-                p.removeArgument(ai)
-                cp = a._argPart
-                cp.unsetParent()
-
-            p.unsetRelType()
-
-        for nid, p in nid_part.items():
-            pclust = getClustIdx()
-            Part.clustIdx_partRootNodeIds[pclust].remove(p.getRelTreeRoot().getId())
-
-            if len(Part.clustIdx_partRootNodeIds[pclust]) == 0:
-                del Part.clustIdx_partRootNodeIds[pclust]
+    def onPartUnsetClust(self, part):
+        self._ttlCnt -= 1
+        ridx = part.getRelTypeIdx()
+        self.onPartUnsetRelTypeIdx(ridx)
 
         return None
 
-    def updatePartStat(nid_part):
-        for nid, p in nid_part.items():
-            cl = Clust.getClust(p.getClustIdx())
-            cl.onPartSetClust(p)
+    def onPartUnsetRelTypeIdx(self, oldRelTypeIdx):
+        self._relTypeIdx_cnt[oldRelTypeIdx] -= 1
+        return None
 
-            if p.getParPart() is None:
-                cl.incRootCnt()
+    def removeArgClust(self, argClustIdx):
+        del self._argClusts[argClustIdx]
+        toDel = set()
 
-            for ai, arg in p._args:
-                aci = p._argTypeIdx_argClustIdxs[ai]
-                cl.onPartSetArg(p, arg, aci)
+        for ati in self._argTypeIdx_argClustIdxs:
+            self._argTypeIdx_argClustIdxs[ati].remove(argClustIdx)
+
+            if len(self._argTypeIdx_argClustIdxs[ati]) == 0:
+                del self._argTypeIdx_argClustIdxs[ati]
 
         return None
 

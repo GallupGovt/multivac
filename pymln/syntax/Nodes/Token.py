@@ -1,8 +1,6 @@
 
 class Token(object):
 
-    tkn_cnt = dict()
-
     def isContent(t):
         return t._pos in ['J','R','V','N']
 
@@ -21,11 +19,6 @@ class Token(object):
             self._form = lemma
         else:
             self._form = form
-
-        if self.hashCode in Token.tkn_cnt:
-            Token.tkn_cnt[self.hashCode] += 1
-        else:
-            Token.tkn_cnt[self.hashCode] = 1
 
     def __str__(self):
         return self.toString()

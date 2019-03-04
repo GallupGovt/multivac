@@ -1,6 +1,6 @@
 
 from semantic import Clust, ArgClust, Part
-from syntax.Relations import ArgType
+from syntax.Relations import ArgType, RelType
 
 import json
 import pickle
@@ -30,10 +30,9 @@ class MLN(object):
     def printClustering(path=None):
         out_str = "=== Clustering ===\n"
 
-        for ci in Clust.clusts:
-            cl = Clust.getClust(ci)
-            if len(cl._relTypeIdx_cnt) > 1:
-                out_str += cl.toString() + "\n"
+        for ci, clust in Clust.clusts.items():
+            if len(clust._relTypeIdx_cnt) > 1:
+                out_str += clust.toString() + "\n"
 
         if path is not None:
             dst = "{}/{}.clustering".format(path, 
@@ -45,21 +44,48 @@ class MLN(object):
         else:
             return out_str
 
-    def saveMLN(path=None):
-        if path is not None:
-            dst = "{}/{}.mln.json".format(path, 
-                                     os.path.basename(os.path.dirname(path)))
-            with open(dst, 'wb') as f:
-                pickle.dump(Clust.clusts,f)
+    def save_mln(path):
+        '''
+            Save all objects necessary to recreate the MLN knowledgebase
+        '''
+        with open(path, 'wb') as f:
+            pickle.dump({'clusts': Clust.clusts,
+                         'relTypeIdx_clustIdx': Clust.relTypeIdx_clustIdx,
+                         'relTypes': RelType.relTypes,
+                         'relTypeStr_idx': RelType.relTypeStr_idx,
+                         'argTypes': ArgType.argTypes,
+                         'argTypeStr_idx': ArgType.argTypeStr_idx,
+                         'rootNodeId_part': Part.rootNodeId_part,
+                         'clustIdx_partRootNodeIds': Part.clustIdx_partRootNodeIds,
+                         'pairClustIdxs_pairPartRootNodeIds': Part.pairClustIdxs_pairPartRootNodeIds,
+                         'clustIdx_pairClustIdxs': Part.clustIdx_pairClustIdxs}, 
+                        f)
 
         return None
 
-    def saveParse(path=None):
-        if path is not None:
-            dst = "{}/{}.parse.json".format(path, 
-                                     os.path.basename(os.path.dirname(path)))
-            with open(dst, 'wb') as f:
-                pickle.dump(Part.rootNodeId_part, f)
+    def load_mln(path):
+        with open(path, 'rb') as f:
+            mln = pickle.load(f)
+
+        try:
+            _ = len(Clust.clusts)
+            _ = len(ArgType.argTypes)
+            _ = len(RelType.relTypes)
+            _ = len(Part.rootNodeId_part)
+        except NameError:
+            from semantic import Clust, Part
+            from syntax.Relations import ArgType, RelType
+        finally:
+            Clust.clusts = mln['clusts']
+            Clust.relTypeIdx_clustIdx = mln['relTypeIdx_clustIdx']
+            RelType.relTypes = mln['relTypes']
+            RelType.relTypeStr_idx = mln['relTypeStr_idx']
+            ArgType.argTypes = mln['argTypes']
+            ArgType.argTypeStr_idx = mln['argTypeStr_idx']
+            Part.rootNodeId_part = mln['rootNodeId_part']
+            Part.clustIdx_partRootNodeIds = mln['clustIdx_partRootNodeIds']
+            Part.pairClustIdxs_pairPartRootNodeIds = mln['pairClustIdxs_pairPartRootNodeIds']
+            Part.clustIdx_pairClustIdxs = mln['clustIdx_pairClustIdxs']
 
         return None
 
@@ -75,13 +101,13 @@ class MLN(object):
                 out_str += "\t{}: ".format(aci)
 
                 out_str += "\t".join(["{}: {}".format(k, v) 
-                                      for k, v in ac._argNum_cnt])
+                                      for k, v in ac._argNum_cnt.items()])
                 out_str += "\n\t"
                 out_str += "\t".join(["{}: {}".format(k, v) 
-                                      for k, v in ac._argTypeIdx_cnt])
+                                      for k, v in ac._argTypeIdx_cnt.items()])
                 out_str += "\n\t"
                 out_str += "\t".join(["{}: {}: {}".format(k, Clust.getClust(k), v) 
-                                      for k, v in ac._chdClustIdx_cnt])
+                                      for k, v in ac._chdClustIdx_cnt.items()])
                 out_str += "\n"
 
         if path is not None:
@@ -96,7 +122,7 @@ class MLN(object):
 
 
     def printParse(path=None):
-        out_str = "=== Parse ===\n"
+        out_str = ""
 
         for rnid, pt in Part.rootNodeId_part.items():
             out_str += "{}\t{}\n".format(rnid, pt._relTreeRoot.getTreeStr())
@@ -107,7 +133,7 @@ class MLN(object):
                 out_str += "\t\n\t\n"
             else:
                 arg = pt._parPart.getArgument(pt._parArgIdx)
-                out_str += "\t{}: {}: {}\n".format(pt._parPart._relTreeRoot.getId(),
+                out_str += "\t{}\t{}\t{}\n".format(pt._parPart._relTreeRoot.getId(),
                                                    pt._parPart._clustIdx,
                                                    Clust.getClust(pt._parPart._clustIdx))
                 out_str += "\t{}: {}: {}\n".format(pt._parPart.getArgClust(pt._parArgIdx),

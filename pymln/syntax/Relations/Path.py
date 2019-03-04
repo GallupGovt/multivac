@@ -1,5 +1,5 @@
 
-from syntax.Relations import RelType
+from syntax.Relations import RelType, ArgType
 
 class Path(object):
     def __init__(self, dep, treeRoot=None, argNode=None, dep2=None):
@@ -7,8 +7,15 @@ class Path(object):
         self._treeRoot = treeRoot
         self._argNode = argNode
         self._dep2 = dep2
-        self._argTypeIdx = -1
         self._str = None
+
+        self._argTypeIdx = ArgType.getArgType(self)
+
+    def __str__(self):
+        return self.toString()
+
+    def __repr__(self):
+        return self.toString()
 
     def getDep(self):
         return self._dep

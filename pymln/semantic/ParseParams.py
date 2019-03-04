@@ -9,5 +9,3 @@ class ParseParams(object):
 	priorNumParam = 5
 	priorNumConj = 10
 
-	def __init__(self):
-		return None

@@ -1,9 +1,4 @@
 
-
-#
-# Sentence class
-# 
-
 from syntax.Nodes.Token import Token
 
 class Sentence(object):

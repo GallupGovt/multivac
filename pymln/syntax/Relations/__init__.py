@@ -1,6 +1,6 @@
 
 
-from syntax.Relations.ArgType import ArgType
-from syntax.Relations.Path import Path
-from syntax.Relations.RelType import RelType
+from . ArgType import ArgType
+from . Path import Path
+from . RelType import RelType
 

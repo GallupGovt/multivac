@@ -2,27 +2,25 @@
 from syntax.Nodes import Token
 
 class TreeNode(object):
-    # dictionary mapping {str: TreeNode}
-    id_treeNodes = {}
-
-    def getTreeNode(idx):
-        return TreeNode.id_treeNodes[idx]
-
-
     def __init__(self, idx, tkn):
         self._id = idx
         self._tkn = tkn
         self._children = {}
-        TreeNode.id_treeNodes[idx] = self
+
+    def __str__(self):
+        return self.toString()
+
+    def __repr__(self):
+        return self.toString()
+
 
     def addChild(self, dep, child):
-        try:
-            tns = self._children[dep]
-        except KeyError:
-            tns = set(child)
-            self._children[dep] = tns
-        else:
+        if dep in self._children:
             self._children[dep] = tns.add(child)
+        else:
+            tns = set()
+            tns.add(child)
+            self._children[dep] = tns
 
         return None
 
@@ -41,8 +39,8 @@ class TreeNode(object):
 
         return self._tkn.compareTo(z.tkn_)
 
-    def equals(self, o):
-        return self.compareTo(o) == 0
+    def equals(self, obj):
+        return self.compareTo(obj) == 0
 
     def toString(self):
         return self._tkn.toString()
@@ -51,9 +49,9 @@ class TreeNode(object):
         id_str = {}
 
         if (len(self._children) > 0):
-            for dep in self._children.keys():
-                nodes = self._children[dep]
+            for dep, nodes in self._children.items():
                 s = ''
+
                 for node in nodes:
                     if dep.startswith('prep_') or dep.startswith('conj_'):
                         s = dep[5:] + ' '

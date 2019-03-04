@@ -3,13 +3,14 @@
 #
 # Part class
 # 
-
+from collections import OrderedDict
 from semantic import Clust, Argument, ArgClust
 from syntax.Relations import RelType
 
 class Part(object):
-    # dictionary mapping {str: Part}
-    rootNodeId_part = {}
+    # OrderedDict mapping {str: Part}
+    #  - listing of all Part() objects by rootNodeId
+    rootNodeId_part = OrderedDict()
     # dictionary mapping {int: set(str)}
     clustIdx_partRootNodeIds = {}
     # dictionary mapping {(int, int): set((str, str))}
@@ -17,28 +18,61 @@ class Part(object):
     # dictionary mapping {int: set((int, int))}
     clustIdx_pairClustIdxs = {}
 
-    def __init__(self, relTreeRoot):
-        self._isDebug = False
+    def getClustPartRootNodeIds():
+        return Part.clustIdx_partRootNodeIds
 
-        self._relTreeRoot = relTreeRoot
+    def getPairPartRootNodeIds(parClustIdx=None, chdClustIdx=None):
+        if parClustIdx is None and chdClustIdx is None:
+            return Part.pairClustIdxs_pairPartRootNodeIds
+        elif parClustIdx is None:
+            keys = [k for k in Part.pairClustIdxs_pairPartRootNodeIds if k[1]==chdClustIdx]
+            return {k: v for k, v in Part.pairClustIdxs_pairPartRootNodeIds if k in keys}
+        elif chdClustIdx is None:
+            keys = [k for k in Part.pairClustIdxs_pairPartRootNodeIds if k[0]==parClustIdx]
+            return {k: v for k, v in Part.pairClustIdxs_pairPartRootNodeIds if k in keys}
+        else:
+            if (parClustIdx, chdClustIdx) in Part.pairClustIdxs_pairPartRootNodeIds:
+                return Part.pairClustIdxs_pairPartRootNodeIds[(parClustIdx,
+                                                               chdClustIdx)]
+            else:
+                return None
+
+    def getPartByRootNodeId(rnId):
+        if rnId in Part.rootNodeId_part:
+            return Part.rootNodeId_part[rnId]
+        else:
+            return None
+
+    def getPartRootNodeIds(clustIdx):
+        if clustIdx in Part.clustIdx_partRootNodeIds:
+            return Part.clustIdx_partRootNodeIds[clustIdx]
+        else:
+            return None
+
+
+    def __init__(self, relTreeRoot):
+        self._relTreeRoot = relTreeRoot # TreeNode
         self._relTypeIdx = RelType.getRelType(relTreeRoot)
         self._clustIdx = -1
-        self._nxtArgIdx = 0 # Remember next index because _args should be ordered Dict
+        self._nxtArgIdx = 0 # Remember next index because _args is OrderedDict
 
         self._parPart = None
         self._parArgIdx = -1
 
         # Dictionary mapping {int: Argument}
-        self._args = {}
+        self._args = OrderedDict()
         # Dictionary mapping {int: int}
         self._argIdx_argClustIdx = {}
         # Dictionary mapping {int: set(int)}
         self._argClustIdx_argIdxs = {}
 
+        Part.rootNodeId_part[relTreeRoot.getId()] = self
+
         return None
 
     def addArgument(self, arg):
-        argIdx = self._nxtArgIdx + 1
+        argIdx = self._nxtArgIdx
+        self._nxtArgIdx += 1
         self._args[argIdx] = arg
 
         return argIdx
@@ -98,16 +132,17 @@ class Part(object):
                 Part.clustIdx_pairClustIdxs[oldClustIdx].remove(opci)
                 Part.clustIdx_pairClustIdxs[parent_clust_id].remove(opci)
 
-            if npci in Part.pairClustIdxs_pairPartRootNodeIds:
-                Part.pairClustIdxs_pairPartRootNodeIds[npci].add(ptnid)
-            else:
-                Part.pairClustIdxs_pairPartRootNodeIds[npci] = set(ptnid)
+            if npci not in Part.pairClustIdxs_pairPartRootNodeIds:
+                Part.pairClustIdxs_pairPartRootNodeIds[npci] = set()
+
+            Part.pairClustIdxs_pairPartRootNodeIds[npci].add(ptnid)
 
             Part.clustIdx_pairClustIdxs[parent_clust_id] = npci
-            if newClustIdx in Part.clustIdx_pairClustIdxs:
-                Part.clustIdx_pairClustIdxs[newClustIdx].add(npci)
-            else:
-                Part.clustIdx_pairClustIdxs[newClustIdx] = set(npci)
+
+            if newClustIdx not in Part.clustIdx_pairClustIdxs:
+                Part.clustIdx_pairClustIdxs[newClustIdx] = set()
+
+            Part.clustIdx_pairClustIdxs[newClustIdx].add(npci)
 
         return None
 
@@ -168,36 +203,11 @@ class Part(object):
     def getClustIdx(self):
         return self._clustIdx
 
-    def getClustPartRootNodeIds():
-        return Part.clustIdx_partRootNodeIds
-
     def getParArgIdx(self):
         return self._parArgIdx
 
-    def getPairPartRootNodeIds(parClustIdx=None, chdClustIdx=None):
-        if parClustIdx is None or chdClustIdx is None:
-            return Part.pairClustIdxs_pairPartRootNodeIds
-        else:
-            if (parClustIdx, chdClustIdx) in Part.pairClustIdxs_pairPartRootNodeIds:
-                return Part.pairClustIdxs_pairPartRootNodeIds[(parClustIdx,
-                                                               chdClustIdx)]
-            else:
-                return None
-
     def getParPart(self):
         return self._parPart
-
-    def getPartByRootNodeId(rnId):
-        if rnId in Part.rootNodeId_part:
-            return Part.rootNodeId_part[rnId]
-        else:
-            return None
-
-    def getPartRootNodeIds(clustIdx):
-        if clustIdx in Part.clustIdx_partRootNodeIds:
-            return Part.clustIdx_partRootNodeIds[clustIdx]
-        else:
-            return None
 
     def getRelTreeRoot(self):
         return self._relTreeRoot
@@ -212,7 +222,7 @@ class Part(object):
         self._argClustIdx_argIdxs[oldArgClustIdx].remove(argIdx)
 
         if len(self._argClustIdx_argIdxs[oldArgClustIdx]) == 0:
-            self._argClustIdx_argIdxs.remove(oldArgClustIdx)
+            del self._argClustIdx_argIdxs[oldArgClustIdx]
 
         if not clust_only:
             cl = Clust.getClust(self.getClustIdx())
@@ -232,11 +242,10 @@ class Part(object):
         if oldArgClustIdx != argClustIdx:
             self._argIdx_argClustIdx[argIdx] = argClustIdx
 
-            if argClustIdx in self._argClustIdx_argIdxs:
-                self._argClustIdx_argIdxs[argClustIdx].add(argIdx)
-            else:
-                self._argClustIdx_argIdxs[argClustIdx] = set(argIdx)
+            if argClustIdx not in self._argClustIdx_argIdxs:
+                self._argClustIdx_argIdxs[argClustIdx] = set()
 
+            self._argClustIdx_argIdxs[argClustIdx].add(argIdx)
             arg = self.getArgument(argIdx)
 
             if not clust_only:
@@ -246,10 +255,12 @@ class Part(object):
                 if not clust_only:
                     cl.onPartSetArg(self, arg, argClustIdx)
             else:
-                self._argClustIdx_argIdxs[oldArgClustIdx].remove(argIdx)
+                aci_ai = self._argClustIdx_argIdxs[oldArgClustIdx]
+                aci_ai.remove(argIdx)
+                self._argClustIdx_argIdxs[oldArgClustIdx] = aci_ai
 
-                if len(self._argClustIdx_argIdxs[oldArgClustIdx]) == 0:
-                    self._argClustIdx_argIdxs.remove(oldArgClustIdx)
+                if len(aci_ai) == 0:
+                    del self._argClustIdx_argIdxs[oldArgClustIdx]
 
                 if not clust_only:
                     cl.onPartSetArg(self, arg, argClustIdx, oldArgClustIdx)
@@ -260,10 +271,10 @@ class Part(object):
         self._clustIdx = clustIdx
         rootID = self.getRelTreeRoot().getId()
 
-        if clustIdx in Part.clustIdx_partRootNodeIds:
-            Part.clustIdx_partRootNodeIds[clustIdx].add(rootID)
-        else:
-            Part.clustIdx_partRootNodeIds[clustIdx] = set(rootID)
+        if clustIdx not in Part.clustIdx_partRootNodeIds:
+            Part.clustIdx_partRootNodeIds[clustIdx] = set()
+
+        Part.clustIdx_partRootNodeIds[clustIdx].add(rootID)
 
         if not clust_only:
             cl = Clust.getClust(clustIdx)
@@ -287,17 +298,16 @@ class Part(object):
 
         pcci = (parClustID, clustIdx)
 
-        if parClustID in Part.clustIdx_pairClustIdxs:
-            Part.clustIdx_pairClustIdxs[parClustID].add(pcci)
-        else:
-            Part.clustIdx_pairClustIdxs[parClustID] = set(pcci)
+        if parClustID not in Part.clustIdx_pairClustIdxs:
+            Part.clustIdx_pairClustIdxs[parClustID] = set()
 
+        Part.clustIdx_pairClustIdxs[parClustID].add(pcci)
         pids = (parPart.getRelTreeRoot().getId(), self.getRelTreeRoot().getId())
 
-        if pcci in Part.pairClustIdxs_pairPartRootNodeIds:
-            Part.pairClustIdxs_pairPartRootNodeIds[pcci].add(pids)
-        else:
-            Part.pairClustIdxs_pairPartRootNodeIds[pcci] = set(pids)
+        if pcci not in Part.pairClustIdxs_pairPartRootNodeIds:
+            Part.pairClustIdxs_pairPartRootNodeIds[pcci] = set()
+
+        Part.pairClustIdxs_pairPartRootNodeIds[pcci].add(pids)
 
         if parPart is not None:
             arg = parPart.getArgument(parArgIdx)
@@ -329,7 +339,7 @@ class Part(object):
         self._argClustIdx_argIdxs[oldArgClustIdx].remove(argIdx)
 
         if len(self._argClustIdx_argIdxs[oldArgClustIdx]) == 0:
-            self._argClustIdx_argIdxs.remove(oldArgClustIdx)
+            del self._argClustIdx_argIdxs[oldArgClustIdx]
 
         if not clust_only:
             cl = Clust.getClust(self.getClustIdx())
@@ -341,7 +351,6 @@ class Part(object):
         '''
         Remove parent-child cluster index information
         Remove parent-child relationship index information
-        NEEDS ADDITIONAL FACTORING - where does Cluster come from?
         '''
         parent = self.getParPart()
         clustIdx = self.getClustIdx()

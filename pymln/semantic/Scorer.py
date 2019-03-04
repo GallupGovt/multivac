@@ -1,5 +1,5 @@
 
-from semantic import SearchOp, Clust, ParseParams
+from semantic import SearchOp, Clust, ParseParams, Part
 from syntax import RelType
 from utils.Utils import inc_key, dec_key, xlogx, java_iter
 from math import log
@@ -566,24 +566,25 @@ class Scorer(object):
 
         return finalScore
 
-    def scoreMergeArgs(self, clust, ai1, ai2):
+    def scoreMergeArgs(self, clust, arg1, arg2):
         score = -ParseParams.priorMerge
-        ac1, ac2 = [clust._argClusts[x] for x in (ai1, ai2)]
-        tpc = clust._ttlCnt
-        ptids1, ptids2 = [x._partRootTreeNodeIds for x in (ac1, ac2)]
+        arg_clust1, arg_clust2 = [clust._argClusts[x] for x in (arg1, arg2)]
+        total_part_cnt = clust._ttlCnt
+        ptids1, ptids2 = [x._partRootTreeNodeIds for x in (arg_clust1, arg_clust2)]
         tpc1, tpc2 = [len(x) for x in (ptids1, ptids2)]
-        tac1, tac2 = [x._ttlArgCnt for x in (ac1, ac2)]
+        tac1, tac2 = [x._ttlArgCnt for x in (arg_clust1, arg_clust2)]
 
-        score -= (xlogx(tpc-tpc1) + xlogx(tpc-tpc2))
-        score += xlogx(tpc)
+        score -= (xlogx(total_part_cnt-tpc1) + xlogx(total_part_cnt-tpc2))
+        score += xlogx(total_part_cnt)
         score -= (2 * (xlogx(tac1+tac2)-xlogx(tac1)-xlogx(tac2)))
 
         argNum_newCnt = dict()
 
-        for d in (ac1._argNum_cnt, ac2._argNum_cnt):
+        for d in (arg_clust1._argNum_cnt, arg_clust2._argNum_cnt):
             for an, cnt in d.items():
                 if cnt == 0:
-                    raise ZeroArgumentException
+                    print("Zero arguments of type {}".format(an))
+                    raise Exception
                 else:
                     score -= xlogx(cnt)
 
@@ -595,8 +596,8 @@ class Scorer(object):
 
         while True:
             if pid1 == pid2:
-                c1 = len(Part.getPartByRootNodeId(pid1)._argClustIdx_argIdxs[ai1])
-                c2 = len(Part.getPartByRootNodeId(pid2)._argClustIdx_argIdxs[ai2])
+                c1 = len(Part.getPartByRootNodeId(pid1)._argClustIdx_argIdxs[arg1])
+                c2 = len(Part.getPartByRootNodeId(pid2)._argClustIdx_argIdxs[arg2])
                 c0 = c1 + c2
                 tpc12 -= 1
 
@@ -627,18 +628,20 @@ class Scorer(object):
                 if pid1 > pid2:
                     break
 
-        score += xlogx(tpc - tpc12)
+        score += xlogx(total_part_cnt - tpc12)
 
         for c in argNum_newCnt.values():
             score += xlogx(c)
 
-        score += ((len(ac1._argNum_cnt)+len(ac2._argNum_cnt)-len(argNum_newCnt)) \
+        score += ((len(arg_clust1._argNum_cnt) \
+                   + len(arg_clust2._argNum_cnt) \
+                   - len(argNum_newCnt)) \
                  * ParseParams.priorNumParam)
 
-        atc1, atc2 = [x._argTypeIdx_cnt for x in (ac1, ac2)]
+        atc1, atc2 = [x._argTypeIdx_cnt for x in (arg_clust1, arg_clust2)]
         score = Scorer.update_score_from_ds(score, atc1, atc2)
 
-        ccc1, ccc2 = [x._chdClustIdx_cnt for x in (ac1, ac2)]
+        ccc1, ccc2 = [x._chdClustIdx_cnt for x in (arg_clust1, arg_clust2)]
         score = Scorer.update_score_from_ds(score, ccc1, ccc2)
 
         return score

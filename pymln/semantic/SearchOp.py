@@ -2,6 +2,7 @@
 from semantic import Clust
 
 class SearchOp(object):
+    # Why are these strings instead of just integers?
     OP_MERGE_CLUST = '0'
     OP_MERGE_ROLE  = '1'
     OP_COMPOSE     = '2'

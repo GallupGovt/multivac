@@ -19,9 +19,9 @@ def dec_key(d, key, base=None, dec=1, remove=False):
         if base is None:
             d = None
         else:
-            d[key] = base - inc
+            d[key] = base - dec
     else:
-        d[key] -= inc
+        d[key] -= dec
 
     if remove and d[key] <= 0:
         del d[key]
@@ -70,6 +70,12 @@ def compareStr(s, t):
         return result
 
 def xlogx(x):
-    x = x * math.log(x)
+    if x <= 0:
+        x = 0
+    else:
+        x = x * math.log(x)
 
     return x
+
+
+    

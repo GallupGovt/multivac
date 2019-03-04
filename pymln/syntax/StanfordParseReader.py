@@ -1,5 +1,6 @@
 
 import os
+import re
 
 from syntax.Nodes import Article, Sentence, Token
 
@@ -92,12 +93,15 @@ class StanfordParseReader(object):
 
                 currSent.add_token(Token(pos,lemma,form))
 
+        if len(currSent.get_tokens()) > 0:
+            sents[len(sents)] = currSent
+
         this_doc.sentences = sents
 
         return this_doc
 
 
-    def readDeps(this_doc, deps_file, ignoreDep):
+    def readDeps(this_doc, dep_file, ignoreDep):
         '''
         Reads a dependency relationships file and adds these relationships to 
         their respective Sentence() objects in an Article() in the form of 
@@ -111,7 +115,7 @@ class StanfordParseReader(object):
         currNonRoots = set()
         currRoots = set()
 
-        with open(deps_file, 'r') as d:
+        with open(dep_file, 'r') as d:
             for line in d.readlines():
                 line = line.strip()
 
@@ -142,8 +146,13 @@ class StanfordParseReader(object):
                         currRoots = set()
 
                     rel = line[:line.index("(")]
-                    items = line[line.index('('):].replace('(','').replace(')','')
-                    gov, dep = items.split(', ')
+                    items = re.sub(r"\(|\)","",line[line.index('('):])
+
+                    item_split = re.search(r"-\d+, ", items).end(0)
+
+                    gov = items[:item_split-2]
+                    dep = items[item_split:]
+
                     gov = (int(gov[gov.rfind('-')+1:]), gov[:gov.rfind('-')])
                     dep = (int(dep[dep.rfind('-')+1:]), dep[:dep.rfind('-')])
 
