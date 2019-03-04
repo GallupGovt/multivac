@@ -1,5 +1,5 @@
 
-
+from datetime import datetime
 from semantic import Argument, Clust, Part, Agenda, Executor, Scorer
 from syntax.StanfordParseReader import StanfordParseReader
 from syntax.Nodes import TreeNode
@@ -74,12 +74,16 @@ class Parse(object):
         return None
 
     def initialize(self, arts, verbose=False):
-        for art in arts:
+        for i, art in enumerate(arts):
             self.id_article[art.uid] = art
             self.numSents += len(art.sentences)
 
             for i, sent in art.sentences.items():
                 self.initializeSent(art.uid, i, sent)
+
+            if verbose:
+                if i%10==0:
+                    print("{} articles ingested into MLN.".format(i))
 
         return None
 
@@ -153,12 +157,13 @@ class Parse(object):
 
         return (k>0)
 
-    def mergeArgs(self):
+    def mergeArgs(self, verbose=False):
         '''
             For each cluster, count up all the arguments for each ArgClust. 
             Iterating from most args to least, for each ArgClust score whether
             merging it 
         '''
+        i = 0
         for clust_id, clust in Clust.clusts.items():
             new_arg_clusts = {}
             counts_per_ArgClust = []
@@ -191,6 +196,13 @@ class Parse(object):
                     new_arg_clusts[arg_clust_id] = arg_clust
 
             clust._argClusts = new_arg_clusts
+
+            i += 1
+
+            if verbose:
+                if i%100==0:
+                    print("{} MergeArgs: {} clusters processed.".format(datetime.now(), 
+                                                                        i))
 
         return None
 

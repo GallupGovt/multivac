@@ -26,8 +26,9 @@ class Agenda(object):
                 
         return None
 
-    def procAgenda(self):
+    def procAgenda(self, verbose=False):
         ttlAgendaScored, ttlExecMC, ttlExecAbs = (0, 0, 0)
+        i = 1
 
         while True:
             As = 0
@@ -55,6 +56,11 @@ class Agenda(object):
                 ttlExecAbs += 1
             elif op._op == SearchOp.OP_MERGE_CLUST:
                 ttlExecMC += 1
+
+            i += 1
+
+            if i%100==0:
+                print("{} Processing agenda: {} loops".format(datetime.now(), i))
 
         return None
 
