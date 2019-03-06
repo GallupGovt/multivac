@@ -21,7 +21,7 @@ class Parse(object):
         self.agenda = Agenda(self)
         self.executor = Executor(self)
 
-    def createArgs(self, art_id, sent_id, sent, parent_id):
+    def createArgs(self, art_id, sent_id, sent, parent_id, done=set()):
         '''
             For each token, get the TreeNode, Part, Cluster and (based on 
             sentence dependencies) the children tokens.
@@ -30,8 +30,15 @@ class Parse(object):
             a Path and then argument type and Argument defining the parent-
             child relationship. Then add/create an ArgClust before recursing
             on any grand-child tokens. 
+
+            #
+            ## CHECK TOKENS SO WE DON'T GET STUCK IN A RECURSIVE LOOP IF 
+            ## DEPENDENCIES ARE MALFORMED
+            # 
         '''
         parent_node_id = genTreeNodeID(art_id, sent_id, parent_id)
+        done.add(parent_node_id)
+
         parent_part = Part.getPartByRootNodeId(parent_node_id)
         parent = parent_part.getRelTreeRoot()
         parent_clust = Clust.getClust(parent_part.getClustIdx())
@@ -40,6 +47,10 @@ class Parse(object):
         if children is not None:
             for child_id, relation in children:
                 child_node_id = genTreeNodeID(art_id, sent_id, child_id)
+
+                if child_node_id in done:
+                    continue
+
                 child_part = Part.getPartByRootNodeId(child_node_id)
 
                 if child_part is None:
@@ -62,6 +73,8 @@ class Parse(object):
                     arg_clust_id = next(iter(arg_clust_ids))
 
                 parent_part.setArgClust(arg_id, arg_clust_id)
+
+                done.add(child_node_id)
                 self.createArgs(art_id, sent_id, sent, child_id)
 
         return None
@@ -78,12 +91,11 @@ class Parse(object):
             self.id_article[art.uid] = art
             self.numSents += len(art.sentences)
 
+            if verbose:
+                    print("Article {} processing...".format(art.uid))
+
             for i, sent in art.sentences.items():
                 self.initializeSent(art.uid, i, sent)
-
-            if verbose:
-                if i%10==0:
-                    print("{} articles ingested into MLN.".format(i))
 
         return None
 
@@ -107,10 +119,10 @@ class Parse(object):
             return None
 
         for k, tok in enumerate(sent.get_tokens()):
-            # How necessary is this? This requires re-traversing the dep tree
-            # of each sentence for every node; gotta be a huge time suck.
-            if Parse.isIgnore(sent, k):
-                continue
+        #     # How necessary is this? This requires re-traversing the dep tree
+        #     # of each sentence for every node; gotta be a huge time suck.
+        #     if Parse.isIgnore(sent, k):
+        #         continue
 
             Parse.part_from_node(ai, sj, sent, k, tok)
 

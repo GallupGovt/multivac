@@ -15,6 +15,7 @@ from semantic import MLN, Part, Clust
 
 class USP(object):
     allowedDeps = set(['nn','amod','prep_of','num','appos'])
+    target_args = set(['nsubj','nsubjpass','dobj','attr','pobj'])
     five_ws_and_h = ['who','what','where','when','why','how']
     evalDir = ''
     resultDir = ''
@@ -44,41 +45,72 @@ class USP(object):
         filename = USP.evalDir + "/questions.txt"
 
         with open(filename, "r") as f:
-            questions = f.read()
+            lines = f.readlines()
 
-        questions = nlp(questions)
-        question_parses = parse_questions(questions)
+        questions = [nlp(line.strip()) for line in lines]
 
-        # Get nsubj, dobjs
-        # Get question sub-tree:
-            # Find question word token, follow it up to ROOT
-            # If dobj in question sub-tree: qu = Question(v, q, 'nsubj')
-            # If nsubj/nsubjpass in question sub-tree: qu = Question(v, q, 'dobj')
-            # if one or both don't exist, it's a question of being/description... look for "nmod" sub-tree
+        for question in questions:
+            if len(question) == 0:
+                continue
+                
+            deps = []
+            args = []
+            q_tok = None
 
+            for t in q:
+                USP.form_lemma[t.lower_] = t.lemma_
 
+                if t.dep_ == 'ROOT':
+                    rel = t
 
+                if t.text in USP.five_ws_and_h:
+                    q_tok = t
 
-                v = line[line.rfind(' ')+1:]
-                q = line[len("What does "):line.rfind(' ')].trim().lower()
+            q_subtree = [q_tok]
 
-                if v not in USP.rel_qs:
-                    USP.rel_qs[v] = list()
+            while q_tok.head != q_tok:
+                q_tok = q_tok.head
+                q_subtree.append(q_tok)
 
-                # each Question is a dependency relationship here - verb, subject, looking for object
-                # other version does reverse - verb, object, subject. Need more generalized version of this
+            args = [t for t in question if t.dep_ in USP.target_args 
+                    and t not in q_subtree]
+            deps = [t for t in q_subtree if t.dep_ in USP.target_args]
 
-                qu = Question(v, q, 'nsubj')
-                USP.rel_qs[v].append(qu)
-                USP.qForms.update(q.split()+[v])
+            if len(deps) == 0:
+                deps = ['advmod']
+            
+            graph = USP.graph_question(question)
+            arg_paths = {}
+
+            for arg in args:
+                path = nx.shortest_path(graph, 
+                                        source='{}-{}'.format(q_tok, q_tok.i), 
+                                        target='{}-{}'.format(arg, arg.i))
+                arg_paths[len(path)] = (arg, path)
+
+            arg, path = arg_paths[min(arg_paths)]
+            arg_tree = [x.text for x in arg.subtree]
+            qu = Question(rel, ' '.join(arg_tree), deps[0])
+
+            if rel not in USP.rel_qs:
+                USP.rel_qs[rel] = list()
+
+            USP.rel_qs[rel].append(qu)
+            USP.qForms.update(arg_tree + [rel])
 
         return None
 
-    def readMorph(aid=None, mfilename=None, ifilename=None):
-        '''
-            Get a mapping of form-lemma for all words in our questions
-        '''
-        return None
+    def graph_question(question):
+        edges = []
+
+        for token in question:
+            for child in token.children:
+                if child.dep_ != 'punct':
+                    edges.append(('{0}-{1}'.format(token.lower_,token.i),
+                                  '{0}-{1}'.format(child.lower_,child.i)))
+        graph = nx.Graph(edges)
+
+        return graph
 
     def readSents(aid=None, filename=None):
         '''
@@ -292,9 +324,9 @@ class USP(object):
                 for each part associated with the question, check for a match 
                 with those argument clusters
         '''
-        for rel, qs in USP.rel_qs.items():
-            ci = Clust.relTypeIdx_clustIdx[rel]
-            pids = Part.clustIdx_partRootNodeIds[ci]
+        for reltype, qs in USP.rel_qs.items():
+            clust_id = Clust.relTypeIdx_clustIdx[reltype]
+            part_ids = Part.clustIdx_partRootNodeIds[clust_id]
 
             for q in qs:
                 dep2 = 'nsubj'
@@ -302,16 +334,16 @@ class USP(object):
                 if q.getDep() == 'nsubj':
                     dep2 = 'dobj'
 
-                aci  = USP.clustIdx_depArgClustIdx[ci][q.getDep()]
-                aci2 = USP.clustIdx_depArgClustIdx[ci][dep2]
+                aci  = USP.clustIdx_depArgClustIdx[clust_id][q.getDep()]
+                aci2 = USP.clustIdx_depArgClustIdx[clust_id][dep2]
 
-                for pid in pids:
-                    if pid not in USP.ptId_aciChdIds:
+                for part_id in part_ids:
+                    if part_id not in USP.ptId_aciChdIds:
                         continue
-                    elif any([x not in USP.ptId_aciChdIds[pid] for x in (aci, aci2)]):
+                    elif any([x not in USP.ptId_aciChdIds[part_id] for x in (aci, aci2)]):
                         continue
 
-                    USP.match_q(q, pid, aci, aci2)
+                    USP.match_q(q, part_id, aci, aci2)
 
         return None
 
@@ -593,55 +625,6 @@ if __name__ == '__main__':
     run()
 
 
-
-
-def parse_questions(qtext):
-    """ 
-    Parse questions using the same method for parsing our original texts.
-    """
-
-    questions = {}
-
-    l_depSentences = {} # for dependencies
-    l_posSentences = {} # for POS tagging
-    l_morSentences = {} # for morphology/lemmatization 
-    
-    for i, question in enumerate(list(qtext.sents)):
-        
-        l_depTokens=[]
-        l_posTokens=[]
-        l_morTokens=[]
-        
-        for token in question:
-            
-            ## For dependency trees
-            child_pos = token.i - question.start  + 1
-            head_pos =  token.head.i - question.start +1 
-
-            if token.dep_ not in ['ROOT','punct']:
-                l_depTokens.append("{0}({1}-{2}, {3}-{4})".format(token.dep_, 
-                                                                  token.head.text, 
-                                                                  head_pos, 
-                                                                  token.text, 
-                                                                  child_pos))
-
-            ## For POS
-            l_posTokens.append("{0}_{1}".format(token, token.tag_))  
-            #print(token.tag_)
-
-            ## For Morphologies
-            l_morTokens.append(token.lemma_)
-
-
-        l_depSentences[i] = "\n".join(l_depTokens)
-        l_posSentences[i] = "\n".join(l_posTokens)
-        l_morSentences[i] = "\n".join(l_morTokens)
-
-    questions['depData'] = l_depSentences
-    questions['posData'] = l_posSentences
-    questions['morData'] = l_morSentences
-
-    return questions
 
 
 

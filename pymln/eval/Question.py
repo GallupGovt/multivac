@@ -1,10 +1,11 @@
 
 class Question(object):
-    def __init__(self, rel, arg, dep):
+    def __init__(self, rel, arg, dep, q_str):
         self._rel = rel
         self._dep = arg
         self._arg = dep
         self._argClustIdxSeq = None
+        self._q_str = q_str
 
     def __str__(self):
         return self.toString()
