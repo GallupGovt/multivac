@@ -1,4 +1,4 @@
-
+from sortedcontainers import SortedSet
 from syntax.Nodes.Token import Token
 
 class Sentence(object):
@@ -15,7 +15,7 @@ class Sentence(object):
         self._tokens = []
 
         # Dictionary mapping {int: set((int, str))}
-        self._tkn_children = {0: set()}
+        self._tkn_children = {0: SortedSet()}
         # Dictionary mapping {int: (str, int)}
         self._tkn_par = {}
 
@@ -73,7 +73,7 @@ class Sentence(object):
         '''
         Add the child/children specified by the key/kids key/value pair.
         '''
-        assert isinstance(kids, set)
+        assert isinstance(kids, SortedSet)
         self._tkn_children[parent] = kids
 
         return None

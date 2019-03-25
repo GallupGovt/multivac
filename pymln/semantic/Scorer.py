@@ -1,7 +1,7 @@
 
 from semantic import SearchOp, Clust, ParseParams, Part
 from syntax import RelType
-from utils.Utils import inc_key, dec_key, xlogx, java_iter
+from utils.Utils import inc_key, dec_key, xlogx
 from math import log
 
 class Scorer(object):
@@ -12,52 +12,88 @@ class Scorer(object):
         if op._op == SearchOp.OP_MERGE_CLUST:
             return self.scoreOpMC(op)
         elif op._op == SearchOp.OP_COMPOSE:
-            return self.scoreOpCompose(op._parClustIdx,op._chdClustIdx)
+            return self.scoreOpCompose(op._parClustIdx, op._chdClustIdx)
         else:
             return -100
 
     def scoreOpMC(self, op):
-        cidx1, cidx2 = op._clustIdx1, op._clustIdx2
-        assert cidx1<cidx2
+        # Get our two cluster ids, and make sure cluster 1 was defined earlier 
+        # than cluster 2.
+        clust_id1, clust_id2 = op._clustIdx1, op._clustIdx2
+        assert clust_id1 < clust_id2
+
+        # Subtract 0 from score? Weird.
 
         score = 0 - ParseParams.priorMerge
 
-        if (cidx1, cidx2) in Clust.pairClustIdxs_conjCnt:
-            score -= ParseParams.priorNumConj * Clust.pairClustIdxs_conjCnt[(cidx1, cidx2)]
+        # If these clusters appear in conjunction with each other (indicating a
+        # dissimilarity, otherwise it's redundant) penalize the score.
+        #
+        # Clust.pairClustIdx_conjCnt is dictionary of type {(int, int): int}
+        #
 
-        cl1 = Clust.getClust(cidx1)
-        cl2 = Clust.getClust(cidx2)
+        if (clust_id1, clust_id2) in Clust.pairClustIdx_conjCnt:
+            score -= (ParseParams.priorNumConj \
+                    * Clust.pairClustIdx_conjCnt[(clust_id1, clust_id2)])
 
-        score -= Scorer.updateScore(cl1._ttlCnt, cl2._ttlCnt)
+        # Now get the actual Clust objects
 
-        for ri, cnt in cl1._relTypeIdx_cnt.items():
-            if ri in cl2._relTypeIdx_cnt:
-                cnt2 = cl2._relTypeIdx_cnt[ri]
-                score += Scorer.updateScore(cnt, cnt2)
+        clust1 = Clust.getClust(clust_id1)
+        clust2 = Clust.getClust(clust_id2)
+
+        #
+        # We update the score by taking xlogx(x+y) - xlogx(x) - xlogx(y)
+        # where xlogx() == x*log(x)
+        # Here we calculate on total counts - basically how common these clusters
+        # are in our corpus. Here we penalize if they are too common.
+
+        score -= Scorer.updateScore(clust1._ttlCnt, clust2._ttlCnt)
+
+        # 
+        # Then we check for shared relTypes, and score up those with lots of 
+        # shared relTypes. 
+
+        for reltype, count1 in clust1._relTypeIdx_cnt.items():
+            if reltype in clust2._relTypeIdx_cnt:
+                count2 = clust2._relTypeIdx_cnt[reltype]
+                score += Scorer.updateScore(count1, count2)
                 score += ParseParams.priorNumParam
 
-        if cidx1 in Clust.clustIdx_rootCnt and cidx2 in Clust.clustIdx_rootCnt:
-            rc1 = Clust.clustIdx_rootCnt[cidx1]
-            rc2 = Clust.clustIdx_rootCnt[cidx2]
-            score = Scorer.updateScore(rc1, rc2)
+        #
+        # Bonus as well if we have lots of sentence roots in these clusters, 
+        # indicating they are semantically important.
+
+        if clust_id1 in Clust.clustIdx_rootCnt and clust_id2 in Clust.clustIdx_rootCnt:
+            root_count1 = Clust.clustIdx_rootCnt[clust_id1]
+            root_count2 = Clust.clustIdx_rootCnt[clust_id2]
+            score += Scorer.updateScore(root_count1, root_count2)
             score += ParseParams.priorNumParam
 
-        score += self.scoreMCForParent(cidx1, cidx2)
+        #
+        # Let's compare the parent components as well
+        # 
 
-        if len(cl2._argClusts) > len(cl1._argClusts):
-            clx1 = cl2
-            clx2 = cl1
+        score += self.scoreMCForParent(clust_id1, clust_id2)
+
+        #
+        # Finally, if cluster 2 has more arguments than cluster 1, reverse them
+        # before scoring on alignment of their arguments
+
+        if len(clust2._argClusts) > len(clust1._argClusts):
+            clx1 = clust2
+            clx2 = clust1
         else:
-            clx1 = cl1
-            clx2 = cl2
+            clx1 = clust1
+            clx2 = clust2
 
-        score += self.scoreMCForAlign(clx1, clx2, dict())
+        score_add, _ = self.scoreMCForAlign(clx1, clx2, dict())
+        score += score_add
 
         return score
 
 
     def scoreMCForParent(self, clustIdx1, clustIdx2):
-        score = 0
+        scr = 0
 
         if clustIdx1 in Clust.clustIdx_parArgs and clustIdx2 in Clust.clustIdx_parArgs:
             parents1 = Clust.clustIdx_parArgs[clustIdx1]
@@ -67,29 +103,35 @@ class Scorer(object):
                 if par_arg in parents2:
                     par_clust_id, arg_clust_id = par_arg
                     pcl = Clust.getClust(par_clust_id)
+
+                    if pcl is None:
+                        print("ERR: ScoreMC parent cluster is null: {}, {}".format(clustIdx1, clustIdx2))
+                        continue
+
                     ac = pcl._argClusts[arg_clust_id]
                     c1 = ac._chdClustIdx_cnt[clustIdx1]
                     c2 = ac._chdClustIdx_cnt[clustIdx2]
-                    score += ParseParams.priorNumParam
-                    score += Scorer.updateScore(c1, c2)
+                    scr += ParseParams.priorNumParam
+                    scr += Scorer.updateScore(c1, c2)
 
-        return score
+        return scr
 
     def scoreOpCompose(self, rcidx, acidx):
 
-        def update_score_from_dict(score, d, orig_d):
+        def update_score_from_dict(scr, d, orig_d):
             for key, cnt in d.items():
                 origcnt = orig_d[key]
-                assert origcnt >= cnt
-                score -= xlogx(origcnt)
+                # assert origcnt >= cnt
+                scr -= xlogx(origcnt)
 
                 if cnt > 0:
-                    score += xlogx(cnt)
+                    scr += xlogx(cnt)
                 else:
-                    score += ParseParams.priorNumParam
+                    scr += ParseParams.priorNumParam
 
-            return score
+            return scr
 
+        # get parent and child root-node id numbers
         parChdNids = Part.getPairPartRootNodeIds(rcidx, acidx)
 
         if parChdNids is None:
@@ -99,7 +141,10 @@ class Scorer(object):
         rcl = Clust.getClust(rcidx)
         acl = Clust.getClust(acidx)
 
-        rtc_new, atc_new = [c._ttlCnt for c in [rcl, acl]]
+        # Parent count, child count, and count of times they occur
+        # together. 
+        rtc_new = rcl._ttlCnt
+        atc_new = acl._ttlCnt
         ratc_new = 0
         raRootCnt = 0
 
@@ -134,8 +179,9 @@ class Scorer(object):
         rNewArgClustIdx_argCnt = dict()
         aNewArgClustIdx_argCnt = dict()
 
+        # For each parent-child pair:
         for pcnid in parChdNids:
-            pp, cp = [Part.getPartByRootNodeId(i) for i in pcnid]
+            pp, cp = Part.getPartByRootNodeId(pcnid[0]), Part.getPartByRootNodeId(pcnid[1])
 
             rtc_new -= 1
             atc_new -= 1
@@ -145,11 +191,13 @@ class Scorer(object):
             art = cp.getRelTypeIdx()
             raArgClustidx = pp.getArgClust(cp._parArgIdx)
 
+            # Decrement individual relType counts and increment the combined
+            # relType count for this pair
             rRelTypeIdx_newcnt = dec_key(rRelTypeIdx_newcnt,
                                          rrt, 
                                          base=rcl._relTypeIdx_cnt[rrt])
 
-            rRelTypeIdx_newcnt = dec_key(rRelTypeIdx_newcnt,
+            aRelTypeIdx_newcnt = dec_key(aRelTypeIdx_newcnt,
                                          art, 
                                          base=acl._relTypeIdx_cnt[art])
 
@@ -157,6 +205,8 @@ class Scorer(object):
 
             pp_par = pp.getParPart()
 
+            # If the parent has a parent, increment the parArg count, otherwise
+            # increment the root count.
             if pp_par is not None:
                 ai = pp.getParArgIdx()
                 ppi = pp_par.getClustIdx()
@@ -166,20 +216,27 @@ class Scorer(object):
             else:
                 raRootCnt += 1
 
+            # For each argClust on the parent part, decrement the old parent 
+            # part count and argClust count, and increment the new ones. The 
+            # trick is don't copy/increment the counts for argument shared by
+            # this pair.
             for arg_ci in pp._argClustIdx_argIdxs:
                 an = len(pp._argClustIdx_argIdxs[arg_ci])
                 ac = rcl._argClusts[arg_ci]
 
                 rArgClustIdx_partCnt = dec_key(rArgClustIdx_partCnt,
                                                arg_ci, 
-                                               base=len(ac.partRootTreeNodeIds))
+                                               base=len(ac._partRootTreeNodeIds))
                 
+                if arg_ci not in rArgClustIdx_argNum_cnt:
+                    rArgClustIdx_argNum_cnt[arg_ci] = {}
+
                 rArgClustIdx_argNum_cnt[arg_ci] = \
                     dec_key(rArgClustIdx_argNum_cnt[arg_ci],
                             an, 
                             base=ac._argNum_cnt[an])
 
-                newArgNum = an + 0
+                newArgNum = an
 
                 if arg_ci == raArgClustidx:
                     newArgNum -= 1
@@ -187,24 +244,34 @@ class Scorer(object):
                 if newArgNum == 0:
                     continue
 
+                if arg_ci not in rNewArgClustIdx_argNum_cnt:
+                    rNewArgClustIdx_argNum_cnt[arg_ci] = {}
+
                 rNewArgClustIdx_argNum_cnt[arg_ci] = \
                     inc_key(rNewArgClustIdx_argNum_cnt[arg_ci], newArgNum)
 
                 rNewArgClustIdx_partCnt = inc_key(rNewArgClustIdx_partCnt,
                                                    arg_ci)
 
+            # Same as above, but for child part, and we don't skip anything.
             for arg_ci in cp._argClustIdx_argIdxs:
                 an = len(cp._argClustIdx_argIdxs[arg_ci])
                 ac = acl._argClusts[arg_ci]
 
                 aArgClustIdx_partCnt = dec_key(aArgClustIdx_partCnt,
                                                arg_ci, 
-                                               base=len(ac.partRootTreeNodeIds))
+                                               base=len(ac._partRootTreeNodeIds))
+
+                if arg_ci not in aArgClustIdx_argNum_cnt:
+                    aArgClustIdx_argNum_cnt[arg_ci] = {}
 
                 aArgClustIdx_argNum_cnt[arg_ci] = \
                     dec_key(aArgClustIdx_argNum_cnt[arg_ci],
                             an, 
                             base=ac._argNum_cnt[an])
+
+                if arg_ci not in aNewArgClustIdx_argNum_cnt:
+                    aNewArgClustIdx_argNum_cnt[arg_ci] = {}
 
                 aNewArgClustIdx_argNum_cnt[arg_ci] = \
                     inc_key(aNewArgClustIdx_argNum_cnt[arg_ci], an)
@@ -213,9 +280,10 @@ class Scorer(object):
 
             args = pp.getArguments()
 
+            # For all the parent's arguments
             for ai, arg in args.items():
-                ap = arg._argPart
-                cci = ap._clustIdx
+                arg_part = arg._argPart
+                child_clust_id = arg_part._clustIdx
                 aci = pp.getArgClust(ai)
                 ac = rcl._argClusts[aci]
                 ati = arg._path.getArgType()
@@ -226,34 +294,47 @@ class Scorer(object):
                                               aci, 
                                               base=ac._ttlArgCnt)
 
+                if aci not in rArgClustIdx_argTypeIdx_cnt:
+                    rArgClustIdx_argTypeIdx_cnt[aci] = {}
+
                 rArgClustIdx_argTypeIdx_cnt[aci] = \
                     dec_key(rArgClustIdx_argTypeIdx_cnt[aci], 
                             ati, 
                             base=ac._argTypeIdx_cnt[ati])
 
+                if aci not in rArgClustIdx_chdClustIdx_cnt:
+                    rArgClustIdx_chdClustIdx_cnt[aci] = {}
+
                 rArgClustIdx_chdClustIdx_cnt[aci] = \
                     dec_key(rArgClustIdx_chdClustIdx_cnt[aci], 
-                            cci, 
-                            base=ac.chdClustIdx_cnt[cci])
+                            child_clust_id, 
+                            base=ac._chdClustIdx_cnt[child_clust_id])
 
-                # Add the new arguments
+                # Add the new arguments, except for the child part we're possibly
+                # absorbing
 
-                if ap.getRelTreeRoot().getId() != cp.getRelTreeRoot().getId():
+                if arg_part.getRelTreeRoot().getId() != cp.getRelTreeRoot().getId():
                     rNewArgClustIdx_argCnt = inc_key(rNewArgClustIdx_argCnt, aci)
 
-                    rNewArgClustIdx_argTypeIdx_cnt[aci] = \
-                        inc_key(rNewArgClustIdx_argTypeIdx_cnt, ati)
+                    if aci not in rNewArgClustIdx_argTypeIdx_cnt:
+                        rNewArgClustIdx_argTypeIdx_cnt[aci] = {}
 
+                    rNewArgClustIdx_argTypeIdx_cnt[aci] = \
+                        inc_key(rNewArgClustIdx_argTypeIdx_cnt[aci], ati)
+
+                    if aci not in rNewArgClustIdx_chdClustIdx_cnt:
+                        rNewArgClustIdx_chdClustIdx_cnt[aci] = {}
+                        
                     rNewArgClustIdx_chdClustIdx_cnt[aci] = \
-                        inc_key(rNewArgClustIdx_chdClustIdx_cnt, cci)
+                        inc_key(rNewArgClustIdx_chdClustIdx_cnt[aci], child_clust_id)
 
             args = cp.getArguments()
 
             for ai, arg in args.items():
                 ap = arg._argPart
                 cci = ap._clustIdx
-                aci = pp.getArgClust(ai)
-                ac = rcl._argClusts[aci]
+                aci = cp.getArgClust(ai)
+                ac = acl._argClusts[aci]
                 ati = arg._path.getArgType()
 
                 # Drop the old arguments
@@ -261,6 +342,9 @@ class Scorer(object):
                 aArgClustIdx_argCnt = dec_key(aArgClustIdx_argCnt, 
                                               aci, 
                                               base=ac._ttlArgCnt)
+
+                if aci not in aArgClustIdx_argTypeIdx_cnt:
+                    aArgClustIdx_argTypeIdx_cnt[aci] = {}
 
                 aArgClustIdx_argTypeIdx_cnt[aci] = \
                     dec_key(aArgClustIdx_argTypeIdx_cnt[aci], 
@@ -273,23 +357,29 @@ class Scorer(object):
                 aArgClustIdx_chdClustIdx_cnt[aci] = \
                     dec_key(aArgClustIdx_chdClustIdx_cnt[aci], 
                             cci, 
-                            base=ac.chdClustIdx_cnt[cci])
+                            base=ac._chdClustIdx_cnt[cci])
 
                 # Add the new arguments
 
                 aNewArgClustIdx_argCnt = inc_key(aNewArgClustIdx_argCnt, aci)
 
+                if aci not in aNewArgClustIdx_argTypeIdx_cnt:
+                    aNewArgClustIdx_argTypeIdx_cnt[aci] = {}
+                    
                 aNewArgClustIdx_argTypeIdx_cnt[aci] = \
-                    inc_key(aNewArgClustIdx_argTypeIdx_cnt, ati)
+                    inc_key(aNewArgClustIdx_argTypeIdx_cnt[aci], ati)
 
+                if aci not in aNewArgClustIdx_chdClustIdx_cnt:
+                    aNewArgClustIdx_chdClustIdx_cnt[aci] = {}
+                    
                 aNewArgClustIdx_chdClustIdx_cnt[aci] = \
-                    inc_key(aNewArgClustIdx_chdClustIdx_cnt, cci)
+                    inc_key(aNewArgClustIdx_chdClustIdx_cnt[aci], cci)
 
         if raRootCnt > 0:
             origRootCnt = Clust.clustIdx_rootCnt[rcidx]
 
             if origRootCnt > raRootCnt:
-                score =   xlogx(raRootCnt) \
+                score +=  xlogx(raRootCnt) \
                         + xlogx(origRootCnt - raRootCnt) \
                         - xlogx(origRootCnt)
                 score -= ParseParams.priorNumParam
@@ -301,26 +391,27 @@ class Scorer(object):
                                        rRelTypeIdx_newcnt, 
                                        rcl._relTypeIdx_cnt)
 
-        socre += denomor
+        score += denomor
         score -= denomnr
 
         denomoa = xlogx(acl._ttlCnt)
-        denomoa = xlogx(atc_new)
+        denomna = xlogx(atc_new)
 
         score = update_score_from_dict(score, 
                                        aRelTypeIdx_newcnt, 
                                        acl._relTypeIdx_cnt)
 
-        socre += denomoa
+        score += denomoa
         score -= denomna
 
         for cnt in raRelTypeIdx_newcnt.values():
             score -= ParseParams.priorNumParam
             score += xlogx(cnt)
 
-        score -= xlogx(ratc_new)
+        denomra = xlogx(ratc_new)
+        score -= denomra
 
-        for pi, cnt in parArg_cnt:
+        for pi, cnt in parArg_cnt.items():
             pc = Clust.getClust(pi[0])
             ac = pc._argClusts[pi[1]]
             origcnt = ac._chdClustIdx_cnt[rcidx]
@@ -331,15 +422,16 @@ class Scorer(object):
             score -= ParseParams.priorNumParam
             score += xlogx(cnt) + xlogx(origcnt-cnt) - xlogx(origcnt)
 
-        for aci, ac in rcl._argClusts:
+        for aci, ac in rcl._argClusts.items():
             origPartCnt = len(ac._partRootTreeNodeIds)
-            score -= xlogx(rcl._ttlCnt - origPartCnt) - denomor
+            score -= (xlogx(rcl._ttlCnt - origPartCnt) - denomor)
 
             if aci not in rArgClustIdx_partCnt:
-                score += xlogx(rtc_new - origPartCnt) - denomnr
+                score += (xlogx(rtc_new - origPartCnt) - denomnr)
                 continue
-            elif rArgClustIdx_partCnt[aci] > 0:
-                score += xlogx(rtc_new - rArgClustIdx_partCnt[aci]) - denomnr
+            
+            if rArgClustIdx_partCnt[aci] > 0:
+                score += (xlogx(rtc_new - rArgClustIdx_partCnt[aci]) - denomnr)
 
             score = update_score_from_dict(score, 
                                            rArgClustIdx_argNum_cnt[aci], 
@@ -359,13 +451,14 @@ class Scorer(object):
 
         for aci, ac in acl._argClusts.items():
             origPartCnt = len(ac._partRootTreeNodeIds)
-            score -= xlogx(acl._ttlArgCnt - origPartCnt) + denomoa
+            score -= (xlogx(acl._ttlCnt - origPartCnt) - denomoa)
 
             if aci not in aArgClustIdx_partCnt:
-                score += xlogx(atc_new - origPartCnt) + denomoa
+                score += (xlogx(atc_new - origPartCnt) - denomna)
                 continue
-            elif aArgClustIdx_partCnt[aci] > 0:
-                score += xlogx(atc_new - aArgClustIdx_partCnt[aci]) + denomoa
+            
+            if aArgClustIdx_partCnt[aci] > 0:
+                score += (xlogx(atc_new - aArgClustIdx_partCnt[aci]) - denomna)
 
             score = update_score_from_dict(score, 
                                            aArgClustIdx_argNum_cnt[aci],
@@ -381,24 +474,28 @@ class Scorer(object):
                                            ac._chdClustIdx_cnt)
 
         for ds in [(rNewArgClustIdx_partCnt, rNewArgClustIdx_argNum_cnt), 
-                   (aNewArgClustIdx_partCnt, rNewArgClustIdx_argNum_cnt)]:
+                   (aNewArgClustIdx_partCnt, aNewArgClustIdx_argNum_cnt)]:
             for aci, partCnt in ds[0].items():
-                score += xlogx(ratc_new-PartCnt) - denomra
+                score += xlogx(ratc_new-partCnt) - denomra
 
-                for idx, cnt in ds[1].items():
+                for idx, cnt in ds[1][aci].items():
                     score += xlogx(cnt)
                     score -= ParseParams.priorNumParam
 
-        for ds in [(rNewArgClustIdx_argCnt, rNewArgClustIdx_argTypeIdx_cnt, rNewArgClustIdx_chdClustIdx_cnt), 
-                   (aNewArgClustIdx_argCnt, aNewArgClustIdx_argTypeIdx_cnt, aNewArgClustIdx_chdClustIdx_cnt)]:
+        for ds in [(rNewArgClustIdx_argCnt, 
+                    rNewArgClustIdx_argTypeIdx_cnt, 
+                    rNewArgClustIdx_chdClustIdx_cnt), 
+                   (aNewArgClustIdx_argCnt, 
+                    aNewArgClustIdx_argTypeIdx_cnt, 
+                    aNewArgClustIdx_chdClustIdx_cnt)]:
             for aci, argCnt in ds[0].items():
                 score -= 2 * xlogx(argCnt)
 
-                for idx, cnt in ds[1].items():
+                for idx, cnt in ds[1][aci].items():
                     score += xlogx(cnt)
                     score -= ParseParams.priorNumParam
 
-                for idx, cnt in ds[2].items():
+                for idx, cnt in ds[2][aci].items():
                     score += xlogx(cnt)
                     score -= ParseParams.priorNumParam
 
@@ -477,141 +574,184 @@ class Scorer(object):
 
         return score
 
-    def scoreMCForAlign(self, clx1, clx2, aci2_aci1):
+    def scoreMCForAlign(self, cluster1, cluster2, aci2_aci1):
         finalScore = 0
 
-        acIdxs1, acIdxs2 = [x._argClusts for x in (clx1, clx2)]
-        tc1, tc2 = [x._ttlCnt for x in (clx1, clx2)]
+        arg_clust_indices1 = cluster1._argClusts
+        arg_clust_indices2 = cluster2._argClusts
 
-        denom  = xlogx(tc1+tc2)
-        denom1 = xlogx(tc1)
-        denom2 = xlogx(tc2)
+        total_count1 = cluster1._ttlCnt
+        total_count2 = cluster2._ttlCnt
+
+        denom  = xlogx(total_count1+total_count2)
+        denom1 = xlogx(total_count1)
+        denom2 = xlogx(total_count2)
 
         deltaNoMergeArgClust = 0
 
-        for ac in acIdxs1.values():
-            pc = len(ac._partRootTreeNodeIds)
-            deltaNoMergeArgClust +=  xlogx(tc1+tc2-pc) \
+        for arg_clust in arg_clust_indices1.values():
+            part_cnt = len(arg_clust._partRootTreeNodeIds)
+            deltaNoMergeArgClust += (xlogx(total_count1+total_count2-part_cnt) \
                                    - denom \
-                                   - xlogx(tc1-pc) \
-                                   + denom1
+                                   - xlogx(total_count1-part_cnt) \
+                                   + denom1)
 
-        for ac in acIdxs2.values():
-            pc = len(ac._partRootTreeNodeIds)
-            deltaNoMergeArgClust +=  xlogx(tc1+tc2-pc) \
+        for arg_clust in arg_clust_indices2.values():
+            part_cnt = len(arg_clust._partRootTreeNodeIds)
+            deltaNoMergeArgClust += (xlogx(total_count1+total_count2-part_cnt) \
                                    - denom \
-                                   - xlogx(tc2-pc) \
-                                   + denom1
+                                   - xlogx(total_count2-part_cnt) \
+                                   + denom2)
 
-        for ai2, ac2 in acIdxs2.items():
-            ptids2 = ac2._partRootTreeNodeIds
-            pc2 = len(ptids2)
-            tac2 = ac2._ttlArgCnt
+        for arg_clust_id2, arg_clust2 in arg_clust_indices2.items():
+            part_count2 = len(arg_clust2._partRootTreeNodeIds)
+            total_arg_count2 = arg_clust2._ttlArgCnt
 
-            newBaseScore = xlogx(tc1+tc2-pc2) - denom - (2 * xlogx(tac2))
+            newBaseScore =  xlogx(total_count1 + total_count2 - part_count2) \
+                          - denom
+            newBaseScore -= 2 * xlogx(total_arg_count2)
             maxScore = newBaseScore
             maxMap = -1
 
-            for j, (ai1, ac1) in enumerate(acIdxs1.items()):
-                ptids1 = ac1._partRootTreeNodeIds
-                pc1 = len(ptids1)
-                tac1 = ac1._ttlArgCnt
+            for arg_clust_id1, arg_clust1 in arg_clust_indices1.items():
+                part_count1 = len(arg_clust1._partRootTreeNodeIds)
+                total_arg_count1 = arg_clust1._ttlArgCnt
 
-                if pc1 == 0:
+                if part_count1 == 0:
                     continue
-                elif pc2 == 0:
-                    aci2_aci1[ai2] = ai1
+                
+                if part_count2 == 0:
+                    aci2_aci1[arg_clust_id2] = arg_clust_id1
                     maxScore = 0
                     break
 
                 score = 0
                 score -= ParseParams.priorMerge
-                score +=  xlogx(tc1+tc2-pc1-pc2) \
-                        - xlogx(tc1+tc2-pc1) \
-                        + (2 * xlogx(tac1)) \
-                        - (2 * xlogx(tac1+tac2))
+                score +=  xlogx(total_count1 + total_count2 - part_count1 - part_count2) \
+                        - xlogx(total_count1 + total_count2 - part_count1) \
+                        + (2 * xlogx(total_arg_count1)) \
+                        - (2 * xlogx(total_arg_count1 + total_arg_count2))
 
                 argNum_newCnt = dict()
 
-                for an, c in ac1._argNum_cnt.items():
-                    argNum_newCnt = inc_key(argNum_newCnt, an, inc=c)
+                for arg_num, count in arg_clust1._argNum_cnt.items():
+                    argNum_newCnt = inc_key(argNum_newCnt, arg_num, inc=count)
 
-                for an, c in ac2._argNum_cnt.items():
-                    argNum_newCnt = inc_key(argNum_newCnt, an, inc=c)
+                for arg_num, count in arg_clust2._argNum_cnt.items():
+                    argNum_newCnt = inc_key(argNum_newCnt, arg_num, inc=count)
 
                 # There is a while() loop in the original code right here 
                 # that is the same as the one in scoreMergeArgs() but here
                 # it doesn't seem to do anything except error out if a certain
                 # condition is met: Scorer.java line 950
 
-                for d in [argNum_newCnt, ac1._argNum_cnt, ac2._argNum_cnt]:
-                    for c in d.values():
-                        if c > 0:
-                            score -= xlogx(c) + ParseParams.priorNumParam
+                for count in argNum_newCnt.values():
+                    if count > 0:
+                        score += xlogx(count) 
+                        score -= ParseParams.priorNumParam
 
-                atc1, atc2 = [x._argTypeIdx_cnt for x in (ac1, ac2)]
-                score = Scorer.update_score_from_ds(score, atc1, atc2)
+                for dictionary in [arg_clust1._argNum_cnt, arg_clust2._argNum_cnt]:
+                    for count in dictionary.values():
+                        if count > 0:
+                            score -= xlogx(count) 
+                            score += ParseParams.priorNumParam
 
-                ccc1, ccc2 = [x._chdClustIdx_cnt for x in (ac1, ac2)]
-                score = Scorer.update_score_from_ds(score, ccc1, ccc2)
+                argtype_count1 = arg_clust1._argTypeIdx_cnt
+                argtype_count2 = arg_clust2._argTypeIdx_cnt
+
+                score = Scorer.update_score_from_ds(score, 
+                                                    argtype_count1, 
+                                                    argtype_count2)
+
+                child_clust_count1 = arg_clust1._chdClustIdx_cnt
+                child_clust_count2 = arg_clust2._chdClustIdx_cnt
+
+                score = Scorer.update_score_from_ds(score, 
+                                                    child_clust_count1, 
+                                                    child_clust_count2)
 
                 if score > maxScore:
                     maxScore = score
-                    maxMap = j
-                    aci2_aci1[ai2] = ai1
+                    aci2_aci1[arg_clust_id2] = arg_clust_id1
 
             finalScore += maxScore - newBaseScore
 
         finalScore += deltaNoMergeArgClust
 
-        return finalScore
+        return finalScore, aci2_aci1
 
+# cl, arg1=0, arg2=11
     def scoreMergeArgs(self, clust, arg1, arg2):
-        score = -ParseParams.priorMerge
-        arg_clust1, arg_clust2 = [clust._argClusts[x] for x in (arg1, arg2)]
-        total_part_cnt = clust._ttlCnt
-        ptids1, ptids2 = [x._partRootTreeNodeIds for x in (arg_clust1, arg_clust2)]
-        tpc1, tpc2 = [len(x) for x in (ptids1, ptids2)]
-        tac1, tac2 = [x._ttlArgCnt for x in (arg_clust1, arg_clust2)]
+        # log = open("/Users/ben_ryan/Documents/DARPA ASKE/usp-code/genia_full/score.log", "a+")
+        # log.write("Scoring merge for args {} and {} for cluster {}\n".format(arg1, arg2, clust))
+        score = 0
+        score -= ParseParams.priorMerge
+        # log.write("Score = {}\n".format(score))
 
-        score -= (xlogx(total_part_cnt-tpc1) + xlogx(total_part_cnt-tpc2))
+        total_part_cnt = clust._ttlCnt
+
+        arg_clust1 = clust._argClusts[arg1]
+        arg_clust2 = clust._argClusts[arg2]
+
+        part_ids1 = arg_clust1._partRootTreeNodeIds
+        part_ids2 = arg_clust2._partRootTreeNodeIds
+
+        total_part_count1 = len(part_ids1)
+        total_part_count2 = len(part_ids2)
+
+        total_arg_count1 = arg_clust1._ttlArgCnt
+        total_arg_count2 = arg_clust2._ttlArgCnt
+
+        score -= (xlogx(total_part_cnt - total_part_count1) \
+                + xlogx(total_part_cnt - total_part_count2))
+        # log.write("score -= (xlogx(total_part_cnt - total_part_count1) + xlogx(total_part_cnt - total_part_count2)) = {}\n".format(score))
         score += xlogx(total_part_cnt)
-        score -= (2 * (xlogx(tac1+tac2)-xlogx(tac1)-xlogx(tac2)))
+        # log.write("score += xlogx(total_part_cnt) = {}\n".format(score))
+        score -= (2 * Scorer.updateScore(total_arg_count1, total_arg_count2))
+        # log.write("score -= (2 * Scorer.updateScore(total_arg_count1, total_arg_count2)) = {}\n".format(score))
 
         argNum_newCnt = dict()
 
-        for d in (arg_clust1._argNum_cnt, arg_clust2._argNum_cnt):
-            for an, cnt in d.items():
-                if cnt == 0:
-                    print("Zero arguments of type {}".format(an))
+        for dic in (arg_clust1._argNum_cnt, arg_clust2._argNum_cnt):
+            for arg_num, count in dic.items():
+                if count == 0:
+                    print("Zero arguments of type {}".format(arg_num))
                     raise Exception
                 else:
-                    score -= xlogx(cnt)
+                    score -= xlogx(count)
+                    # log.write("score -= xlogx({} argnum {}) = {}\n".format(arg_num, count, score))
 
-                argNum_newCnt = inc_key(argNum_newCnt, an, inc=cnt)
+                argNum_newCnt = inc_key(argNum_newCnt, arg_num, inc=count)
 
-        tpc12 = tpc1 + tpc2
-        sit1, sit2 = [java_iter(x) for x in (ptids1, ptids2)]
-        pid1, pid2 = [x.next() for x in (sit1, sit2)]
+        comb_part_cnt = total_part_count1 + total_part_count2
+        part_iter1 = iter(part_ids1)
+        part_iter2 = iter(part_ids2)
+        pid1 = next(part_iter1)
+        pid2 = next(part_iter2)
 
         while True:
+            # log.write("pid1 = {}, pid2 = {}\n".format(pid1, pid2))
             if pid1 == pid2:
-                c1 = len(Part.getPartByRootNodeId(pid1)._argClustIdx_argIdxs[arg1])
-                c2 = len(Part.getPartByRootNodeId(pid2)._argClustIdx_argIdxs[arg2])
-                c0 = c1 + c2
-                tpc12 -= 1
+                cnt1 = len(Part.getPartByRootNodeId(pid1)._argClustIdx_argIdxs[arg1])
+                cnt2 = len(Part.getPartByRootNodeId(pid2)._argClustIdx_argIdxs[arg2])
+                comb_cnts = cnt1 + cnt2
+                comb_part_cnt -= 1
 
-                argNum_newCnt = inc_key(argNum_newCnt, c0)
-                argNum_newCnt = dec_key(argNum_newCnt, c1, remove=True)
-                argNum_newCnt = dec_key(argNum_newCnt, c2, remove=True)
+                argNum_newCnt = inc_key(argNum_newCnt, comb_cnts)
+                argNum_newCnt = dec_key(argNum_newCnt, cnt1, remove=True)
+                argNum_newCnt = dec_key(argNum_newCnt, cnt2, remove=True)
 
-                if not (sit1.hasnext() or sit2.hasnext()):
+                try:
+                    pid1 = next(part_iter1)
+                    pid2 = next(part_iter2)
+                except StopIteration:
                     break
-
-                pid1, pid2 = [x.next() for x in (sit1, sit2)]
             elif pid1 < pid2:
-                while sit1.hasnext():
-                    pid1 = sit1.next()
+                while True:
+                    try:
+                        pid1 = next(part_iter1)
+                    except StopIteration:
+                        break
 
                     if pid1 >= pid2:
                         break
@@ -619,8 +759,11 @@ class Scorer(object):
                 if pid1 < pid2:
                     break
             else:
-                while sit2.hasnext():
-                    pid2 = sit2.next()
+                while True:
+                    try:
+                        pid2 = next(part_iter2)
+                    except StopIteration:
+                        break
 
                     if pid1 <= pid2:
                         break
@@ -628,40 +771,56 @@ class Scorer(object):
                 if pid1 > pid2:
                     break
 
-        score += xlogx(total_part_cnt - tpc12)
+        score += xlogx(total_part_cnt - comb_part_cnt)
+        # log.write("score += xlogx(total_part_cnt - comb_part_cnt) = {}\n".format(score))
 
-        for c in argNum_newCnt.values():
-            score += xlogx(c)
+        for count in argNum_newCnt.values():
+            score += xlogx(count)
+            # log.write("score += xlogx(argNum_newCnt ({})) = {}\n".format(count, score))
 
         score += ((len(arg_clust1._argNum_cnt) \
-                   + len(arg_clust2._argNum_cnt) \
-                   - len(argNum_newCnt)) \
+                 + len(arg_clust2._argNum_cnt) \
+                 - len(argNum_newCnt)) \
                  * ParseParams.priorNumParam)
+        # log.write("score += ((len(arg_clust1._argNum_cnt) + len(arg_clust2._argNum_cnt) - len(argNum_newCnt)) * ParseParams.priorNumParam) = {}\n".format(score))
 
-        atc1, atc2 = [x._argTypeIdx_cnt for x in (arg_clust1, arg_clust2)]
-        score = Scorer.update_score_from_ds(score, atc1, atc2)
+        argtype_count1 = arg_clust1._argTypeIdx_cnt
+        argtype_count2 = arg_clust2._argTypeIdx_cnt
 
-        ccc1, ccc2 = [x._chdClustIdx_cnt for x in (arg_clust1, arg_clust2)]
-        score = Scorer.update_score_from_ds(score, ccc1, ccc2)
+        score = Scorer.update_score_from_ds(score, 
+                                            argtype_count1, 
+                                            argtype_count2)
+        # log.write("score after counting ArgTypes = {}\n".format(score))
+
+        child_clust_count1 = arg_clust1._chdClustIdx_cnt
+        child_clust_count2 = arg_clust2._chdClustIdx_cnt
+
+        score = Scorer.update_score_from_ds(score, 
+                                            child_clust_count1, 
+                                            child_clust_count2)
+        # log.write("score after counting child clusters = {}\n\n".format(score))
+        # log.close()
 
         return score
         
 
-    def update_score_from_ds(score, cntd1, cntd2):
-        if len(cntd1) <= len(cntd2):
-            for key in cntd1:
-                if key in cntd2:
-                    cx1, cx2 = [x[key] for x in (cntd1, cntd2)]
-                    score = Scorer.updateScore(cx1, cx2)
-                    score += ParseParams.priorNumParam
+    def update_score_from_ds(scr, count_dict1, count_dict2):
+        if len(count_dict1) <= len(count_dict2):
+            for key in count_dict1:
+                if key in count_dict2:
+                    cnt_1 = count_dict1[key]
+                    cnt_2 = count_dict2[key]
+                    scr += Scorer.updateScore(cnt_1, cnt_2)
+                    scr += ParseParams.priorNumParam
         else:
-            for key in cntd2:
-                if key in cntd1:
-                    cx1, cx2 = [x[key] for x in (cntd1, cntd2)]
-                    score = Scorer.updateScore(cx1, cx2)
-                    score += ParseParams.priorNumParam
+            for key in count_dict2:
+                if key in count_dict1:
+                    cnt_1 = count_dict1[key]
+                    cnt_2 = count_dict2[key]
+                    scr += Scorer.updateScore(cnt_1, cnt_2)
+                    scr += ParseParams.priorNumParam
 
-        return score
+        return scr
 
     def updateScore(x, y):
         update = xlogx(x+y) - xlogx(x) - xlogx(y)

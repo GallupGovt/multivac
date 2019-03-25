@@ -2,19 +2,102 @@
 import argparse
 import os
 import re
-import spacy
-nlp = spacy.load('en')
+# import spacy
+# nlp = spacy.load('en')
+import stanfordnlp
+nlp = stanfordnlp.Pipeline(processors='tokenize,lemma,pos')
 
-from collections import OrderedDict 
+import corenlp
 
-import settings
+from collections import OrderedDict
+
+#from multivac import settings
 from utils import Utils
 from syntax.Nodes import Article, Sentence, Token
 from semantic import MLN, Part, Clust
 
+class stanford_token():
+    def __init__(self, text='', index=None, lemma_='', pos_='', 
+                 ner='', dep_='', head=None):
+        self.i = index
+        self.text = text
+        self.lemma_ = lemma_
+        self.pos_ = pos_
+        self.ner = ner
+        self.dep_ = dep_
+        self.head = head
+        self.has_children = False
+
+    def __repr__(self):
+        return self.text
+
+
+class stanford_parse():
+    def __init__(self, sentence, deptype='basicDependencies'):
+        self.tokens = []
+        self.root = 0
+
+        if isinstance(sentence,str):
+            sentence = stanford_parse.get_parse(sentence)
+
+        self.deps = sorted(sentence[deptype], key=lambda k: k['dependent'])
+
+        for i, w in enumerate(sentence['tokens']):
+            tok = stanford_token(text=w['originalText'], 
+                                 index=w['index'],
+                                 lemma_=w['lemma'],
+                                 pos_=w['pos'],
+                                 ner=w['ner'],
+                                 dep_=self.deps[i]['dep'],
+                                 head=self.deps[i]['governor']-1)
+            self.tokens.append(tok)
+            if tok.dep_ == 'ROOT':
+                self.root = len(self.tokens)-1
+
+        self._tokens = {t.text: t.i for t in self.tokens}
+
+        for tok in self.tokens:
+            self.tokens[tok.head].has_children = True
+
+    def __repr__(self):
+        return ' '.join(["{}".format(t) for t in self.tokens])
+
+    def get_root(self):
+        return self.tokens[self.root]
+
+    def get_parse(sentence):
+        anns = "tokenize ssplit pos lemma ner depparse"
+        with corenlp.CoreNLPClient(annotators=anns.split()) as client: 
+            ann = client.annotate(sentence, output_format='json')
+
+        return ann['sentences'][0]
+
+    def get_deps(sentence, deptype='basicDependencies', ret='asis'):
+        if isinstance(sentence,str):
+            sentence = stanford_parse.get_parse(sentence, deptype)
+
+        deps = sentence[deptype]
+
+        if ret == 'asis':
+            retval = deps
+        else:
+            retval = {}
+            retval['deps'] = {x['dep']: x['dependent'] for x in deps}
+            retval['heads'] = {x['dependentGloss']: x['governorGloss'] for x in deps}
+            retval['governors'] = {x['dependent']: x['governorGloss'] for x in deps}
+            retval['dependents'] = {x['dependent']: x['dependentGloss'] for x in deps}
+            retval['text'] = ["{}({}-{}, {}-{})".format(x['dep'], 
+                                                x['governorGloss'], 
+                                                x['governor'], 
+                                                x['dependentGloss'], 
+                                                x['dependent']) for x in deps]
+        return retval
+
+    def get_children(self, tok):
+        return set([t for t in self.tokens if t.head+1 == tok.i])
 
 class USP(object):
-    allowedDeps = set(['nn','amod','prep_of','num','appos'])
+    allowedDeps = set(['nn','nmod','amod','case','num','appos'])
     target_args = set(['nsubj','nsubjpass','dobj','attr','pobj'])
     five_ws_and_h = ['who','what','where','when','why','how']
     evalDir = ''
@@ -41,64 +124,91 @@ class USP(object):
     id_sent = dict() # {str: str}
     id_article = dict() # {str: Article}
 
-    def readQuestions():
+    def readQuestions(verbose=False):
         filename = USP.evalDir + "/questions.txt"
 
         with open(filename, "r") as f:
             lines = f.readlines()
 
-        questions = [nlp(line.strip()) for line in lines]
+#        questions = nlp('\n'.join(lines))
+        questions = [stanford_parse(line) for line in lines]
 
-        for question in questions:
-            if len(question) == 0:
+        for i, question in enumerate(questions):
+            if len(question.tokens) == 0:
                 continue
-                
-            deps = []
-            args = []
-            q_tok = None
 
-            for t in q:
-                USP.form_lemma[t.lower_] = t.lemma_
+            if verbose:
+                print(' '.join([t.text for t in question.tokens]))
 
-                if t.dep_ == 'ROOT':
-                    rel = t
+            verbs = [t for t in question.tokens if t.pos_.startswith('V') 
+                                               and t.has_children
+                                               and not t.dep_.startswith('aux')
+                                               and not t.dep_ in ['cop','dep']]
+            if len(verbs) == 0:
+                verbs = [question.get_root()]
 
-                if t.text in USP.five_ws_and_h:
-                    q_tok = t
+            if verbose:
+                print("Key relations: {}".format(verbs))
 
-            q_subtree = [q_tok]
+            # q_tok = [t for t in question.tokens if t.pos_=='WRB'][0]
 
-            while q_tok.head != q_tok:
-                q_tok = q_tok.head
-                q_subtree.append(q_tok)
+            # Get args by:
+            #       - what to do when two question words included?
 
-            args = [t for t in question if t.dep_ in USP.target_args 
-                    and t not in q_subtree]
-            deps = [t for t in q_subtree if t.dep_ in USP.target_args]
+            for t in question.tokens:
+                USP.form_lemma[t.text] = t.lemma_
 
-            if len(deps) == 0:
-                deps = ['advmod']
-            
-            graph = USP.graph_question(question)
-            arg_paths = {}
+            for rel in verbs:
+                args = [t for t in question.get_children(rel) if t.pos_.startswith('N')]
 
-            for arg in args:
-                path = nx.shortest_path(graph, 
-                                        source='{}-{}'.format(q_tok, q_tok.i), 
-                                        target='{}-{}'.format(arg, arg.i))
-                arg_paths[len(path)] = (arg, path)
+                if len(args) == 0:
+                    args = [t for t in question.tokens if t.pos_.startswith('N')]
 
-            arg, path = arg_paths[min(arg_paths)]
-            arg_tree = [x.text for x in arg.subtree]
-            qu = Question(rel, ' '.join(arg_tree), deps[0])
+                arg = [t for t in args if t.dep_.startswith('nsubj')]
 
-            if rel not in USP.rel_qs:
-                USP.rel_qs[rel] = list()
+                if len(arg) == 0:
+                    arg = [args[0]]
+                    dep = 'nsubj'
+                else:
+                    if len(args) > 1:
+                        dep = [t for t in args if t not in arg][0]
+                    else:
+                        dep = 'dobj'
 
-            USP.rel_qs[rel].append(qu)
-            USP.qForms.update(arg_tree + [rel])
+                if verbose:
+                    print("Main arguments: {} and {}".format(arg, dep))
+
+                if arg[-1].has_children:
+                    if verbose:
+                        print("Argument has children; building sub-tree.")
+                    sub_tree = build_subtree(question, arg[-1], verbose=verbose)
+                    sub_tree = sorted(list(sub_tree), key=lambda k: k.i)
+                    arg += sub_tree
+
+                if verbose:
+                    print("Arg sub-tree: {}".format(arg))
+
+                qu = Question(rel.text, ' '.join([t.text for t in arg]), dep)
+
+                if rel not in USP.rel_qs:
+                    USP.rel_qs[rel] = list()
+
+                USP.rel_qs[rel].append(qu)
+                USP.qForms.update(arg + [rel])
+
+                # del arg
+                # del rel
+                # del dep
 
         return None
+
+    def build_subtree(q, parent, children=set(), verbose=False):
+        if parent.has_children:
+            for child in q.get_children(parent):
+                children.add(child)
+                children = children.union(build_subtree(q, child, children))
+
+        return children
 
     def graph_question(question):
         edges = []
@@ -162,18 +272,26 @@ class USP(object):
 
         return None
 
-    def procRelType(clustIdx, pos, relType):
-        if relType in USP.rel_qs and pos == 'V':
-            Clust.relTypeIdx_clustIdx[relType] = clustIdx
+    def procRelType(clustIdx, relType, POS, rel):
+        # if rel in USP.rel_qs and POS.startswith('V'):
+        #     Clust.relTypeIdx_clustIdx[relType] = clustIdx
 
-        # lemma_clustIdxs never seems to get called in the question parsing/
-        # answering, so I don't think this is necessary
+        if rel in USP.qLemmas:
+            if rel not in USP.lemma_clustIdxs:
+                USP.lemma_clustIdxs[rel] = set()
 
-        # if relType in USP.qLemmas:
-        #     if relType not in USP.lemma_clustIdxs:
-        #         USP.lemma_clustIdxs[relType] = set()
+            USP.lemma_clustIdxs[rel].add(str(clustIdx))
+        else:
+            if ' ' in rel:
+                headdep = rel.split()
+                head = headdep[0]
+                dep = re.search(r'\(\w+:\w+\)', headdep[1]).group()
+                
+                if len(dep) > 0:
+                    dep = dep[dep.index(":")+1:-1]
 
-        #     USP.lemma_clustIdxs[relType].add(str(clustIdx))
+                if (head and dep) in USP.qLemmas:
+                    USP.headDep_clustIdxs[(head, dep)] = str(clustIdx)
 
         return None
 
@@ -192,7 +310,7 @@ class USP(object):
                 rel_str = RelType.getRelType(relType).toString()
                 POS = rel_str[rel_str.index('(')+1:rel_str.index(':')]
                 rel = rel_str[rel_str.index(':')+1:rel_str.rfind(")")]
-                USP.procRelType(cid, POS, rel)
+                USP.procRelType(cid, relType, POS, rel)
 
         return None
 
@@ -237,11 +355,6 @@ class USP(object):
                 for cid in cids:
                     if USP.ptId_parDep[cid] not in USP.allowedDeps:
                         continue
-
-                    if USP.ptId_parDep[cid].startswith('prep_'):
-                        s = USP.ptId_parDep[cid].replace('prep_','')+' '
-                    else:
-                        s = ''
 
                     id_str[cid] = s + USP.getTreeStrOld(cid)
 
@@ -411,12 +524,12 @@ class USP(object):
 
                 if tknIdx in sent._tkn_par:
                     par = sent._tkn_par[tknIdx]
-                    if par[0].startswith('prep_'):
+                    if par[0].startswith('case'):
                         parIdx = par[1]
                         parId = Utils.genTreeNodeId(aid, sIdx, parIdx)
 
                         if a.contains(parId):
-                            prep = par[0].replace('prep_','')
+                            prep = par[0]
                             mpid = pid_minPid[i]
                             midx = USP.getTknIdx(mpid)
 
@@ -471,7 +584,7 @@ class USP(object):
                         y = findAnsPrep(cid, pid_minPid)
                         ans += y
 
-                        if Utils.compareStr(pid_minPid[cid], pid_minPid[pid]) < 0:
+                        if pid_minPid[cid] < pid_minPid[pid] < 0:
                             pid_minPid[pid] = pid_minPid[cid]
                     elif dep in USP.allowedDeps:
                         curr1 = list()

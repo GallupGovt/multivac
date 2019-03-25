@@ -1,4 +1,4 @@
-
+    
 
 #
 # Clust
@@ -51,7 +51,7 @@ class Clust(object):
         return None
 
     def createClust(relTypeIdx):
-        # Should this all go in __init__()? 
+        # Should this all go in __init__()?
         cl = Clust(relTypeIdx)
 
         return cl.getId()
@@ -115,7 +115,7 @@ class Clust(object):
 
         return None
 
-# Non-class functions
+# Class Instance functions
 
     def __init__(self, relTypeIdx):
         self._clustIdx = Clust.nxtClustIdx
@@ -154,11 +154,11 @@ class Clust(object):
         assert argTypeIdx not in self._argTypeIdx_argClustIdxs
         argClustIdx = self._nxtArgClustIdx
         self._nxtArgClustIdx += 1
-        ac = ArgClust()
-        self._argClusts[argClustIdx] = ac
-        acs = set()
-        acs.add(argClustIdx)
-        self._argTypeIdx_argClustIdxs[argTypeIdx] = acs
+        arg_clust = ArgClust()
+        self._argClusts[argClustIdx] = arg_clust
+        arg_clust_ids = set()
+        arg_clust_ids.add(argClustIdx)
+        self._argTypeIdx_argClustIdxs[argTypeIdx] = arg_clust_ids
 
         return argClustIdx
 
@@ -203,10 +203,10 @@ class Clust(object):
         else:
             ac._argTypeIdx_cnt[argTypeIdx]  = 1
 
-        if chdClustIdx in ac._argTypeIdx_cnt:
-            ac._argTypeIdx_cnt[chdClustIdx] += 1
+        if chdClustIdx in ac._chdClustIdx_cnt:
+            ac._chdClustIdx_cnt[chdClustIdx] += 1
         else:
-            ac._argTypeIdx_cnt[chdClustIdx]  = 1
+            ac._chdClustIdx_cnt[chdClustIdx]  = 1
 
         ac._ttlArgCnt += 1
 
@@ -277,7 +277,7 @@ class Clust(object):
         else:
             ac._chdClustIdx_cnt[chdClustIdx] -= 1
 
-        ac._ttlCnt -= 1
+        ac._ttlArgCnt -= 1
         cl_ac = (self.getId(), argClustIdx)
 
         if Clust.clustIdx_parArgs[chdClustIdx][cl_ac] == 1:
@@ -288,7 +288,8 @@ class Clust(object):
         if len(Clust.clustIdx_parArgs[chdClustIdx]) == 0:
             del Clust.clustIdx_parArgs[chdClustIdx]
 
-        ac._partRootTreeNodeIds.remove(part.getRelTreeRoot().getId())
+        if part.getRelTreeRoot().getId() in ac._partRootTreeNodeIds:
+            ac._partRootTreeNodeIds.discard(part.getRelTreeRoot().getId())
 
         if ac._ttlArgCnt == 0:
             self.removeArgClust(argClustIdx)
@@ -297,7 +298,7 @@ class Clust(object):
             oldArgNum = 0
 
             if argClustIdx in part._argClustIdx_argIdxs:
-                oldArgNum = part._argClustIdx_argIdxs[argClustIdx]
+                oldArgNum = len(part._argClustIdx_argIdxs[argClustIdx])
 
             if oldArgNum > 0:
                 if oldArgNum in ac._argNum_cnt:
@@ -326,10 +327,13 @@ class Clust(object):
         toDel = set()
 
         for ati in self._argTypeIdx_argClustIdxs:
-            self._argTypeIdx_argClustIdxs[ati].remove(argClustIdx)
+            self._argTypeIdx_argClustIdxs[ati].discard(argClustIdx)
 
             if len(self._argTypeIdx_argClustIdxs[ati]) == 0:
-                del self._argTypeIdx_argClustIdxs[ati]
+                toDel.add(ati)
+
+        for ati in toDel:
+            del self._argTypeIdx_argClustIdxs[ati]
 
         return None
 

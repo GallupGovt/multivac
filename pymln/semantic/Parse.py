@@ -1,5 +1,6 @@
 
 from datetime import datetime
+from sortedcontainers import SortedDict
 from semantic import Argument, Clust, Part, Agenda, Executor, Scorer
 from syntax.StanfordParseReader import StanfordParseReader
 from syntax.Nodes import TreeNode
@@ -13,15 +14,16 @@ class Parse(object):
         self.numSents = 0
         self.numTkns = 0
 
-        self.id_article = {}
+        self.id_article = SortedDict()
 
-#        self.rootTreeNodeIds = set()
-#        self.parseReader = StanfordParseReader()
+        self.rootTreeNodeIds = set()
+        self.parseReader = StanfordParseReader()
         self.scorer = Scorer()
-        self.agenda = Agenda(self)
         self.executor = Executor(self)
+        self.agenda = Agenda(self)
 
-    def createArgs(self, art_id, sent_id, sent, parent_id, done=set()):
+    def createArgs(self, art_id, sent_id, sent, parent_id, 
+                   done=set(), verbose=False):
         '''
             For each token, get the TreeNode, Part, Cluster and (based on 
             sentence dependencies) the children tokens.
@@ -37,32 +39,35 @@ class Parse(object):
             # 
         '''
         parent_node_id = genTreeNodeID(art_id, sent_id, parent_id)
-        done.add(parent_node_id)
-
+        parent = TreeNode.getTreeNode(parent_node_id)
         parent_part = Part.getPartByRootNodeId(parent_node_id)
-        parent = parent_part.getRelTreeRoot()
         parent_clust = Clust.getClust(parent_part.getClustIdx())
         children = sent.get_children(parent_id)
 
         if children is not None:
-            for child_id, relation in children:
+            for relation, child_id in children:
                 child_node_id = genTreeNodeID(art_id, sent_id, child_id)
+                path = Path(relation)
+                arg_type_id = path.getArgType()
 
-                if child_node_id in done:
-                    continue
+                # if child_node_id in done:
+                #     continue
 
                 child_part = Part.getPartByRootNodeId(child_node_id)
 
                 if child_part is None:
-                    continue
-                elif child_part.getParPart() is not None:
+                    if verbose:
+                        print("Child node id {} has no part".format(child_node_id))
+                
+                if child_part.getParPart() is not None:
+                    if verbose:
+                        print("Child node id {} already has "
+                              "parent {}".format(child_node_id,
+                                                 child_part.getParPart().getRelTreeRoot().getId()))
                     continue
                 
-                path = Path(relation)
-                arg_type_id = path.getArgType()
-                arg_id = parent_part.addArgument(Argument(parent, 
-                                                          path, 
-                                                          child_part))
+                arg = Argument(parent, path, child_part)
+                arg_id = parent_part.addArgument(arg)
                 child_part.setParent(parent_part, arg_id)
 
                 arg_clust_ids = parent_clust.getArgClustIdxs(arg_type_id)
@@ -74,8 +79,10 @@ class Parse(object):
 
                 parent_part.setArgClust(arg_id, arg_clust_id)
 
-                done.add(child_node_id)
+                #done.add(child_node_id)
                 self.createArgs(art_id, sent_id, sent, child_id)
+        
+        #done.add(parent_node_id)
 
         return None
 
@@ -87,19 +94,19 @@ class Parse(object):
         return None
 
     def initialize(self, arts, verbose=False):
-        for i, art in enumerate(arts):
+        for art in arts:
             self.id_article[art.uid] = art
             self.numSents += len(art.sentences)
 
             if verbose:
                     print("Article {} processing...".format(art.uid))
 
-            for i, sent in art.sentences.items():
-                self.initializeSent(art.uid, i, sent)
+            for i, sent in enumerate(art.sentences):
+                self.initializeSent(art.uid, i, sent, verbose)
 
         return None
 
-    def initializeSent(self, ai, sj, sent):
+    def initializeSent(self, ai, sj, sent, verbose=False):
         '''
             Create TreeNode, Part, and Clust for each token in a sentence,
             also adding/assigning RelTypes.
@@ -110,7 +117,6 @@ class Parse(object):
             tree for each sentence.
         '''
         self.numTkns += len(sent.get_tokens())-1
-
         roots = sent.get_children(0)
 
         if roots is None:
@@ -118,53 +124,53 @@ class Parse(object):
         elif len(roots) == 0:
             return None
 
-        for k, tok in enumerate(sent.get_tokens()):
-        #     # How necessary is this? This requires re-traversing the dep tree
-        #     # of each sentence for every node; gotta be a huge time suck.
-        #     if Parse.isIgnore(sent, k):
-        #         continue
+        for k in range(1, len(sent.get_tokens())):
+            Parse.part_from_node(ai, sj, sent, k, sent.get_token(k))
 
-            Parse.part_from_node(ai, sj, sent, k, tok)
+        # if len(roots) == 1:
+        for _, idx in roots:
+            sub_node_id = genTreeNodeID(ai, sj, idx)
+            # Is this global set really necessary? I don't think it is...
+            self.rootTreeNodeIds.add(sub_node_id)
+            node_part = Part.getPartByRootNodeId(sub_node_id)
 
-        if len(roots) == 1:
-            for idx, _ in roots:
-                sub_node_id = genTreeNodeID(ai, sj, idx)
-                # Is this global set really necessary? I don't think it is...
-                # self.rootTreeNodeIds.add(sub_node_id)
-                node_part = Part.getPartByRootNodeId(sub_node_id)
-
-                if node_part is None:
-                    continue
-                
-                ncl = Clust.getClust(node_part.getClustIdx())
-                ncl.incRootCnt()
-                self.createArgs(ai, sj, sent, idx)
+            if node_part is None:
+                continue
+            
+            ncl = Clust.getClust(node_part.getClustIdx())
+            ncl.incRootCnt()
+            self.createArgs(ai, sj, sent, idx, verbose)
 
         return None
 
     def part_from_node(ai, sj, sent, k, tok):
-            node_id = genTreeNodeID(ai,sj,k)
-            tn = TreeNode(node_id, tok)
-            part = Part(tn)
-            relTypeIdx = part.getRelTypeIdx()
-            clustIdxs = Clust.getClustsWithRelType(relTypeIdx)
+            if not Parse.isIgnore(sent, k):
+                tn = TreeNode(genTreeNodeID(ai,sj,k), tok)
+                part = Part(tn)
+                relTypeIdx = part.getRelTypeIdx()
+                clustIdxs = Clust.getClustsWithRelType(relTypeIdx)
 
-            if clustIdxs is not None:
-                clustIdx = next(iter(clustIdxs))
-            else: 
-                clustIdx = Clust.createClust(relTypeIdx)
+                if clustIdxs is not None:
+                    clustIdx = next(iter(clustIdxs))
+                else: 
+                    clustIdx = Clust.createClust(relTypeIdx)
 
-            part.setClust(clustIdx)
+                part.setClust(clustIdx)
 
             return None
 
     def isIgnore(sent, k):
+        done = set()
+
         while True:
             parent = sent.get_parent(k)
             
             if parent is None:
                 break
+            elif parent in done:
+                break
             else:
+                done.add(k)
                 k = parent[1]
 
         return (k>0)
@@ -173,7 +179,7 @@ class Parse(object):
         '''
             For each cluster, count up all the arguments for each ArgClust. 
             Iterating from most args to least, for each ArgClust score whether
-            merging it 
+            merging it makes sense.
         '''
         i = 0
         for clust_id, clust in Clust.clusts.items():
@@ -191,16 +197,19 @@ class Parse(object):
 
                 if len(new_arg_clusts) == 0:
                     new_arg_clusts[arg_clust_id] = arg_clust
+                    continue
 
                 maxScore = 0
                 maxMap = -1
 
-                for i in new_arg_clusts:
-                    score = self.scorer.scoreMergeArgs(clust, i, arg_clust_id)
+                for aci in new_arg_clusts.keys():
+                    # This sorting is not necessary - for debugging only
+                    # remove on final version
+                    score = self.scorer.scoreMergeArgs(clust, aci, arg_clust_id)
 
                     if score > maxScore:
                         maxScore = score
-                        maxMap = i
+                        maxMap = aci
 
                 if maxMap >= 0:
                     self.executor.mergeArg(clust, maxMap, arg_clust_id)
@@ -263,8 +272,7 @@ class Parse(object):
                 part.setClust(clustIdx, clust_only=True)
 
             if len(roots) == 1:
-                dep_idx = next(iter(roots))
-                idx = dep_idx[0]
+                _, idx = next(iter(roots))
                 nid = genTreeNodeID(aid, si, idx)
                 np = Part.getPartByRootNodeId(nid)
 
@@ -296,38 +304,37 @@ class Parse(object):
 
         return None
 
-    def setArgs(self, aid, si, sent, idx):
-        nid = genTreeNodeID(aid, si, idx)
-        np = Part.getPartByRootNodeId(nid)
-        node = np.getRelTreeRoot()
-        ncl = Clust.getClust(np.getClustIdx())
-        chds = sent.get_children(idx)
+    def setArgs(self, art_id, sent_id, sent, idx):
+        this_part = Part.getPartByRootNodeId(genTreeNodeID(art_id, sent_id, idx))
+        this_node = this_part.getRelTreeRoot()
+        node_clust = Clust.getClust(this_part.getClustIdx())
+        children = sent.get_children(idx)
 
-        if chds is None:
+        if children is None:
             return None
         else:
-            for cidx, dep in chds:
-                cid = genTreeNodeID(aid, si, cidx)
-                p = Path(dep)
-                argTypeIdx = p.getArgType()
-                cp = Part.getPartByRootNodeId(cid)
+            for dependency, child_index in children:
+                child_node_id = genTreeNodeID(art_id, sent_id, child_index)
+                path = Path(dependency)
+                argTypeIdx = path.getArgType()
+                child_part = Part.getPartByRootNodeId(child_node_id)
 
-                if cp.getParPart() is not None:
+                if child_part.getParPart() is not None:
                     continue
 
-                arg = Argument(node, p, cp)
-                argIdx = np.addArgument(arg)
-                cp.setParent(np, argIdx)
-                argClustIdxs = ncl.getArgClustIdxs(argTypeIdx)
+                arg = Argument(this_node, path, child_part)
+                argIdx = this_part.addArgument(arg)
+                child_part.setParent(this_part, argIdx)
+                argClustIdxs = node_clust.getArgClustIdxs(argTypeIdx)
                 argClustIdx = -1
 
                 if argClustIdxs is None:
-                    argClustIdx = ncl.createArgClust(argTypeIdx)
+                    argClustIdx = node_clust.createArgClust(argTypeIdx)
                 else:
                     argClustIdx = next(iter(argClustIdxs))
 
-                np.setArgClust(argIdx, argClustIdx, clust_only=True)
+                this_part.setArgClust(argIdx, argClustIdx, clust_only=True)
 
-                setArgs(aid, si, sent, cidx)
+                setArgs(art_id, sent_id, sent, child_index)
 
         return None

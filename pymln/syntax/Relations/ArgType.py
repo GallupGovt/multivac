@@ -22,6 +22,18 @@ class ArgType(object):
         i = len(ArgType.argTypes) - 1
         ArgType.argTypeStr_idx[s] = i
 
+    def __hash__(self):
+        return hash(self.toString())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
+    def __str__(self):
+        return self.toString()
+
+    def __repr__(self):
+        return self.toString()
+
     def getArgType(target):
         if isinstance(target, int):
             return ArgType.argTypes[target]
@@ -56,9 +68,6 @@ class ArgType(object):
                         result = this - that
         
         return result
-
-    def equals(self, o):
-        return self.compareTo(o) == 0
 
     def toString(self):
         if self._str is None:

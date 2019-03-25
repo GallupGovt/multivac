@@ -9,13 +9,9 @@ class Article(object):
     '''
     def __init__(self, fn=None):
         self.uid = fn
-        self.sentences = {}
+        self.sentences = []
 
     def __repr__(self):
         return str(self.__dict__)
-
-    def add_new_sent(self, sent):
-        self.sentences[len(self.sentences)+1] = sent
-        return None
 
     

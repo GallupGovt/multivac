@@ -18,18 +18,24 @@ class SearchOp(object):
         self._chdClustIdx = None
         self._str = None
 
+    def __hash__(self):
+        return hash(self.toString())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
+    def __lt__(self, other):
+        return self.compareTo(other) < 0
+
+    def __repr__(self):
+        return self.toString()
+
     def compareTo(self, z):
         this = sum([ord(x) for x in self.toString()])
         that = sum([ord(x) for x in z.toString()])
         result = this - that
         
         return result
-
-    def equals(self, o):
-        if not isinstance(o, SearchOp):
-            return False
-        else:
-            return self.compareTo(o) == 0
 
     def toString(self):
         if self._str is None:
@@ -40,15 +46,15 @@ class SearchOp(object):
     def genString(self):
         self._str = "OP_{}:".format(self._op)
 
-        if self._op == OP_MERGE_CLUST:
+        if self._op == SearchOp.OP_MERGE_CLUST:
             c1 = Clust.getClust(self._clustIdx1)
             c2 = Clust.getClust(self._clustIdx2)
             self._str += "{} == {}".format(c1.toString(), c2.toString())
-        elif self._op == OP_MERGE_ROLE:
+        elif self._op == SearchOp.OP_MERGE_ROLE:
             self._str += "{}:{}:{}".format(self._clustIdx, 
                                            self._argIdx1, 
                                            self._argIdx2)
-        elif self._op == OP_COMPOSE:
+        elif self._op == SearchOp.OP_COMPOSE:
             rc = Clust.getClust(self._parClustIdx)
             ac = Clust.getClust(self._chdClustIdx)
             self._str += "{} ++ {}".format(rc.toString(), ac.toString())

@@ -1,11 +1,27 @@
 
+# from collections import OrderedDict
+from sortedcontainers import SortedDict, SortedSet
 from syntax.Nodes import Token
 
 class TreeNode(object):
-    def __init__(self, idx, tkn):
-        self._id = idx
-        self._tkn = tkn
-        self._children = {}
+    # map {str: TreeNode}
+    id_treeNodes = {}
+
+    def __init__(self, tree_node_id, token):
+        self._id = tree_node_id
+        self._tkn = token
+        # map {str: set(TreeNodes)}
+        self._children = SortedDict()
+        TreeNode.id_treeNodes[tree_node_id] = self
+
+    def __hash__(self):
+        return hash(self.toString())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
+    def __lt__(self, other):
+        return self.compareTo(other) < 0
 
     def __str__(self):
         return self.toString()
@@ -13,14 +29,11 @@ class TreeNode(object):
     def __repr__(self):
         return self.toString()
 
-
     def addChild(self, dep, child):
-        if dep in self._children:
-            self._children[dep] = tns.add(child)
-        else:
-            tns = set()
-            tns.add(child)
-            self._children[dep] = tns
+        if dep not in self._children:
+            self._children[dep] = SortedSet()
+
+        self._children[dep].add(child)
 
         return None
 
@@ -37,16 +50,16 @@ class TreeNode(object):
         if not isinstance(z, TreeNode):
             raise ValueError
 
-        return self._tkn.compareTo(z.tkn_)
-
-    def equals(self, obj):
-        return self.compareTo(obj) == 0
+        return self._tkn.compareTo(z._tkn)
 
     def toString(self):
         return self._tkn.toString()
 
+    def getTreeNode(tree_node_id):
+        return TreeNode.id_treeNodes[tree_node_id]
+
     def getTreeStr(self):
-        id_str = {}
+        id_str = SortedDict()
 
         if (len(self._children) > 0):
             for dep, nodes in self._children.items():
@@ -59,7 +72,7 @@ class TreeNode(object):
                     id_str[node.getId()] = s
 
         id_str[self._id] = self._tkn.getLemma()
-        result = ' '.join([id_str[x] for x in id_str.keys()])
+        result = ' '.join(id_str.values())
 
         return result
 

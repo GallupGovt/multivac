@@ -31,8 +31,10 @@ class MLN(object):
         out_str = "=== Clustering ===\n"
 
         for ci, clust in Clust.clusts.items():
-            if len(clust._relTypeIdx_cnt) > 1:
-                out_str += clust.toString() + "\n"
+            # if len(clust._relTypeIdx_cnt) > 1:
+            out_str += str(ci) + " " + clust.toString() + "\n"
+            for aci, ac in clust._argClusts.items():
+                out_str += "\t{}\t{}\t{}\n".format(aci, ac.toString(), ac._ttlArgCnt)
 
         if path is not None:
             dst = "{}/{}.clustering".format(path, 
@@ -57,8 +59,7 @@ class MLN(object):
                          'argTypeStr_idx': ArgType.argTypeStr_idx,
                          'rootNodeId_part': Part.rootNodeId_part,
                          'clustIdx_partRootNodeIds': Part.clustIdx_partRootNodeIds,
-                         'pairClustIdxs_pairPartRootNodeIds': Part.pairClustIdxs_pairPartRootNodeIds,
-                         'clustIdx_pairClustIdxs': Part.clustIdx_pairClustIdxs}, 
+                         'pairClustIdxs_pairPartRootNodeIds': Part.pairClustIdxs_pairPartRootNodeIds}, 
                         f)
 
         return None
@@ -90,31 +91,29 @@ class MLN(object):
         return None
 
     def printMLN(path=None):
-        out_str = ""
-
-        for ci in Clust.clusts:
-            cl = Clust.getClust(ci)
-            out_str += "{}\t{}\n".format(cl._clustIdx,cl)
-
-            for aci in cl._argClusts:
-                ac = cl._argClusts[aci]
-                out_str += "\t{}: ".format(aci)
-
-                out_str += "\t".join(["{}: {}".format(k, v) 
-                                      for k, v in ac._argNum_cnt.items()])
-                out_str += "\n\t"
-                out_str += "\t".join(["{}: {}".format(k, v) 
-                                      for k, v in ac._argTypeIdx_cnt.items()])
-                out_str += "\n\t"
-                out_str += "\t".join(["{}: {}: {}".format(k, Clust.getClust(k), v) 
-                                      for k, v in ac._chdClustIdx_cnt.items()])
-                out_str += "\n"
-
         if path is not None:
             dst = "{}/{}.mln".format(path, 
                                      os.path.basename(os.path.dirname(path)))
             with open(dst, 'w') as f:
-                f.write(out_str)
+                for ci in Clust.clusts:
+                    cl = Clust.getClust(ci)
+                    out_str = "{}\t{}\n".format(cl._clustIdx,cl)
+
+                    for aci in cl._argClusts:
+                        ac = cl._argClusts[aci]
+                        out_str += "\t{}: ".format(aci)
+
+                        out_str += "\t".join(["{}: {}".format(k, v) 
+                                              for k, v in ac._argNum_cnt.items()])
+                        out_str += "\n\t"
+                        out_str += "\t".join(["{}: {}: {}".format(k, ArgType.getArgType(k).toString(), v) 
+                                              for k, v in ac._argTypeIdx_cnt.items()])
+                        out_str += "\n\t"
+                        out_str += "\t".join(["{}: {}: {}".format(k, Clust.getClust(k), v) 
+                                              for k, v in ac._chdClustIdx_cnt.items()])
+                        out_str += "\n"
+
+                    f.write(out_str)
 
             return None
         else:

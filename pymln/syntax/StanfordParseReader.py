@@ -1,7 +1,7 @@
 
 import os
 import re
-
+from sortedcontainers import SortedSet
 from syntax.Nodes import Article, Sentence, Token
 
 
@@ -20,8 +20,8 @@ class StanfordParseReader(object):
     ignored_deps.add("det")
     ignored_deps.add("cop")
     ignored_deps.add("complm")
-    ignored_deps.add("num")
-    ignored_deps.add("number")
+#    ignored_deps.add("num")
+#    ignored_deps.add("number")
     ignored_deps.add("preconj")
     ignored_deps.add("predet")
     ignored_deps.add("punct")
@@ -29,7 +29,7 @@ class StanfordParseReader(object):
     
     ignored_deps.add("expl")
     ignored_deps.add("mark")
-    ignored_deps.add("parataxis")
+#    ignored_deps.add("parataxis")
 
     def __init__(self): 
         return None
@@ -64,7 +64,7 @@ class StanfordParseReader(object):
         which are collected in an Article() object "this_doc" and returned.
         '''
         isNew = True
-        sents = {}
+        sents = []
         currSent = Sentence()
 
         with open(morph_file, 'r') as mor, open(input_file, 'r') as inp:
@@ -72,29 +72,29 @@ class StanfordParseReader(object):
                 mline = mline.strip()
                 iline = inp.readline().strip()
 
-                if iline == '':
+                if len(iline) == 0:
                     isNew = True
                     continue
 
-                # MIGHT NEED TO CHANGE THIS TO FIRST INDEX OF '_'
-
-                ts = iline.split('_')
+                ts = iline.rsplit('_', 1)
 
                 if isNew:
                     if len(currSent.get_tokens()) > 0:
-                        sents[len(sents)] = currSent
+                        sents.append(currSent)
                         currSent = Sentence()
 
                     currSent.add_token(Token('ROOT','ROOT'))
                     isNew = False
 
-                pos, form = ts[1], ts[0].lower()
+                pos, form = ts[1], ts[0]
                 lemma = mline.replace(':','.').lower()
+                if "_nn" in lemma:
+                    lemma = lemma[:lemma.index("_nn")]
 
                 currSent.add_token(Token(pos,lemma,form))
 
         if len(currSent.get_tokens()) > 0:
-            sents[len(sents)] = currSent
+            sents.append(currSent)
 
         this_doc.sentences = sents
 
@@ -128,7 +128,7 @@ class StanfordParseReader(object):
                     if currRoots is not None:
                         dep_chds = currSent.get_children(0)
                         for i in currRoots:
-                            dep_chds.add((i, 'ROOT'))
+                            dep_chds.add(('ROOT', i))
                             currSent.set_parent(i, ('ROOT', 0))
                         currSent.set_children(0, dep_chds)
                         this_doc.sentences[senId-1] = currSent
@@ -146,17 +146,56 @@ class StanfordParseReader(object):
                         currRoots = set()
 
                     rel = line[:line.index("(")]
-                    items = re.sub(r"\(|\)","",line[line.index('('):])
 
-                    item_split = re.search(r"-\d+, ", items).end(0)
+                    if rel.lower() == 'root':
+                        continue
+
+                    #items = re.sub(r"\'","",line)
+                    items = line[line.index('(')+1:-1]
+
+                    try:
+                        item_split = re.search(r"-\d+\'*, ", items).end(0)
+                    except:
+                        print("ERR: " + line)
+                        print("Malformed dependency in " + dep_file)
 
                     gov = items[:item_split-2]
                     dep = items[item_split:]
 
-                    gov = (int(gov[gov.rfind('-')+1:]), gov[:gov.rfind('-')])
-                    dep = (int(dep[dep.rfind('-')+1:]), dep[:dep.rfind('-')])
+                    gov = (int(gov[gov.rfind('-')+1:].replace("'","")), gov[:gov.rfind('-')])
+                    dep = (int(dep[dep.rfind('-')+1:].replace("'","")), dep[:dep.rfind('-')])
 
-                    if ('conj' not in rel) & (gov[0] == dep[0]):
+                    # If we are on the wrong sentence:
+                    if not StanfordParseReader.tokens_in_sent(currSent, gov, dep):
+                        badId = senId
+                        # increment sentences until we find the right one. 
+                        while True:
+                            senId += 1
+                            try:
+                                nextSent = this_doc.sentences[senId]
+                            except IndexError:
+                                print("Error from sentence {}, can't find"
+                                    " {} - {} combo in file.".format(badId, gov, dep))
+                                raise IndexError
+
+                            if StanfordParseReader.tokens_in_sent(nextSent, gov, dep):
+                                # Then transfer any work we've done for the
+                                # wrong one to the right one, 
+                                nextSent._tkn_children = currSent._tkn_children
+                                nextSent._tkn_par = currSent._tkn_par
+
+                                # and clear that work from the wrong one. 
+                                currSent._tkn_children = {0: SortedSet()}
+                                currSent._tkn_par = {}
+                                this_doc.sentences[badId] = currSent
+                                currSent = None
+
+                                # Finally, pick up with the right one where 
+                                # we left off. 
+                                currSent = nextSent
+                                break
+
+                    if (rel.startswith('conj')) & (gov[0] == dep[0]):
                         continue
 
                     currNonRoots.add(dep[0])
@@ -170,16 +209,15 @@ class StanfordParseReader(object):
 
                     currSent.set_parent(dep[0], (rel, gov[0]))
 
-                    if gov[0] in currSent.get_children():
-                        currSent.add_child(gov[0], (dep[0], rel))
-                    else:
-                        currSent.set_children(gov[0], set())
-                        currSent.add_child(gov[0], (dep[0], rel))
+                    if gov[0] not in currSent.get_children():
+                        currSent.set_children(gov[0], SortedSet())
+
+                    currSent.add_child(gov[0], (rel, dep[0]))
 
             if currRoots is not None:
                 dep_chds = currSent.get_children(0)
                 for i in currRoots:
-                    dep_chds.add((i, 'ROOT'))
+                    dep_chds.add(('ROOT', i))
                     currSent.set_parent(i, ('ROOT', 0))
                 currSent.set_children(0, dep_chds)
                 this_doc.sentences[senId-1] = currSent
@@ -190,7 +228,21 @@ class StanfordParseReader(object):
 
         return this_doc
 
+    def tokens_in_sent(sent, tok1, tok2):
+        # tok1 and tok2 are tuples of type (int, str) where int is the index
+        # and str is the _form.
+        result = False
 
+        try:
+            if tok1[0] < len(sent._tokens) and tok2[0] < len(sent._tokens):
+                if sent._tokens[tok1[0]]._form == tok1[1] \
+                    and sent._tokens[tok2[0]]._form == tok2[1]:
+                    result = True
+        except:
+            print("Error in {} with tokens {} and {}".format(sent, tok1, tok2))
+            raise Exception
+
+        return result
 
 
 
