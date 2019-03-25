@@ -3,49 +3,57 @@ from syntax.Nodes import Token, TreeNode
 
 class RelType(object):
     relTypes = []
+    # Dictionary mapping {str: int} tracking RelType strings and 
+    # their unique indices. 
     relTypeStr_idx = {}
 
-    def __init__(self):
-        self._str = None
-        self._type = ''
+    def __init__(self, target):
+        self._str = RelType.genTypeStr(target)
+
+        if Token.isContent(target._tkn):
+            self._type = 'C'
+        else:
+            self._type = 'N'
+
+        RelType.relTypeStr_idx[self._str] = len(RelType.relTypes)
+        RelType.relTypes.append(self)
+
+    def __hash__(self):
+        return hash(self.toString())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
 
     def getType(self):
         return self._type
 
     def getRelType(target):
         if target is None:
-            return None
+            result = None
         elif isinstance(target,int):
-            return RelType.relTypes[target]
+            result = RelType.relTypes[target]
         else:
-            s = RelType.genTypeStr(target)
+            type_str = RelType.genTypeStr(target)
 
-            if s not in RelType.relTypeStr_idx:
-                t = RelType()
-                t._str = s
-                
-                if target.getToken().isContent():
-                    t._type = 'C'
-                else:
-                    t._type = 'N'
+            if type_str not in RelType.relTypeStr_idx:
+                t = RelType(target)
 
-                RelType.relTypes.append(t)
-                RelType.relTypeStr_idx[s] = len(RelType.relTypes) - 1
+            result = RelType.relTypeStr_idx[type_str]
 
-        return RelType.relTypeStr_idx[s]
+        return result
 
     def genTypeStr(tn):
         type_str = '('
-        type_str += tn.getToken().toString()
+        type_str += tn.toString()
         children = tn.getChildren()
 
         if len(children) > 0:
             for child in children:
                 type_str += ' (' + child
-                tns = children[child]
+                tree_nodes = children[child]
 
-                for node in tns:
-                    type_str += ' ' + genTypeStr(node)
+                for node in tree_nodes:
+                    type_str += ' ' + RelType.genTypeStr(node)
 
                 type_str += ')'
 
@@ -59,9 +67,6 @@ class RelType(object):
         result = this - that
 
         return result
-
-    def equals(self, o):
-        return self.compareTo(o)==0
 
     def toString(self):
         return self._str

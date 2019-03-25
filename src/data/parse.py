@@ -21,7 +21,8 @@ def load_data(picklePath = None):
         l_docs = pickle.load(open(picklePath, "rb" ))
     else:
         nlp = spacy.load('en')
-        #if above doesn't work, load english model from local 
+        #if above doesn't work, run python -m spacy download en from 
+        # command line
 
         #Read JSON data into the datastore variable
         with open(settings.processed_dir / 'data.json', 'r') as f:

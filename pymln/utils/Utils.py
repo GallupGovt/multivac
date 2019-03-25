@@ -19,9 +19,9 @@ def dec_key(d, key, base=None, dec=1, remove=False):
         if base is None:
             d = None
         else:
-            d[key] = base - inc
+            d[key] = base - dec
     else:
-        d[key] -= inc
+        d[key] -= dec
 
     if remove and d[key] <= 0:
         del d[key]
@@ -30,7 +30,7 @@ def dec_key(d, key, base=None, dec=1, remove=False):
 
 
 def genTreeNodeID(aid, sid, wid):
-    node_id = ':'.join([str(x) for x in [aid, sid, wid]])
+    node_id = '{0}:{1}:{2:03d}'.format(aid, sid, wid)
 
     return node_id
 
@@ -62,14 +62,23 @@ class java_iter(object):
     
         return self._hasnext
 
+
 def compareStr(s, t):
+    # compare each character until there's a difference!!!
         this = sum([ord(x) for x in s])
         that = sum([ord(x) for x in t])
         result = this - that
 
         return result
 
-def xlogx(x):
-    x = x * math.log(x)
 
-    return x
+def xlogx(x):
+    if x <= 0:
+        result = 0
+    else:
+        result = x * math.log(x)
+
+    return result
+
+
+    

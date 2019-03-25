@@ -6,6 +6,12 @@ class Question(object):
         self._arg = dep
         self._argClustIdxSeq = None
 
+    def __hash__(self):
+        return hash(self.toString())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
     def __str__(self):
         return self.toString()
 
@@ -42,12 +48,6 @@ class Question(object):
             return ' '.join([self._rel, self._arg])
         else:
             return None
-
-    def equals(self, o):
-        if not isinstance(o, Question):
-            return False
-        else:
-            return self.compareTo(o) == 0
 
     def toString(self):
         if self._dep == 'nsubj':

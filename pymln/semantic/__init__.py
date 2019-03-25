@@ -1,14 +1,14 @@
 
-from . parseparams import ParseParams
-from . argument import Argument
+from . ParseParams import ParseParams
+from . Argument import Argument
 from . argclust import ArgClust
 
-from . clust import Clust
-from . searchop import SearchOp
-from . part import Part
-from . agenda import Agenda
-from . scorer import Scorer as Scorer
-from . executor import Executor
-from . mln import MLN
+from . Clust import Clust
+from . SearchOp import SearchOp
+from . Part import Part
+from . Agenda import Agenda
+from . Scorer import Scorer as Scorer
+from . Executor import Executor
+from . MLN import MLN
 
-from . parse import Parse
+from . Parse import Parse
