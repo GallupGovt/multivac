@@ -83,7 +83,7 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                 
                 latexEquationId = token.text
                 
-                l_depTokens_latex_sub_tuples, l_posTokens_latex_sub, l_morTokens_latex_sub = latexParsing(
+                l_depTokens_latex_sub_tuples, l_posTokens_latex_sub, l_morTokens_latex_sub = eq.latexParsing(
                     latexEquationId, int(token.index) + adjustedPosition)
                 
                 # Need to adjust position so that it we add all the new tokens, then subtract 1 for LateXEquation##
@@ -129,7 +129,7 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                     l_morTokens = l_morTokens + l_morTokens_latex_sub
 
                     # For keeping track of latex tokens and their tag IDs
-                    latexMapTokens[latexEquationId]= ' '.join(l_morTokens_latex_sub)
+                    eq.latexMapTokens[latexEquationId]= ' '.join(l_morTokens_latex_sub)
                     
                     # Use this to replace the Ltxqtn tag when it's a head
 
