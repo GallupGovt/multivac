@@ -269,7 +269,7 @@ def run(args_dict):
     
     ## Process and Clean documents 
     try: 
-        allDocsClean = pickle.load(open('resources/allDocsClean.pkl', "rb" ))
+        allDocsClean = pickle.load(open(args_dict['data'] + '/allDocsClean.pkl', "rb" ))
         print('Loaded pickle!')
     except:
         print('Starting from scratch')
@@ -279,7 +279,7 @@ def run(args_dict):
                 print(i)
             allDocsClean.append(textparsing.clean_doc(doc, spacynlp))
             
-        with open('resources/allDocsClean.pkl', 'wb') as f:
+        with open(args_dict['data']  + '/allDocsClean.pkl', 'wb') as f:
             pickle.dump(allDocsClean, f)
 
 
