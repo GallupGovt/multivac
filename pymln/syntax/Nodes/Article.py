@@ -1,5 +1,5 @@
 
-from . import Sentence
+from syntax.Nodes import Sentence
 
 class Article(object):
     '''
@@ -7,10 +7,11 @@ class Article(object):
     and an article id, which can be of any particular type but should be unique
     in a collection of Articles. 
     '''
-    def __init__(self, fn=None, sentences=[]):
+    def __init__(self, fn=None):
         self.uid = fn
-        self.sentences = sentences
+        self.sentences = []
 
     def __repr__(self):
         return str(self.__dict__)
 
+    

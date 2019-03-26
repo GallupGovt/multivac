@@ -1,51 +1,49 @@
 
-from . import RelType
+from syntax.Relations import RelType
 
 class ArgType(object):
     argTypes = []
     # Dictionary mapping {str: int}
     argTypeStr_idx = {}
 
-    ARGTYPEIDX_SUBJ = -1
-    ARGTYPEIDX_OBJ = -1
-    ARGTYPEIDX_IN = -1
-
-    def __init__(self):
-        self._dep = None
-        self._relTypeIdx = -1
-        self._dep2 = None
+    def __init__(self, target):
+        s = target.toString()
+        self._dep = target.getDep()
+        self._dep2 = target.getDep2()
         self._str = None
 
-    def getArgType(target):
-        if isinstance(target,int):
-            result = ArgType.argTypes[idx]
+        if target.getTreeRoot() is not None:
+            self._relTypeIdx = RelType.getRelType(target.getTreeRoot())
         else:
+            self._relTypeIdx = -1
+
+        self._str = self.toString()
+        ArgType.argTypes.append(self)
+        i = len(ArgType.argTypes) - 1
+        ArgType.argTypeStr_idx[s] = i
+
+    def __hash__(self):
+        return hash(self.toString())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
+    def __str__(self):
+        return self.toString()
+
+    def __repr__(self):
+        return self.toString()
+
+    def getArgType(target):
+        if isinstance(target, int):
+            return ArgType.argTypes[target]
+        elif not isinstance(target, str):
             s = target.toString()
 
             if s not in ArgType.argTypeStr_idx:
-                t = ArgType()
-                t._dep  = p.getDep()
-                t._dep2 = p.getDep2()
-                t._relTypeIdx = -1
+                t = ArgType(target)
 
-                if p.getTreeRoot() is not None:
-                    t._relTypeIdx = RelType.getRelType(p.getTreeRoot())
-
-                ArgType.argTypes.append(t)
-                ati = len(ArgType.argTypes) - 1
-                ArgType.argTypeStr_idx[s] = ati
-
-                if p.getTreeRoot() is None:
-                    if p.getDep() == 'nsubj':
-                        ARGTYPEIDX_SUBJ = ati
-                    elif p.getDep() == 'dobj':
-                        ARGTYPEIDX_OBJ = ati
-                    elif p.getDep() == 'prep_in':
-                        ARGTYPEIDX_IN = ati
-
-            result = ArgType.argTypeStr_idx[s]
-
-        return result
+        return ArgType.argTypeStr_idx[s]
 
     def compareTo(self, z):
         if self._dep is None or z.GetDep() is None:
@@ -70,9 +68,6 @@ class ArgType(object):
                         result = this - that
         
         return result
-
-    def equals(self, o):
-        return self.compareTo(o) == 0
 
     def toString(self):
         if self._str is None:

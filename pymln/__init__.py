@@ -8,3 +8,8 @@
 #   Processing (EMNLP), 2009. http://alchemy.cs.washington.edu/usp.
 # 
 
+from semantic import *
+from syntax import *
+from utils import *
+from eval import *
+

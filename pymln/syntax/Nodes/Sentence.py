@@ -1,10 +1,5 @@
-
-
-#
-# Sentence class
-# 
-
-from . import Token
+from sortedcontainers import SortedSet
+from syntax.Nodes.Token import Token
 
 class Sentence(object):
     def __init__(self):
@@ -20,7 +15,7 @@ class Sentence(object):
         self._tokens = []
 
         # Dictionary mapping {int: set((int, str))}
-        self._tkn_children = {0: set()}
+        self._tkn_children = {0: SortedSet()}
         # Dictionary mapping {int: (str, int)}
         self._tkn_par = {}
 
@@ -28,8 +23,7 @@ class Sentence(object):
 
 
     def __repr__(self):
-        return ('Tokens: ' + str(self._tokens) + '\n' + 'Parents: ' + 
-            str(self._tkn_par) + '\n' + 'Children: ' + str(self._tkn_children))
+        return ('Tokens: ' + str([str(x) for x in self._tokens]))
 
     def get_tokens(self, idx=None):
         '''
@@ -39,8 +33,11 @@ class Sentence(object):
             return self._tokens
         elif isinstance(idx, list):
             return [self._tokens[i] for i in idx]
+        elif isinstance(idx, int):
+            return self.get_token(idx)
         else:
             raise ValueError
+
 
     def get_token(self, idx):
         '''
@@ -76,7 +73,7 @@ class Sentence(object):
         '''
         Add the child/children specified by the key/kids key/value pair.
         '''
-        assert isinstance(kids, set)
+        assert isinstance(kids, SortedSet)
         self._tkn_children[parent] = kids
 
         return None
@@ -94,7 +91,10 @@ class Sentence(object):
         '''
         Return the parent of the child specified by the given key.
         '''
-        return self._tkn_par[kid]
+        if kid in self._tkn_par:
+            return self._tkn_par[kid]
+        else:
+            return None
 
     def set_parent(self, kid, parent):
         '''

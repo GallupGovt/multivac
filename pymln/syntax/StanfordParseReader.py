@@ -1,7 +1,8 @@
 
 import os
-
-from .Nodes import Article, Sentence, Token
+import re
+from sortedcontainers import SortedSet
+from syntax.Nodes import Article, Sentence, Token
 
 
 class StanfordParseReader(object):
@@ -13,27 +14,28 @@ class StanfordParseReader(object):
     documents, this compiles lists of tokens and dictionary mappings defining
     the dependency relationships in the sentences in a given document.
     '''
+    ignored_deps = set()
+    ignored_deps.add("aux")
+    ignored_deps.add("auxpass")
+    ignored_deps.add("det")
+    ignored_deps.add("cop")
+    ignored_deps.add("complm")
+#    ignored_deps.add("num")
+#    ignored_deps.add("number")
+    ignored_deps.add("preconj")
+    ignored_deps.add("predet")
+    ignored_deps.add("punct")
+    ignored_deps.add("quantmod")
+    
+    ignored_deps.add("expl")
+    ignored_deps.add("mark")
+#    ignored_deps.add("parataxis")
+
     def __init__(self): 
-        self._isDebug=False
-        self._ignored_deps = set()
-        self._ignored_deps.add("aux")
-        self._ignored_deps.add("auxpass")
-        self._ignored_deps.add("det")
-        self._ignored_deps.add("cop")
-        self._ignored_deps.add("complm")
-#       self._ignored_deps.add("num")
-#       self._ignored_deps.add("number")
-        self._ignored_deps.add("preconj")
-        self._ignored_deps.add("predet")
-        self._ignored_deps.add("punct")
-#       self._ignored_deps.add("quantmod")
-        
-        self._ignored_deps.add("expl")
-        self._ignored_deps.add("mark")
-#       self._ignored_deps.add("parataxis")
+        return None
 
 
-    def readParse(self, fileName, data_dir, ignoreDep=True):
+    def readParse(fileName, data_dir, ignoreDep=True):
         '''
         Given a filename of the type "$FILENAME.dep" gets the file and 
         corresponding *.morph and *.input files and reads the Tokens and 
@@ -48,48 +50,58 @@ class StanfordParseReader(object):
         dep_file = os.path.join(data_dir, fileName)
 
         doc = Article(file)
-        doc = self.readTokens(doc, morph_file, input_file)
-        doc = self.readDeps(doc, dep_file, ignoreDep)
+        doc = StanfordParseReader.readTokens(doc, morph_file, input_file)
+        doc = StanfordParseReader.readDeps(doc, dep_file, ignoreDep)
 
         return doc
 
 
-    def readTokens(self, doc, morph_file, input_file):
+    def readTokens(this_doc, morph_file, input_file):
         '''
-        Reads a morphology and input (POS tagged lemmas) file simultaneously, 
-        parsing single tokens from each line into a Token() object and 
-        appending each Token to its respective Sentence() object, which 
-        are collected in an Article() object "doc" and returned.
+        Reads a morphology (lemmas) and input (POS tagged words) file
+        simultaneously, parsing single tokens from each line into a Token() 
+        object and appending each Token to its respective Sentence() object, 
+        which are collected in an Article() object "this_doc" and returned.
         '''
-        isNew=True
+        isNew = True
+        sents = []
+        currSent = Sentence()
 
         with open(morph_file, 'r') as mor, open(input_file, 'r') as inp:
             for mline in mor.readlines():
                 mline = mline.strip()
                 iline = inp.readline().strip()
 
-                if iline == '':
+                if len(iline) == 0:
                     isNew = True
                     continue
 
-                ts = iline.split('_')
+                ts = iline.rsplit('_', 1)
 
                 if isNew:
-                    sent = Sentence()
-                    sent.add_token(Token('ROOT','ROOT'))
-                    doc.sentences.append(sent)
+                    if len(currSent.get_tokens()) > 0:
+                        sents.append(currSent)
+                        currSent = Sentence()
+
+                    currSent.add_token(Token('ROOT','ROOT'))
                     isNew = False
 
-                pos = ts[1]
+                pos, form = ts[1], ts[0]
                 lemma = mline.replace(':','.').lower()
-                form = iline[0]
+                if "_nn" in lemma:
+                    lemma = lemma[:lemma.index("_nn")]
 
-                doc.sentences[-1].add_token(Token(pos,lemma,form))
+                currSent.add_token(Token(pos,lemma,form))
 
-        return doc
+        if len(currSent.get_tokens()) > 0:
+            sents.append(currSent)
+
+        this_doc.sentences = sents
+
+        return this_doc
 
 
-    def readDeps(self, doc, deps_file, ignoreDep):
+    def readDeps(this_doc, dep_file, ignoreDep):
         '''
         Reads a dependency relationships file and adds these relationships to 
         their respective Sentence() objects in an Article() in the form of 
@@ -99,11 +111,11 @@ class StanfordParseReader(object):
         blank = False
         senId = 0
 
-        currSent = doc.sentences[senId]
+        currSent = this_doc.sentences[senId]
         currNonRoots = set()
         currRoots = set()
 
-        with open(deps_file, 'r') as d:
+        with open(dep_file, 'r') as d:
             for line in d.readlines():
                 line = line.strip()
 
@@ -116,10 +128,10 @@ class StanfordParseReader(object):
                     if currRoots is not None:
                         dep_chds = currSent.get_children(0)
                         for i in currRoots:
-                            dep_chds.add((i, 'ROOT'))
+                            dep_chds.add(('ROOT', i))
                             currSent.set_parent(i, ('ROOT', 0))
                         currSent.set_children(0, dep_chds)
-                        doc.sentences[senId] = currSent
+                        this_doc.sentences[senId-1] = currSent
 
                         currSent = None
                         currNonRoots = None
@@ -129,18 +141,61 @@ class StanfordParseReader(object):
                 else:
                     if blank:
                         blank = False
-                        currSent = doc.sentences[senId]
+                        currSent = this_doc.sentences[senId]
                         currNonRoots = set()
                         currRoots = set()
 
                     rel = line[:line.index("(")]
-                    items = line[line.index('('):].replace('(','').replace(')','')
-                    items = items.split(', ')
-                    gov, dep = items[0], items[1]
-                    gov = (int(gov[gov.rfind('-')+1:]), gov[:gov.rfind('-')])
-                    dep = (int(dep[dep.rfind('-')+1:]), dep[:dep.rfind('-')])
 
-                    if ('conj' not in rel) & (gov[0] == dep[0]):
+                    if rel.lower() == 'root':
+                        continue
+
+                    #items = re.sub(r"\'","",line)
+                    items = line[line.index('(')+1:-1]
+
+                    try:
+                        item_split = re.search(r"-\d+\'*, ", items).end(0)
+                    except:
+                        print("ERR: " + line)
+                        print("Malformed dependency in " + dep_file)
+
+                    gov = items[:item_split-2]
+                    dep = items[item_split:]
+
+                    gov = (int(gov[gov.rfind('-')+1:].replace("'","")), gov[:gov.rfind('-')])
+                    dep = (int(dep[dep.rfind('-')+1:].replace("'","")), dep[:dep.rfind('-')])
+
+                    # If we are on the wrong sentence:
+                    if not StanfordParseReader.tokens_in_sent(currSent, gov, dep):
+                        badId = senId
+                        # increment sentences until we find the right one. 
+                        while True:
+                            senId += 1
+                            try:
+                                nextSent = this_doc.sentences[senId]
+                            except IndexError:
+                                print("Error from sentence {}, can't find"
+                                    " {} - {} combo in file.".format(badId, gov, dep))
+                                raise IndexError
+
+                            if StanfordParseReader.tokens_in_sent(nextSent, gov, dep):
+                                # Then transfer any work we've done for the
+                                # wrong one to the right one, 
+                                nextSent._tkn_children = currSent._tkn_children
+                                nextSent._tkn_par = currSent._tkn_par
+
+                                # and clear that work from the wrong one. 
+                                currSent._tkn_children = {0: SortedSet()}
+                                currSent._tkn_par = {}
+                                this_doc.sentences[badId] = currSent
+                                currSent = None
+
+                                # Finally, pick up with the right one where 
+                                # we left off. 
+                                currSent = nextSent
+                                break
+
+                    if (rel.startswith('conj')) & (gov[0] == dep[0]):
                         continue
 
                     currNonRoots.add(dep[0])
@@ -149,32 +204,45 @@ class StanfordParseReader(object):
                     if gov[0] not in currNonRoots:
                         currRoots.add(gov[0])
 
-                    if ignoreDep & (rel in self._ignored_deps):
+                    if ignoreDep & (rel in StanfordParseReader.ignored_deps):
                         continue
 
                     currSent.set_parent(dep[0], (rel, gov[0]))
 
-                    if gov[0] in currSent.get_children():
-                        currSent.add_child(gov[0], (dep[0], rel))
-                    else:
-                        currSent.set_children(gov[0], set())
-                        currSent.add_child(gov[0], (dep[0], rel))
+                    if gov[0] not in currSent.get_children():
+                        currSent.set_children(gov[0], SortedSet())
+
+                    currSent.add_child(gov[0], (rel, dep[0]))
 
             if currRoots is not None:
                 dep_chds = currSent.get_children(0)
                 for i in currRoots:
-                    dep_chds.add((i, 'ROOT'))
+                    dep_chds.add(('ROOT', i))
                     currSent.set_parent(i, ('ROOT', 0))
                 currSent.set_children(0, dep_chds)
-                doc.sentences[senId] = currSent
+                this_doc.sentences[senId-1] = currSent
 
                 currSent = None
                 currNonRoots = None
                 currRoots = None
 
-        return doc
+        return this_doc
 
+    def tokens_in_sent(sent, tok1, tok2):
+        # tok1 and tok2 are tuples of type (int, str) where int is the index
+        # and str is the _form.
+        result = False
 
+        try:
+            if tok1[0] < len(sent._tokens) and tok2[0] < len(sent._tokens):
+                if sent._tokens[tok1[0]]._form == tok1[1] \
+                    and sent._tokens[tok2[0]]._form == tok2[1]:
+                    result = True
+        except:
+            print("Error in {} with tokens {} and {}".format(sent, tok1, tok2))
+            raise Exception
+
+        return result
 
 
 
