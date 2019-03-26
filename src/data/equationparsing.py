@@ -3,18 +3,13 @@
 ####################################################################
 
 import json
-import ast
 import pickle
-import codecs
-import pandas as pd
 import re as reg
-import numpy as np 
 import copy
 import stanfordnlp
 import random
 import string
 
-from interruptingcow import timeout
 from collections import OrderedDict
 from sympy.parsing.sympy_parser import (parse_expr, standard_transformations, implicit_multiplication_application)
 from sympy.parsing.latex import parse_latex  

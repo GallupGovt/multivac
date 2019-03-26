@@ -1,3 +1,6 @@
+####################################################################
+## Load packages
+####################################################################
 import argparse
 import equationparsing as eq
 import textparsing
@@ -9,6 +12,9 @@ import gc
 
 from interruptingcow import timeout
 
+####################################################################
+## Functions 
+####################################################################
 
 def getAdjustmentPosition(tokenPosition, adjustmentDictionary):
     '''This determines the adjustment position for DEP files, because things get reordered when there are equations
@@ -297,6 +303,7 @@ def run(args_dict):
                     thisDocumentData = create_parse_files(nlpifiedDoc, i, True, args_dict['output'])
             except RuntimeError:
                 print("Didn't finish document #{} within five minutes. Moving to next one.".format(i))
+
 
 
 if __name__ == '__main__':
