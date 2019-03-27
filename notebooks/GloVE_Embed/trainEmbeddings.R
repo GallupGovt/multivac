@@ -60,9 +60,3 @@ trainEmbeddings <- function(docs,
   return(results)
 }
 
-## Run Glove Model
-setwd("~/Desktop/ASKE_MULTIVAC")
-
-#text_data = read.csv('text_for_glove.csv')
-#glove_model = trainEmbeddings(text_data$text,verbose=TRUE)
-#write.csv(glove_model,'Domain_Adapted_GloVe.csv')
