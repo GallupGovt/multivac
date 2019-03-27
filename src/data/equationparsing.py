@@ -1,87 +1,26 @@
-####################################################################
-## Load packages
-####################################################################
-
-import json
-import pickle
-import re as reg
 import copy
-import stanfordnlp
+import json
 import random
+import re as reg
 import string
 
 from collections import OrderedDict
 from sympy.parsing.sympy_parser import (parse_expr, standard_transformations, implicit_multiplication_application)
 from sympy.parsing.latex import parse_latex  
+from sympy.parsing.latex.errors import LaTeXParsingError
 from sympy import *
 
-####################################################################
-## Global variables, mostly regex for LateX parsing and text cleaning
-####################################################################
-
-#LateX identifiers
-latexBlock= reg.compile('\$\$.*?\$\$')
-latexInline= reg.compile('\\\\.*?\\\\\)')
-
-## For finding LatexEQuations
-re_LE = reg.compile("L[0-9]+E")
 
 # Use this to store LateX code 
-latexMap = {}
-latexMapTokens = {}
-
-
-def replace_latex(m):
-    '''
-    Replace LateX equations with placeholder token, with format LtxqtnXXXXXXXX
-    '''
-    latexStr = m.group()
-    latexStr = cleaned_latex(latexStr)
-    
-    aggregatedMapKey = ''
-    if ('cid:' not in latexStr):
-
-        ## Sometimes there are multiple equations within each block. Get those here
-        latexArray = latexStr.split(', \\\\')
-        
-        ## Create keyword for each latex equation
-        for latexItem in latexArray: 
-            counter = len(latexMap)
-
-            ## StanfordNLP tries to parse out random strings - subbing out vowels and keeping length at 14 seems to keep 
-            ##              the pipeline from recognizing these as potential words
-            randomString = ''.join(random.choices(string.ascii_lowercase, k=8))
-            randomString = randomString.replace('a', 'z')
-            randomString = randomString.replace('e', 'z')
-            randomString = randomString.replace('i', 'z')
-            randomString = randomString.replace('o', 'z')
-            randomString = randomString.replace('u', 'z')
-            thisMapKey = ' Ltxqtn' + randomString
-            
-            aggregatedMapKey = aggregatedMapKey +  thisMapKey
-            latexMap[thisMapKey.replace(' ','')] = latexItem ## in this case, 'key' is the latex code
-
-        return (aggregatedMapKey)
-        
-
-def extract_and_replace_latex(doc, docNum):
-    '''
-    Find and extract LateX, start with blockquote and then do inline
-    '''
-    doc = reg.sub(latexBlock, replace_latex, doc)
-    doc = reg.sub(latexInline, replace_latex, doc)
-
-    return doc
+LATEXMAP = {}
+LATEXMAPTOKENS = {}
 
 
 def cleaned_latex(s):    
     '''LateX requires some cleaning from original file format
     '''
     s=s.replace('$$','')
-    s = reg.sub(r'\\begin{array}{.*?}', '', s)
-    s = reg.sub(r'\\end{array}', '', s)
-    s = reg.sub(r'\\begin{aligned}', '', s)
-    s = reg.sub(r'\\end{aligned}', '', s)
+    s = reg.sub(r'\\begin{array}{.*?}|\\end{array}|\\begin{aligned}|\\end{aligned}', '', s)
     s=s.replace('&=&','=')
     s=s.replace('\(','(')
     s=s.replace('\)',')')
@@ -90,105 +29,18 @@ def cleaned_latex(s):
     return s
 
 
-def get_symbol_and_type(s):
+def extract_and_replace_latex(doc):
     '''
-    For LateX Symbols/Integers/Rational, return value of symbol and symbol type
+    Find and extract LateX, start with blockquote and then do inline
     '''
-    symbol = s[s.find("(")+1:s.find(")")]
-    symbolType = s[0:3]
-    return symbol, symbolType
-
-
-def latexParsing(token, tokenPos):
-    '''
-    LateX parsing function for DIM files
-    '''
-    lastPos = 0
-
-    # Each line gets stored as a separate list item in the list
-    l_depTokens = []
-    l_posTokens = []
-    l_morTokens = []
-    stringRep = ''
+    #LateX identifiers
+    latexBlock= reg.compile('\$\$.*?\$\$')
+    latexInline= reg.compile('\\\\.*?\\\\\)')
     
-    # Try parsing the latex code as is
-    try:
-        expr = parse_latex(latexMap[token])
-        stringRep = srepr(expr)
-    except:
-        # Good chance the problem is the leading and trailing parens - remove them and try again
-        try: 
-            expr = parse_latex(latexMap[token].lstrip('(').rstrip(')'))
-            stringRep = srepr(expr)
-        except:
-            pass
-            
-    
-    ## If we have a sympy string representation...
-    if stringRep !='':
-        
-        # Problematics artefact from sympy parsing
-        stringRep = stringRep.replace(", precision=53","")
-        stringRep = stringRep.replace("oo","Symbol(inf)")
-        
-        # Call gov_dep function to get list of dependencies, objects
-        l_dependencies = (gov_dep(stringRep))
-        
-        # This will store each dependency item
-        dictAll = {}
-        
-        ## If we actually have a list of items rather than a single symbol/integer
-        if len(l_dependencies)>0:
-        
-            #Do the D in DIM
-            for li in l_dependencies:
+    doc = reg.sub(latexBlock, replace_latex, doc)
+    doc = reg.sub(latexInline, replace_latex, doc)
 
-                head=li[0]
-                tail=li[1]
-                dictAll[head[1]]=head[0]
-                dictAll[tail[1]]=tail[0]
-                                
-                l_depTokens.append( ( get_rel(head[0]) , (head[0], head[1]+tokenPos-1), (tail[0], tail[1]+tokenPos-1) ) )
-                
-                #Keep track of govs for debugging 
-                listGovs.append(head[0])
-                listGovs.append(tail[0])
-                
-                if head[1]> lastPos:
-                    lastPos = head[1]
-                
-                if tail[1]> lastPos:
-                    lastPos = tail[1]
-
-        ## We're dealing with just a symbol or integer
-        else: 
-            
-            #Keep track of govs for debugging 
-            listGovs.append(stringRep)
-            dictAll[1]=stringRep
-            lastPos = 1
-            
-        ## Do the I and M in DIM
-        for key, val in dictAll.items():
-            
-            # IF it's a symbol/integer
-            if '(' in val:
-                symbol, symbolType =get_symbol_and_type(val)
-                l_posTokens.append('{}\t{}_{}'.format(key, symbol.replace("'",''),symbolType[0:5].upper()))
-                l_morTokens.append(symbol.replace("'",''))
-            else:
-                thisPos = 'TRANSFORM'
-                if val in ['Equality','StrictGreaterThan','StrictLessThan','Approx','approx']:
-                    thisPos = "COMPARE"
-                elif val in ['Mul','Add','Pow']:
-                    thisPos = "COMBINE"
-                elif val in ['Function']:
-                    thisPos = "FUNCTION"
-                
-                l_posTokens.append('{}\t{}_{}'.format(key, val, thisPos))
-                l_morTokens.append(val)
-
-    return l_depTokens, l_posTokens, l_morTokens
+    return doc
 
 
 def find_parens(s):
@@ -209,6 +61,46 @@ def find_parens(s):
     if len(pstack) > 0:
         raise IndexError("No matching opening parens at: {} for string: {}".format(i, s))
     return OrderedDict(sorted(toret.items()))
+
+
+def get_rel(gov):
+    '''
+    Add the relation to the dependencies for a  final format of: relation(gov-#, dep-#)
+    '''
+    
+    if gov in ['Equality','StrictGreaterThan','StrictLessThan','Approx','approx']:
+        rel = "compare"
+    elif gov in ['Mul','Add','Pow']:
+        rel = "combine"
+    elif gov in ['Function']:
+        rel = "function"
+    else:
+        rel = "transform"
+    
+    return rel
+
+
+def get_symbol_and_type(s):
+    '''
+    For LateX Symbols/Integers/Rational, return value of symbol and symbol type
+    '''
+    symbol = s[s.find("(")+1:s.find(")")]
+    symbolType = s[0:3]
+    return symbol, symbolType
+
+
+def generate_random_tag():
+    '''
+    Generate a random tag that begins with Ltxqtn
+    '''
+    while True:
+        tag = ''.join(random.choices(string.ascii_lowercase, k=8))
+        tag = reg.sub('a|e|i|o|u', 'z', tag)
+        tag = ' Ltxqtn' + tag
+        if tag.replace(' ','') not in LATEXMAP:
+            break
+    
+    return tag
 
 
 def gov_dep(s, i=1):
@@ -304,21 +196,88 @@ def gov_dep(s, i=1):
     return results
 
 
-def get_rel(gov):
+def latexParsing(token, tokenPos):
     '''
-    Add the relation to the dependencies for a  final format of: relation(gov-#, dep-#)
+    LateX parsing function for DIM files
     '''
+    lastPos = 0
+
+    # Each line gets stored as a separate list item in the list
+    l_depTokens = []
+    l_posTokens = []
+    l_morTokens = []
+    stringRep = ''
     
-    if gov in ['Equality','StrictGreaterThan','StrictLessThan','Approx','approx']:
-        rel = "compare"
-    elif gov in ['Mul','Add','Pow']:
-        rel = "combine"
-    elif gov in ['Function']:
-        rel = "function"
-    else:
-        rel = "transform"
+    # Try parsing the latex code as is
+    try:
+        expr = parse_latex(LATEXMAP[token])
+        stringRep = srepr(expr)
+    except (LaTeXParsingError,SympifyError,TypeError):
+        # Good chance the problem is the leading and trailing parens - remove them and try again
+        try: 
+            expr = parse_latex(LATEXMAP[token].lstrip('(').rstrip(')'))
+            stringRep = srepr(expr)
+        except( LaTeXParsingError, ValueError, TypeError):
+            pass
+
+        
+            
     
-    return rel
+    ## If we have a sympy string representation...
+    if stringRep !='':
+        
+        # Problematic artefacts from sympy parsing
+        stringRep = stringRep.replace(", precision=53","")
+        stringRep = stringRep.replace("oo","Symbol(inf)")
+        
+        # Call gov_dep function to get list of dependencies, objects
+        l_dependencies = (gov_dep(stringRep))
+        
+        # This will store each dependency item
+        dictAll = {}
+        
+        ## If we actually have a list of items rather than a single symbol/integer
+        if len(l_dependencies)>0:
+        
+            #Do the D in DIM
+            for li in l_dependencies:
+
+                head=li[0]
+                tail=li[1]
+                dictAll[head[1]]=head[0]
+                dictAll[tail[1]]=tail[0]
+                                
+                l_depTokens.append( ( get_rel(head[0]) , (head[0], head[1]+tokenPos-1), (tail[0], tail[1]+tokenPos-1) ) )
+                
+                if head[1]> lastPos:
+                    lastPos = head[1]
+                
+                if tail[1]> lastPos:
+                    lastPos = tail[1]
+
+        ## We're dealing with just a symbol or integer
+        else: 
+            
+            #Keep track of govs for debugging 
+            dictAll[1]=stringRep
+            lastPos = 1
+            
+        ## Do the I and M in DIM
+        for key, val in dictAll.items():
+            
+            # IF it's a symbol/integer
+            if '(' in val:
+                symbol, symbolType =get_symbol_and_type(val)
+                l_posTokens.append('{}_{}'.format(symbol.replace("'",''),symbolType[0:5].upper()))
+                l_morTokens.append(symbol.replace("'",''))
+            else:
+                thisPos = get_rel(val)
+                thisPos = thisPos.upper()
+                
+                l_posTokens.append('{}_{}'.format(val, thisPos))
+                l_morTokens.append(val)
+
+    return l_depTokens, l_posTokens, l_morTokens
 
 
 def put_equation_tokens_in_text(m):
@@ -330,3 +289,25 @@ def put_equation_tokens_in_text(m):
                     token, 0)
     
     return ' '.join(l_morTokens_latex_sub)
+
+
+def replace_latex(m):
+    '''
+    Replace LateX equations with placeholder token, with format LateXEquation
+    '''
+    latexStr = m.group()
+    latexStr = cleaned_latex(latexStr)
+    
+    
+    if ('cid:' not in latexStr):
+        
+        #Sometimes there are multiple equations within each block. Get those here
+        latexArray = latexStr.split(', \\\\')
+        for latexItem in latexArray: 
+            counter = len(LATEXMAP)
+            thisMapKey =  generate_random_tag()
+            LATEXMAP[thisMapKey.replace(' ','')] = latexItem ## in this case, 'key' is the latex code
+
+        return (thisMapKey)
+        
+

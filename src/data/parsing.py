@@ -1,39 +1,15 @@
-####################################################################
-## Load packages
-####################################################################
 import argparse
-import equationparsing as eq
-import textparsing
+import gc
+import json
+import pickle
+
 import spacy
 import stanfordnlp
-import pickle
-import json
-import gc
-
 from interruptingcow import timeout
 
-####################################################################
-## Functions 
-####################################################################
+import equationparsing as eq
+import textparsing
 
-def getAdjustmentPosition(tokenPosition, adjustmentDictionary):
-    '''This determines the adjustment position for DEP files, because things get reordered when there are equations
-    '''
-    if len(adjustmentDictionary)>1:
-        for key, val in sorted(list(adjustmentDictionary.items()), key=lambda x:x, reverse=True):
-            if tokenPosition>key:
-                return val
-    return 0
-
-
-
-def get_token_governor(token, sent):
-    if token.governor==0:
-        govWord = 'ROOT'
-    else:
-        govWord = sent.words[token.governor-1].text
-    return govWord
-        
 
 def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
     """ Creates parse files and stores them in the folder passed when writeFile=True and pathToFolders is provided
@@ -124,9 +100,9 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                     childTokenPosition = int(token.index)
                     l_depTokens_tuples.append( ( token.dependency_relation.replace(":","") , 
                                                 (tokenHeadText, 
-                                                 headTokenPosition + getAdjustmentPosition(headTokenPosition,
+                                                 headTokenPosition + get_adjustment_position(headTokenPosition,
                                                                                            adjustmentDictionary)), 
-                                                (token.text, childTokenPosition + getAdjustmentPosition(
+                                                (token.text, childTokenPosition + get_adjustment_position(
                                                     childTokenPosition, adjustmentDictionary)) ) )
                     
                     # Now add to the master list
@@ -135,7 +111,7 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                     l_morTokens = l_morTokens + l_morTokens_latex_sub
 
                     # For keeping track of latex tokens and their tag IDs
-                    eq.latexMapTokens[latexEquationId]= ' '.join(l_morTokens_latex_sub)
+                    eq.LATEXMAPTOKENS[latexEquationId]= ' '.join(l_morTokens_latex_sub)
                     
                     # Use this to replace the Ltxqtn tag when it's a head
 
@@ -147,9 +123,9 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                     childTokenPosition = int(token.index)
                     l_depTokens_tuples.append( ( token.dependency_relation.replace(":","") , 
                                                 (tokenHeadText, 
-                                                 headTokenPosition + getAdjustmentPosition(headTokenPosition,
+                                                 headTokenPosition + get_adjustment_position(headTokenPosition,
                                                                                            adjustmentDictionary)), 
-                                                (token.text, childTokenPosition + getAdjustmentPosition(
+                                                (token.text, childTokenPosition + get_adjustment_position(
                                                     childTokenPosition, adjustmentDictionary)) ) )
                     l_posTokens.append("{0}_{1}".format(token.text, token.upos))  
                     l_morTokens.append(token.text)
@@ -161,8 +137,8 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                 ## Create dependency trees
                 childTokenPosition = int(token.index)
                 headTokenPosition =  token.governor 
-                headAdjustment = getAdjustmentPosition(headTokenPosition, adjustmentDictionary)
-                childAdjustment = getAdjustmentPosition(childTokenPosition, adjustmentDictionary)
+                headAdjustment = get_adjustment_position(headTokenPosition, adjustmentDictionary)
+                childAdjustment = get_adjustment_position(childTokenPosition, adjustmentDictionary)
                 
                 if token.dependency_relation not in ['ROOT']:
                     
@@ -228,6 +204,23 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
     return d_documentData
 
 
+def get_adjustment_position(tokenPosition, adjustmentDictionary):
+    '''This determines the adjustment position for DEP files, because things get reordered when there are equations
+    '''
+    if len(adjustmentDictionary)>1:
+        for key, val in sorted(list(adjustmentDictionary.items()), key=lambda x:x, reverse=True):
+            if tokenPosition>key:
+                return val
+    return 0
+
+
+def get_token_governor(token, sent):
+    if token.governor==0:
+        govWord = 'ROOT'
+    else:
+        govWord = sent.words[token.governor-1].text
+    return govWord
+        
 
 def load_data(jsonPath, picklePath = None):
     """Load data - if picklePath is specified, load the pickle. Else, try json file.
@@ -269,7 +262,7 @@ def run(args_dict):
     
     ## Process and Clean documents 
     try: 
-        allDocsClean = pickle.load(open(args_dict['data'] + '/allDocsClean.pkl', "rb" ))
+        allDocsClean = pickle.load(open('allDocsClean.pkl', "rb" ))
         print('Loaded pickle!')
     except:
         print('Starting from scratch')
@@ -279,12 +272,12 @@ def run(args_dict):
                 print(i)
             allDocsClean.append(textparsing.clean_doc(doc, spacynlp))
             
-        with open(args_dict['data']  + '/allDocsClean.pkl', 'wb') as f:
+        with open('allDocsClean.pkl', 'wb') as f:
             pickle.dump(allDocsClean, f)
 
 
-    allDocs2 = [eq.extract_and_replace_latex(doc, docNum) for docNum, doc in enumerate(allDocsClean)]
-    print('Number of LateX Equations parsed: {}'.format(len(eq.latexMap)))
+    allDocs2 = [eq.extract_and_replace_latex(doc) for docNum, doc in enumerate(allDocsClean)]
+    print('Number of LateX Equations parsed: {}'.format(len(eq.LATEXMAP)))
     
 
     ## Parse files into DIM 
@@ -305,11 +298,7 @@ def run(args_dict):
                 print("Didn't finish document #{} within five minutes. Moving to next one.".format(i))
 
 
-
 if __name__ == '__main__':
-    #-s '../../../stanfordnlp_resources/'
-    #-d '../../../data/20181212.json'
-    #-o resources
 
     parser = argparse.ArgumentParser(description='Parse texts for natural language and equations.')
     parser.add_argument('-b', '--beginpoint', required=False, help='Which document to start with', type=int)
