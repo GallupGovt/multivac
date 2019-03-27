@@ -85,7 +85,7 @@ def get_symbol_and_type(s):
     For LateX Symbols/Integers/Rational, return value of symbol and symbol type
     '''
     symbol = s[s.find("(")+1:s.find(")")]
-    symbolType = s[0:3]
+    symbolType = s[0:s.find("(")]
     return symbol, symbolType
 
 
@@ -268,8 +268,8 @@ def latexParsing(token, tokenPos):
             # IF it's a symbol/integer
             if '(' in val:
                 symbol, symbolType =get_symbol_and_type(val)
-                l_posTokens.append('{}_{}'.format(symbol.replace("'",''),symbolType[0:5].upper()))
-                l_morTokens.append(symbol.replace("'",''))
+                l_posTokens.append('{}_{}'.format(val,symbolType.upper()))
+                l_morTokens.append(val)
             else:
                 thisPos = get_rel(val)
                 thisPos = thisPos.upper()

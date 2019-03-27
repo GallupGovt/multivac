@@ -1,15 +1,16 @@
 import argparse
+import copy
 import gc
 import json
 import pickle
+import re as reg
 
 import spacy
 import stanfordnlp
 from interruptingcow import timeout
 
 import equationparsing as eq
-import textparsing
-
+from textparsing import clean_doc
 
 def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
     """ Creates parse files and stores them in the folder passed when writeFile=True and pathToFolders is provided
@@ -270,7 +271,7 @@ def run(args_dict):
         for i, doc in enumerate(allDocs):
             if i%10==0:
                 print(i)
-            allDocsClean.append(textparsing.clean_doc(doc, spacynlp))
+            allDocsClean.append(clean_doc(doc, spacynlp))
             
         with open('allDocsClean.pkl', 'wb') as f:
             pickle.dump(allDocsClean, f)
@@ -280,6 +281,29 @@ def run(args_dict):
     print('Number of LateX Equations parsed: {}'.format(len(eq.LATEXMAP)))
     
 
+    ## Put equations back into text - this will be fed to glove embedding
+    if args_dict['createnewjson'].lower() == 'y' :
+        print('***************\nBuilding JSON file for glove embedding...')
+        allDocs3 = []
+        percentCompletedMultiple = int(len(allDocs2)/10)
+        for i, doc in enumerate(allDocs2[0:]):
+            if i%percentCompletedMultiple == 0: 
+                print('{}% completed'.format(round(i/(len(allDocs2))*100, 0)))
+            newDoc = reg.sub(r'Ltxqtn[a-z]{8}', eq.put_equation_tokens_in_text, doc)
+            allDocs3.append(newDoc)
+
+        jsonObj2 = copy.deepcopy(jsonObj)
+        allDocs3Counter = 0 
+
+        for key, value in list(jsonObj2.items()):
+            if value['text']:
+                jsonObj2[key]['text']=allDocs3[allDocs3Counter]
+                allDocs3Counter = allDocs3Counter+1
+                
+        with open('articles-with-equations.json', 'w', encoding='utf8') as fp:
+            json.dump(jsonObj2, fp)
+
+    
     ## Parse files into DIM 
     startPoint=0 
     if args_dict['beginpoint'] is not None:
@@ -303,6 +327,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Parse texts for natural language and equations.')
     parser.add_argument('-b', '--beginpoint', required=False, help='Which document to start with', type=int)
     parser.add_argument('-s', '--stanfordnlp', required=True, help='Path to Stanford NLP Model')
+    parser.add_argument('-c', '--createnewjson', required=True, help='y/n indicator for create new JSON file for glove embedding')
     parser.add_argument('-d', '--data', required=True, help='Path to JSON data file')
     parser.add_argument('-o', '--output', required=True, help='Where DIM files are to be written')
     args_dict = vars(parser.parse_args())
