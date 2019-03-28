@@ -209,19 +209,19 @@ def latexParsing(token, tokenPos):
     stringRep = ''
     
     # Try parsing the latex code as is
-    try:
-        expr = parse_latex(LATEXMAP[token])
-        stringRep = srepr(expr)
-    except (LaTeXParsingError,SympifyError,TypeError):
-        # Good chance the problem is the leading and trailing parens - remove them and try again
-        try: 
-            expr = parse_latex(LATEXMAP[token].lstrip('(').rstrip(')'))
+    if len(token) == 14:
+        try:
+            expr = parse_latex(LATEXMAP[token])
             stringRep = srepr(expr)
-        except( LaTeXParsingError, ValueError, TypeError):
-            pass
-
         
-            
+        except (LaTeXParsingError,SympifyError,TypeError):
+            # Good chance the problem is the leading and trailing parens - remove them and try again
+            try: 
+                expr = parse_latex(LATEXMAP[token].lstrip('(').rstrip(')'))
+                stringRep = srepr(expr)
+            except( LaTeXParsingError, ValueError, TypeError):
+                pass
+
     
     ## If we have a sympy string representation...
     if stringRep !='':

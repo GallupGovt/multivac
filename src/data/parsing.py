@@ -251,7 +251,7 @@ def run(args_dict):
     ''' Main run file that orchestrates everything  
     '''
     
-    ## Load NLPs
+    ## Load NLP engines
     spacynlp = spacy.load('en_core_web_sm')
     nlp = stanfordnlp.Pipeline(models_dir=args_dict['stanfordnlp'], 
                             treebank='en_ewt', use_gpu=False, pos_batch_size=3000)
@@ -265,7 +265,7 @@ def run(args_dict):
     try: 
         allDocsClean = pickle.load(open('allDocsClean.pkl', "rb" ))
         print('Loaded pickle!')
-    except:
+    except FileNotFoundError:
         print('Starting from scratch')
         allDocsClean= []
         for i, doc in enumerate(allDocs):
@@ -305,7 +305,7 @@ def run(args_dict):
 
     
     ## Parse files into DIM 
-    startPoint=0 
+    startPoint=-1
     if args_dict['beginpoint'] is not None:
         startPoint = args_dict['beginpoint']
     
