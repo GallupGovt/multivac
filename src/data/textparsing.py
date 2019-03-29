@@ -8,6 +8,7 @@ def clean_doc(doc, spacynlp):
     Clean individual documents and remove citations, URLs, emails, other trivial content. Returns cleaned doc
     '''
 
+
     ### Regex for cleaning 
     re_citationsNumeric = reg.compile('(\[\d+)(,\s*\d+)*]')
     re_url= reg.compile(r'((http|ftp|https):\/\/)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)')
@@ -70,4 +71,13 @@ def clean_doc(doc, spacynlp):
             else:
                 doc = doc.replace(match, mergedWord)
     
+    
+    #De-dup for PUBMED articles, where the main text is sometimes duplicated
+    sliceText = doc[0:500]
+    count = doc.count(sliceText)
+
+    if count>1:
+        posDup = doc.find(sliceText, 1)
+        doc = doc[0:posDup-1]        
+
     return doc
