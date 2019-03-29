@@ -10,6 +10,9 @@ class Answer(object):
     def __eq__(self, other):
         return self.compareTo(other) == 0
 
+    def __lt__(self, other):
+        return self.compareTo(other) < 0
+
     def __str__(self):
         return self.toString()
 
@@ -20,14 +23,18 @@ class Answer(object):
         return self._rst
 
     def compareTo(self, a):
-        this = sum([ord(x) for x in self._rst])
-        that = sum([ord(x) for x in a.getRst()])
-        result = this - that
+        result = 0
 
-        if result == 0:
-            this = sum([ord(x) for x in self._sid])
-            that = sum([ord(x) for x in a.getSentId()])
-            result = this - that
+        if self._rst != a.getRst():
+            if self._rst < a.getRst():
+                result -= 1
+            else:
+                result += 1
+        elif self._sid != a.getSentId():
+            if self._sid < a.getSentId():
+                result -= 1
+            else:
+                result += 1
 
         return result
 

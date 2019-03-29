@@ -86,7 +86,6 @@ class MLN(object):
             Part.rootNodeId_part = mln['rootNodeId_part']
             Part.clustIdx_partRootNodeIds = mln['clustIdx_partRootNodeIds']
             Part.pairClustIdxs_pairPartRootNodeIds = mln['pairClustIdxs_pairPartRootNodeIds']
-            Part.clustIdx_pairClustIdxs = mln['clustIdx_pairClustIdxs']
 
         return None
 

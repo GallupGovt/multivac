@@ -4,17 +4,18 @@ import os
 import re
 # import spacy
 # nlp = spacy.load('en')
-import stanfordnlp
-nlp = stanfordnlp.Pipeline(processors='tokenize,lemma,pos')
+# import stanfordnlp
+# nlp = stanfordnlp.Pipeline(processors='tokenize,lemma,pos')
 
 import corenlp
 
-from collections import OrderedDict
+from sortedcontainers import SortedDict
 
 #from multivac import settings
 from utils import Utils
 from syntax.Nodes import Article, Sentence, Token
 from semantic import MLN, Part, Clust
+from eval import Answer, Question
 
 class stanford_token():
     def __init__(self, text='', index=None, lemma_='', pos_='', 
@@ -29,7 +30,30 @@ class stanford_token():
         self.has_children = False
 
     def __repr__(self):
-        return self.text
+        return "{}:{}=>{}:{}".format(self.i, 
+                                     self.text, 
+                                     self.dep_, 
+                                     self.head)
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
+    def __lt__(self, other):
+        return self.compareTo(other) < 0
+
+    def compareTo(self, other):
+        result = 0
+
+        if self.__repr__() != other.__repr__():
+            if self.__repr__() < other.__repr__():
+                result -= 1
+            else:
+                result += 1
+
+        return result
 
 
 class stanford_parse():
@@ -67,8 +91,8 @@ class stanford_parse():
 
     def get_parse(sentence):
         anns = "tokenize ssplit pos lemma ner depparse"
-        with corenlp.CoreNLPClient(annotators=anns.split()) as client: 
-            ann = client.annotate(sentence, output_format='json')
+        with corenlp.CoreNLPClient(annotators=anns.split(), output_format='json') as client: 
+            ann = client.annotate(sentence)
 
         return ann['sentences'][0]
 
@@ -104,8 +128,8 @@ class USP(object):
     resultDir = ''
     dataDir = ''
     
-    qas = dict() # {Question: set(Answers)}
-    rel_qs = OrderedDict() # {str: list(Questions)}
+    qas = SortedDict() # {Question: set(Answers)}
+    rel_qs = SortedDict() # {str: list(Questions)}
     
     # Library of tokens
     qForms = set()
@@ -125,7 +149,7 @@ class USP(object):
     id_article = dict() # {str: Article}
 
     def readQuestions(verbose=False):
-        filename = USP.evalDir + "/questions.txt"
+        filename = USP.evalDir + "/questions_full.txt"
 
         with open(filename, "r") as f:
             lines = f.readlines()
@@ -133,7 +157,7 @@ class USP(object):
 #        questions = nlp('\n'.join(lines))
         questions = [stanford_parse(line) for line in lines]
 
-        for i, question in enumerate(questions):
+        for question in questions:
             if len(question.tokens) == 0:
                 continue
 
@@ -181,7 +205,7 @@ class USP(object):
                 if arg[-1].has_children:
                     if verbose:
                         print("Argument has children; building sub-tree.")
-                    sub_tree = build_subtree(question, arg[-1], verbose=verbose)
+                    sub_tree = USP.build_subtree(question, arg[-1], verbose=verbose)
                     sub_tree = sorted(list(sub_tree), key=lambda k: k.i)
                     arg += sub_tree
 
@@ -206,7 +230,7 @@ class USP(object):
         if parent.has_children:
             for child in q.get_children(parent):
                 children.add(child)
-                children = children.union(build_subtree(q, child, children))
+                children = children.union(USP.build_subtree(q, child, children))
 
         return children
 
@@ -331,7 +355,7 @@ class USP(object):
         return None
 
     def getTreeStr(ptId):
-        id_str = OrderedDict()
+        id_str = SortedDict()
 
         if ptId in USP.ptId_aciChdIds:
             for cids in USP.ptId_aciChdIds[ptId]:
@@ -348,7 +372,7 @@ class USP(object):
         return x
 
     def getTreeStrOld(ptId):
-        id_str = OrderedDict()
+        id_str = SortedDict()
 
         if ptId in USP.ptId_aciChdIds:
             for cids in USP.ptId_aciChdIds[ptId]:
@@ -380,7 +404,7 @@ class USP(object):
         return odict
 
     def getTreeCis(ptId):
-        cis = OrderedDict()
+        cis = SortedDict()
         cis[USP.ptId_clustIdxStr[ptId][0]] = 1
 
         if ptId in USP.ptId_aciChdIds:
@@ -506,8 +530,8 @@ class USP(object):
         ans = USP.findAnsPrep(pid, pid_minPid)
 
         for a in ans:
-            na = OrderedDict()
-            idx_prep = OrderedDict()
+            na = SortedDict()
+            idx_prep = SortedDict()
 
             for i in a:
                 tknIdx = USP.getTknIdx(i)
@@ -569,7 +593,7 @@ class USP(object):
     def findAnsPrep(pid, pid_minPid):
         ans = list()
         curr = list()
-        z = OrderedDict()
+        z = SortedDict()
         z[pid] = 1
         curr.append(z)
         pid_minPid[pid] = pid
@@ -595,7 +619,7 @@ class USP(object):
 
                         for a in curr:
                             for b in y:
-                                c = OrderedDict(list(a.items())+list(b.items()))
+                                c = SortedDict(list(a.items())+list(b.items()))
                                 curr1.append(c)
                         curr = curr1
 
@@ -641,7 +665,7 @@ class USP(object):
                 cis.append(x)
 
                 if len(ts) >= 2:
-                    z = OrderedDict()
+                    z = SortedDict()
                     hs = USP.form_lemma[ts[-1]]
                     ds = USP.form_lemma[ts[-2]]
 
