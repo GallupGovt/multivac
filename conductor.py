@@ -12,9 +12,19 @@ following flow:
     a. the json objects that are saved from the collection step are processed
        for dependencies, input (word position), and morphology (lemma) [dim]
     b. it also identifies and notates equations throughout articles
+3. run glove models
+    a. take article collection that is parsed and create glove word embeddings
+    b. develops both domain-general and domain-specific models
+4. build the query generation (qg) network
+    a.
+    b.
+5. build markov logic network (mln)
+    a.
+    b.
 """
 import argparse
 
+from multivac.src.data.glove import glove_main
 from multivac.src.data.make import collect_main
 from multivac.src.data.parsing import nlp_parse_main
 
@@ -25,6 +35,15 @@ def conduct(args_dict):
 
     # step 2:
     nlp_parse_main(args_dict)
+
+    # step 3: run glove models
+    glove_main()
+
+    # step 4: build qg network
+    pass
+
+    # step 5: build mln
+    pass
 
 
 if __name__ == '__main__':
