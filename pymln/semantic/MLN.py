@@ -103,9 +103,8 @@ class MLN(object):
                 out_str += "\t".join(["{}: {}".format(k, v) 
                                       for k, v in ac._argNum_cnt.items()])
                 out_str += "\n\t"
-                arg_type_str = ArgType.getArgType(k).toString()
                 out_str += "\t".join(["{}: {}: {}".format(k, 
-                                                          arg_type_str, 
+                                                          ArgType.getArgType(k).toString(), 
                                                           v) 
                                       for k, v in ac._argTypeIdx_cnt.items()])
                 out_str += "\n\t"
