@@ -1,8 +1,12 @@
 beautifulsoup4==4.7.1
 feedparser==5.2.1
+interruptingcow==0.8
 lxml==4.3.3
 pathlib==1.0.1
 python-dotenv==0.10.1
+spacy==2.1.3
+stanfordnlp==0.1.2
+sympy==1.3
 requests==2.21.0
 xmljson==0.2.0
 

@@ -22,6 +22,7 @@ interim_dir = cfg['PATHS'].get('interim_dir', data_dir/'interim')
 processed_dir = cfg['PATHS'].get('processed_dir', data_dir/'processed')
 metadata_dir = cfg['PATHS'].get('metadata_dir', processed_dir/'metadata')
 models_dir = cfg['PATHS'].get('models_dir', root_dir/'models')
+stanf_nlp_dir = cfg['PATHS'].get('nlp_dir', root_dir/'stanford_nlp_model')
 
 # Get search and filter settings; default to empty lists
 terms = eval(cfg['SEARCH'].get('terms', '[]'))
@@ -29,10 +30,15 @@ sources = eval(cfg['SEARCH'].get('sources', '[]'))
 arxiv_drops = eval(cfg['FILTER'].get('drops', '[]'))
 
 # make data directories if they don't already exist
-dirs = [data_dir, raw_dir, interim_dir, processed_dir, metadata_dir, models_dir]
+dirs = [
+    data_dir,
+    raw_dir,
+    interim_dir,
+    processed_dir,
+    metadata_dir,
+    models_dir,
+    stanf_nlp_dir,
+]
 dirs += [raw_dir / x for x in sources]
 for _dir in dirs:
     utilities.mkdir(_dir)
-
-
-

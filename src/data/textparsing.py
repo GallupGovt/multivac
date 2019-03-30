@@ -1,22 +1,21 @@
-import codecs
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import re as reg
-import copy
 
 
-def clean_doc(doc, spacynlp):   
+def clean_doc(doc, spacynlp):
     '''
-    Clean individual documents and remove citations, URLs, emails, other trivial content. Returns cleaned doc
+    Clean individual documents and remove citations, URLs, emails, other
+    trivial content. Returns cleaned doc
     '''
-
-
-    ### Regex for cleaning 
+    ### Regex for cleaning
     re_citationsNumeric = reg.compile('(\[\d+)(,\s*\d+)*]')
     re_url= reg.compile(r'((http|ftp|https):\/\/)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)')
     author = r"(?:[A-Z][A-Za-z'`-]+)"
     etal = r"(?:et al.?)"
     additional = r"(?:,? (?:(?:and |& )?" + author + "|" + etal + "))"
     year_num = r"(?:19|20)[0-9][0-9]"
-    page_num = r"(?:, p.? [0-9]+)?" 
+    page_num = r"(?:, p.? [0-9]+)?"
     year = "(?:, *"+year_num+page_num+"| *\("+year_num+page_num+"\))"
     re_intextcite = reg.compile(r"((?:[A-Za-z][A-Za-z'`-éü-]+)(?:,? (?:(?:and |& )?(?:[A-Za-z][A-Za-z'`-éü-]+)|(?:et al.?)))*(?:,* *((?:19|20)[0-9][0-9][a-z]*)(\s*&\s*[0-9]*[a-z]*)*(, (\d+))*(?:, p.? [0-9]+)?| *\\((?:19|20)[0-9][0-9][a-z](\s*&)(?:, p.? [0-9]+)?\\)))")
 
@@ -32,7 +31,7 @@ def clean_doc(doc, spacynlp):
     re_vixraHeader = reg.compile(r"^(\s?.?\s)+(v i X r a)")
     re_hyphenatedWords = reg.compile(r'\S(?=\S*[-]\s)([a-zA-Z-]+)(\s)[A-za-z]+')
 
-    #Actual cleaning 
+    #Actual cleaning
     doc = reg.sub(re_cid, ' ', doc)
     doc = reg.sub(re_citationsNumeric, ' NumericCitation ', doc)
     doc = reg.sub(re_url, ' ', doc)
@@ -45,22 +44,21 @@ def clean_doc(doc, spacynlp):
     doc = reg.sub(re_emptySee, ' ', doc)
     doc = reg.sub(re_arxivHeader, ' ', doc)
     doc = reg.sub(re_vixraHeader, ' ', doc)
-    
-    #This work supported by --> all the way to end of document
-    #Only remove this when it appears in the second half of the article
+
+    # This work supported by --> all the way to end of document
+    # Only remove this when it appears in the second half of the article
     removeSupported = False
     for m in reg.finditer(re_sponsors, doc):
         if m.start()>(len(doc)/2):
-            #print('************',m.start(), len(doc))
             doc = reg.sub(re_sponsors, ' ', doc)
-    
+
     #Handling hyphens - 2-28-2018
     for m in reg.finditer(re_hyphenatedWords, doc):
         match=m.group(0)
-        
+
         mergedWord = match.replace(' ', '').replace('-','')
-        if mergedWord in spacynlp.vocab: 
-            
+        if mergedWord in spacynlp.vocab:
+
             doc = doc.replace(match, mergedWord)
         else:
             allWords = True
@@ -70,14 +68,13 @@ def clean_doc(doc, spacynlp):
                 doc = doc.replace(match,(match.replace(' ', '')) )
             else:
                 doc = doc.replace(match, mergedWord)
-    
-    
+
     #De-dup for PUBMED articles, where the main text is sometimes duplicated
     sliceText = doc[0:500]
     count = doc.count(sliceText)
 
     if count>1:
         posDup = doc.find(sliceText, 1)
-        doc = doc[0:posDup-1]        
+        doc = doc[0:posDup-1]
 
     return doc
