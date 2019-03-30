@@ -90,29 +90,37 @@ class MLN(object):
         return None
 
     def printMLN(path=None):
+        out_str = ""
+
+        for ci in Clust.clusts:
+            cl = Clust.getClust(ci)
+            out_str = "{}\t{}\n".format(cl._clustIdx,cl)
+
+            for aci in cl._argClusts:
+                ac = cl._argClusts[aci]
+                out_str += "\t{}: ".format(aci)
+
+                out_str += "\t".join(["{}: {}".format(k, v) 
+                                      for k, v in ac._argNum_cnt.items()])
+                out_str += "\n\t"
+                arg_type_str = ArgType.getArgType(k).toString()
+                out_str += "\t".join(["{}: {}: {}".format(k, 
+                                                          arg_type_str, 
+                                                          v) 
+                                      for k, v in ac._argTypeIdx_cnt.items()])
+                out_str += "\n\t"
+                out_str += "\t".join(["{}: {}: {}".format(k, 
+                                                          Clust.getClust(k), 
+                                                          v) 
+                                      for k, v in ac._chdClustIdx_cnt.items()])
+                out_str += "\n"
+
         if path is not None:
             dst = "{}/{}.mln".format(path, 
                                      os.path.basename(os.path.dirname(path)))
+
             with open(dst, 'w') as f:
-                for ci in Clust.clusts:
-                    cl = Clust.getClust(ci)
-                    out_str = "{}\t{}\n".format(cl._clustIdx,cl)
-
-                    for aci in cl._argClusts:
-                        ac = cl._argClusts[aci]
-                        out_str += "\t{}: ".format(aci)
-
-                        out_str += "\t".join(["{}: {}".format(k, v) 
-                                              for k, v in ac._argNum_cnt.items()])
-                        out_str += "\n\t"
-                        out_str += "\t".join(["{}: {}: {}".format(k, ArgType.getArgType(k).toString(), v) 
-                                              for k, v in ac._argTypeIdx_cnt.items()])
-                        out_str += "\n\t"
-                        out_str += "\t".join(["{}: {}: {}".format(k, Clust.getClust(k), v) 
-                                              for k, v in ac._chdClustIdx_cnt.items()])
-                        out_str += "\n"
-
-                    f.write(out_str)
+                f.write(out_str)
 
             return None
         else:

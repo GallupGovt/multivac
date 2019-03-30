@@ -2,8 +2,8 @@
 class Question(object):
     def __init__(self, rel, arg, dep):
         self._rel = rel
-        self._dep = arg
-        self._arg = dep
+        self._dep = dep
+        self._arg = arg
         self._argClustIdxSeq = None
 
     def __hash__(self):
