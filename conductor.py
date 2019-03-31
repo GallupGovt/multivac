@@ -16,8 +16,9 @@ following flow:
     a. take article collection that is parsed and create glove word embeddings
     b. develops both domain-general and domain-specific models
 4. build the query generation (qg) network
-    a.
-    b.
+    a. uses context/answers as inputs to create questions as output
+    b. builds off of the domain-adapted glove models to produces robust
+       questions around a topic of interest (in this case, epidemiology)
 5. build markov logic network (mln)
     a.
     b.
@@ -27,6 +28,7 @@ import argparse
 from multivac.src.data.glove import glove_main
 from multivac.src.data.make import collect_main
 from multivac.src.data.parsing import nlp_parse_main
+from multivac.src.data.qgnet import qgnet_main
 
 
 def conduct(args_dict):
@@ -40,7 +42,7 @@ def conduct(args_dict):
     glove_main()
 
     # step 4: build qg network
-    pass
+    qgnet_main(args_dict)
 
     # step 5: build mln
     pass
@@ -54,6 +56,9 @@ if __name__ == '__main__':
     parser.add_argument('-js', '--nlp_newjson', action='store_true',
                         help='Boolean; indicates whether to create new JSON '
                         'file for glove embedding.')
+    parser.add_argument('-qd', '--qgnet_path', required=True, help='The '
+                        'top-level qgnet directory to create folders for '
+                        'models and data.')
     args_dict = vars(parser.parse_args())
 
     conduct(args_dict)
