@@ -95,11 +95,13 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                         t3=list(t3)
 
                         #current position is the threshold for change
-                        if (t2[1]-lastAdjustedPosition)>int(token.index) and
-                            t1 not in ['combine', 'compare', 'function', 'transform']:
+                        if ((t2[1]-lastAdjustedPosition)>int(token.index) and
+                            t1 not in ['combine', 'compare', 'function',
+                            'transform']):
                             t2[1] = t2[1]+(len(l_posTokens_latex_sub)-1)
-                        if (t3[1]-lastAdjustedPosition)>int(token.index) and
-                            t1 not in ['combine', 'compare', 'function', 'transform']:
+                        if ((t3[1]-lastAdjustedPosition)>int(token.index) and
+                            t1 not in ['combine', 'compare', 'function',
+                            'transform']):
                             t3[1] = t3[1]+(len(l_posTokens_latex_sub)-1)
 
                         adjustedTuple = (t1,tuple(t2),tuple(t3))
@@ -252,13 +254,13 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
 
 
     if writeFile:
-        with open(pathToFolders+'/dep/{0:04d}.dep'.format(docNum),
+        with open(pathToFolders+'{0:04d}.dep'.format(docNum),
                   "w", encoding='utf8') as text_file:
             text_file.write('\n\n'.join(l_depSentences))
-        with open(pathToFolders+'/input/{0:04d}.input'.format(docNum),
+        with open(pathToFolders+'{0:04d}.input'.format(docNum),
                   "w", encoding='utf8') as text_file:
             text_file.write('\n\n'.join(l_posSentences))
-        with open(pathToFolders+'/morph/{0:04d}.morph'.format(docNum),
+        with open(pathToFolders+'{0:04d}.morph'.format(docNum),
                   "w", encoding='utf8') as text_file:
             text_file.write('\n\n'.join(l_morSentences))
 
@@ -368,7 +370,8 @@ def nlp_parse_main(args_dict):
                 jsonObj2[key]['text']=allDocs3[allDocs3Counter]
                 allDocs3Counter = allDocs3Counter+1
 
-        with open('articles-with-equations.json', 'w', encoding='utf8') as fp:
+        with open('{}/articles-with-equations.json'.format(settings.data_dir),
+                  'w', encoding='utf8') as fp:
             json.dump(jsonObj2, fp)
 
 

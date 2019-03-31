@@ -45,6 +45,25 @@ def aggregate_pubmed(srcs, verbose=False):
     return pubmed_data
 
 
+def collect_process_main():
+    output = {}
+    for source in settings.sources:
+        data_raw_dir = settings.raw_dir / source
+        if source in ['arxiv', 'springer']:
+            data = parse_articles_data(source, data_raw_dir)
+        elif source == 'pubmed':
+            srcs = [data_raw_dir / x for x in os.listdir(data_raw_dir)]
+            data = aggregate_pubmed(srcs)
+        if len(output) == 0:
+            output = copy.deepcopy(data)
+        else:
+            output.update(data)
+    arxiv_drops = [x.split()[0] for x in settings.arxiv_drops]
+    filtered_output = filter_arxiv(output, arxiv_drops)
+    save_outputs(filtered_output)
+    return True
+
+
 def filter_arxiv(output, arxiv_drops):
     filtered_output = OrderedDict()
     for k, v in output.items():
@@ -134,25 +153,6 @@ def parse_pdf(src):
         text = None
 
     return text
-
-
-def collect_process_main():
-    output = {}
-    for source in settings.sources:
-        data_raw_dir = settings.raw_dir / source
-        if source in ['arxiv', 'springer']:
-            data = parse_articles_data(source, data_raw_dir)
-        elif source == 'pubmed':
-            srcs = [data_raw_dir / x for x in os.listdir(data_raw_dir)]
-            data = aggregate_pubmed(srcs)
-        if len(output) == 0:
-            output = copy.deepcopy(data)
-        else:
-            output.update(data)
-    arxiv_drops = [x.split()[0] for x in settings.arxiv_drops]
-    filtered_output = filter_arxiv(output, arxiv_drops)
-    save_outputs(filtered_output)
-    return True
 
 
 def parse_pubmed(src):

@@ -20,8 +20,8 @@ following flow:
     b. builds off of the domain-adapted glove models to produces robust
        questions around a topic of interest (in this case, epidemiology)
 5. build markov logic network (mln)
-    a.
-    b.
+    a. compile parsed dim files into trees and semantically cluster
+    b. produce a graphical model based on first-order logic for
 """
 import argparse
 
@@ -45,20 +45,30 @@ def conduct(args_dict):
     qgnet_main(args_dict)
 
     # step 5: build mln
-    pass
+    mln_main(args_dict)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Parse texts for natural '
-                                     'language and equations.')
-    parser.add_argument('-bp', '--nlp_bp', required=False, help='Which '
-                        'document to start with', type=int)
+    parser = argparse.ArgumentParser(description='Orchestrate pipeline for '
+                                     'MULTIVAC processing and modeling.')
+    parser.add_argument('-bp', '--nlp_bp', required=False, type=int,
+                        help='Which document to start parsing with.')
     parser.add_argument('-js', '--nlp_newjson', action='store_true',
                         help='Boolean; indicates whether to create new JSON '
                         'file for glove embedding.')
-    parser.add_argument('-qd', '--qgnet_path', required=True, help='The '
+    parser.add_argument('-an', '--subset', type=int, help='Number of articles '
+                        'for MLN run.')
+    parser.add_argument('-pc', '--prior_num_conj', default=10, type=int,
+                        help='Prior on number of conjunctive parts assigned to '
+                        'same cluster in MLN.')
+    parser.add_argument('-pp', '--prior_num_param', default=5, type=int,
+                        help='Prior on number of parameters for cluster '
+                        'merges.')
+    parser.add_argument('-qp', '--qgnet_path', required=True, help='The '
                         'top-level qgnet directory to create folders for '
                         'models and data.')
+    parser.add_argument('-v', "--verbose", action='store_true', help='Give '
+                        'verbose output during MLN modeling.')
     args_dict = vars(parser.parse_args())
 
     conduct(args_dict)

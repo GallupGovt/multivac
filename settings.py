@@ -24,7 +24,9 @@ interim_dir = cfg['PATHS'].get('interim_dir', data_dir/'interim')
 processed_dir = cfg['PATHS'].get('processed_dir', data_dir/'processed')
 metadata_dir = cfg['PATHS'].get('metadata_dir', processed_dir/'metadata')
 models_dir = cfg['PATHS'].get('models_dir', root_dir/'models')
-stanf_nlp_dir = cfg['PATHS'].get('nlp_dir', root_dir/'stanford_nlp_model')
+stanf_nlp_dir = cfg['PATHS'].get('stanf_nlp_dir',
+                                 root_dir/'stanford_nlp_models')
+mln_dir = cfg['PATHS'].get('mln_dir', root_dir/'mln_models')
 
 # Get search and filter settings; default to empty lists
 terms = eval(cfg['SEARCH'].get('terms', '[]'))
@@ -40,6 +42,7 @@ dirs = [
     metadata_dir,
     models_dir,
     stanf_nlp_dir,
+    mln_dir,
 ]
 dirs += [raw_dir / x for x in sources]
 for _dir in dirs:

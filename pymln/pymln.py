@@ -5,7 +5,6 @@
 #   Hoifung Poon and Pedro Domingos (2009). "Unsupervised Semantic Parsing",
 #   in Proceedings of the Conference on Empirical Methods in Natural Language
 #   Processing (EMNLP), 2009. http://alchemy.cs.washington.edu/usp.
-import argparse
 import os
 
 from datetime import datetime
@@ -24,29 +23,24 @@ def read_input_files(DIR):
     return files
 
 
-def run(args):
-    verbose = args['verbose']
-    data_dir = args['data_dir']
+def mln_main(args_dict):
+    # set variables
+    verbose = args_dict['verbose']
+    data_dir = settings.data_dir
+    results_dir = settings.mln_dir
+    parser = Parse(args_dict['priorNumParam'], args_dict['priorNumConj'])
 
-    if 'results_dir' in args:
-        results_dir = args['results_dir']
-    else:
-        results_dir = data_dir
-
-    priorNumParam = args['priorNumParam']
-    priorNumConj = args['priorNumConj']
-
-    parser = Parse(priorNumParam, priorNumConj)
-
+    # read in inputs
     input_files = read_input_files(data_dir)
     input_files.sort()
 
-    articles = []
+    # set final parameter
     if 'subset' in args:
-        subset = int(args['subset'])
+        subset = args_dict['subset']
     else:
         subset = len(input_files)
 
+    articles = []
     for i, fileName in enumerate(input_files):
         try:
             a = StanfordParseReader.readParse(fileName, data_dir)
@@ -65,7 +59,6 @@ def run(args):
 
     if verbose:
         print("{} Initializing...".format(datetime.now()))
-
     parser.initialize(articles, verbose)
 
     if verbose:
@@ -112,24 +105,4 @@ def run(args):
 
 
 if __name__ == '__main__':
-    prs = argparse.ArgumentParser(description='DO it.')
-    prs.add_argument('-d', '--data_dir',
-                        help='Directory of source files. If not specified, '
-                        'defaults to the current working directory.')
-    prs.add_argument('-r', '--results_dir',
-                        help='Directory to save results files. If not specified,'
-                        ' defaults to the current working directory.')
-    prs.add_argument('-v', "--verbose", action='store_true',
-                        help='Give verbose output.')
-    prs.add_argument('-c', '--priorNumConj',
-                        help='Prior on number of conjunctive parts assigned to '
-                        'same cluster. If not specified, defaults to 10.')
-    prs.add_argument('-p', '--priorNumParam',
-                        help='Prior on number of conjunctive parts assigned to '
-                        'same cluster. If not specified, defaults to 10.')
-    prs.add_argument('-n', '--subset',
-                        help='Number of articles for a rest run.')
-
-    args = vars(prs.parse_args())
-
-    run(args)
+    mln_main(args_dict)
