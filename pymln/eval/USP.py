@@ -9,7 +9,7 @@ import re
 
 import corenlp
 
-from sortedcontainers import SortedDict
+from sortedcontainers import SortedDict, SortedSet
 
 #from multivac import settings
 from utils import Utils
@@ -73,7 +73,7 @@ class stanford_parse():
                                  lemma_=w['lemma'],
                                  pos_=w['pos'],
                                  ner=w['ner'],
-                                 dep_=self.deps[i]['dep'],
+                                 dep_=self.deps[i]['dep'].replace(":",""),
                                  head=self.deps[i]['governor']-1)
             self.tokens.append(tok)
             if tok.dep_ == 'ROOT':
@@ -121,8 +121,12 @@ class stanford_parse():
     def get_children(self, tok):
         return set([t for t in self.tokens if t.head+1 == tok.i])
 
+    def toString(self):
+        return ' '.join([t.text for t in self.tokens])
+
+
 class USP(object):
-    allowedDeps = set(['nn','nmod','amod','case','num','appos'])
+    allowedDeps = set(['nn','nmod','obl','amod','case','num','appos'])
     target_args = set(['nsubj','nsubjpass','dobj','attr','pobj'])
     five_ws_and_h = ['who','what','where','when','why','how']
     evalDir = ''
@@ -182,10 +186,16 @@ class USP(object):
             #       - what to do when two question words included?
 
             for t in question.tokens:
-                USP.form_lemma[t.text] = t.lemma_
+                if t.text not in USP.form_lemma:
+                    USP.form_lemma[t.text] = set()
+
+                USP.form_lemma[t.text].add(t.lemma_)
 
             for rel in verbs:
-                args = [t for t in question.get_children(rel) if t.pos_.startswith('N') or 'subj' in t.dep_ or 'obj' in t.dep_]
+                args = [t for t in question.get_children(rel) 
+                                if t.pos_.startswith('N') 
+                                or 'subj' in t.dep_ 
+                                or 'obj' in t.dep_]
 
                 if len(args) == 0:
                     args = [t for t in question.tokens if t.pos_.startswith('N')]
@@ -193,18 +203,22 @@ class USP(object):
                 arg = [t for t in args if t.dep_.startswith('nsubj')]
 
                 if len(arg) == 0:
-                    try:
-                        arg = [args[0]]
-                    except IndexError:
+                    if len(args) == 0:
                         if verbose:
-                            print("Skipping question as unparsable: {}".format(' '.join([t.text for t in question.tokens])))
+                            print("Skipping question as unparsable: "
+                                  "{}".format(question.toString()))
                         continue
+                    else:
+                        arg = [args[0]]
+
                     dep = 'nsubj'
                 else:
                     if len(args) > 1:
-                        dep = [t for t in args if t not in arg][0].dep_
+                        dep = [t for t in args if t not in arg[0:1]][0].dep_
                     else:
                         dep = 'dobj'
+
+                dep = dep.replace('nmod','obl')
 
                 if verbose:
                     print("Main arguments: {} and {}".format(arg, dep))
@@ -307,22 +321,21 @@ class USP(object):
         if rel in USP.rel_qs and POS.startswith('V'):
             USP.rel_clustIdx[rel] = clustIdx
 
-        if rel in USP.qLemmas:
+        if ' (' not in rel:
             if rel not in USP.lemma_clustIdxs:
                 USP.lemma_clustIdxs[rel] = set()
 
-            USP.lemma_clustIdxs[rel].add(str(clustIdx))
+            USP.lemma_clustIdxs[rel].add(clustIdx)
         else:
-            if ' (' in rel:
-                headdep = rel.split(' ', 1)
-                head = headdep[0]
-                dep = re.search(r'\(\w+:\S+\)', headdep[1]).group()
-                
-                if len(dep) > 0:
-                    dep = dep[dep.index(":")+1:-1]
+            headdep = rel.split(' ', 1)
+            head = headdep[0]
+            dep = re.search(r'\(\w+:\S+\)', headdep[1]).group()
+            
+            if len(dep) > 0:
+                dep = dep[dep.index(":")+1:-1]
 
-                if (head and dep) in USP.qLemmas:
-                    USP.headDep_clustIdxs[(head, dep)] = str(clustIdx)
+            if (head and dep) in USP.qLemmas:
+                USP.headDep_clustIdxs[(head, dep)] = str(clustIdx)
 
         return None
 
@@ -400,23 +413,23 @@ class USP(object):
         else:
             return c in cs.split()
 
-    def update_odict_all_cids(l, ptId, odict):
-        if ptId in USP.ptId_aciChdIds:
-            for cids in USP.ptId_aciChdIds[ptId]:
-                for cid in cids:
-                    if USP.ptId_parDep[cid] not in USP.allowedDeps:
-                        continue
+    # def update_odict_all_cids(l, ptId, odict):
+    #     if ptId in USP.ptId_aciChdIds:
+    #         for cids in USP.ptId_aciChdIds[ptId].values():
+    #             for cid in cids:
+    #                 if USP.ptId_parDep[cid] not in USP.allowedDeps:
+    #                     continue
 
-                    odict.update(l(cid))
+    #                 odict.update(l(cid))
     
-        return odict
+    #     return odict
 
     def getTreeCis(ptId):
-        cis = SortedDict()
-        cis[USP.ptId_clustIdxStr[ptId][0]] = 1
+        cis = SortedSet()
+        cis.add(str(USP.ptId_clustIdxStr[ptId][0]))
 
         if ptId in USP.ptId_aciChdIds:
-            for cids in USP.ptId_aciChdIds[ptId]:
+            for cids in USP.ptId_aciChdIds[ptId].values():
                 for cid in cids:
                     if USP.ptId_parDep[cid] not in USP.allowedDeps:
                         continue
@@ -428,7 +441,7 @@ class USP(object):
     def isMatchFromHead(chdPtId, cis):
         hci = USP.ptId_clustIdxStr[chdPtId][0]
 
-        if hci not in cis:
+        if str(hci) not in cis:
             return False
 
         tcis = USP.getTreeCis(chdPtId)
@@ -460,7 +473,7 @@ class USP(object):
 
         return False
 
-    def match():
+    def match(verbose=False):
         '''
             For each question set, get the cluster ID for the verb/relation, and 
             the associated Parts for that cluster. 
@@ -469,9 +482,16 @@ class USP(object):
                 for each part associated with the question, check for a match 
                 with those argument clusters
         '''
+        bad_qs = 0
+        matches = 0
+
         for reltype, qs in USP.rel_qs.items():
             if reltype not in USP.rel_clustIdx:
-                print("I don't understand this question: {}".format(qs[0].toString()))
+                bad_qs += 1
+
+                if verbose:
+                    print("I don't understand this question: "
+                          "{}".format(qs[0].toString()))
                 continue
 
             clust_id = USP.rel_clustIdx[reltype]
@@ -479,51 +499,46 @@ class USP(object):
 
             for q in qs:
                 dep2 = 'nsubj'
+                dep = q.getDep()
 
-                if q.getDep() == 'nsubj':
+                if 'nsubj' in dep:
                     dep2 = 'dobj'
 
-                try:
-                    if 'nsubj' in q.getDep():
+                if dep in USP.clustIdx_depArgClustIdx[clust_id]:
+                    aci  = USP.clustIdx_depArgClustIdx[clust_id][dep]
+                else:
+                    if dep.startswith('nsubj'):
                         if 'nsubj' in USP.clustIdx_depArgClustIdx[clust_id]:
                             aci  = USP.clustIdx_depArgClustIdx[clust_id]['nsubj']
                         elif 'nsubjpass' in USP.clustIdx_depArgClustIdx[clust_id]:
                             aci  = USP.clustIdx_depArgClustIdx[clust_id]['nsubjpass']
-                    elif 'obj' in q.getDep():
+                    elif 'obj' in dep:
                         if 'dobj' in USP.clustIdx_depArgClustIdx[clust_id]:
                             aci  = USP.clustIdx_depArgClustIdx[clust_id]['dobj']
                         elif 'obj' in USP.clustIdx_depArgClustIdx[clust_id]:
                             aci  = USP.clustIdx_depArgClustIdx[clust_id]['obj']
-                except KeyError:
-                    print("Error on dep with q: {}".format(q.__dict__))
-                    print(clust_id)
-                    print(USP.clustIdx_depArgClustIdx[clust_id])
-                    raise KeyError
 
-                try:
-                    if 'nsubj' in q.getDep2():
-                        if 'nsubj' in USP.clustIdx_depArgClustIdx[clust_id]:
-                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['nsubj']
-                        elif 'nsubjpass' in USP.clustIdx_depArgClustIdx[clust_id]:
-                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['nsubjpass']
-                    elif 'obj' in q.getDep2():
-                        if 'dobj' in USP.clustIdx_depArgClustIdx[clust_id]:
-                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['dobj']
-                        elif 'obj' in USP.clustIdx_depArgClustIdx[clust_id]:
-                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['obj']
-                except KeyError:
-                    print("Error on dep2 with q: {}".format(q.__dict__))
-                    print(clust_id)
-                    print(USP.clustIdx_depArgClustIdx[clust_id])
-                    raise KeyError
+                if dep2 == 'nsubj':
+                    if 'nsubj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                        aci2  = USP.clustIdx_depArgClustIdx[clust_id]['nsubj']
+                    elif 'nsubjpass' in USP.clustIdx_depArgClustIdx[clust_id]:
+                        aci2  = USP.clustIdx_depArgClustIdx[clust_id]['nsubjpass']
+                elif dep2 == 'dobj':
+                    if 'dobj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                        aci2  = USP.clustIdx_depArgClustIdx[clust_id]['dobj']
+                    elif 'obj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                        aci2  = USP.clustIdx_depArgClustIdx[clust_id]['obj']
 
                 for part_id in part_ids:
-                    if part_id not in USP.ptId_aciChdIds:
-                        continue
-                    elif any([x not in USP.ptId_aciChdIds[part_id] for x in (aci, aci2)]):
-                        continue
+                    if part_id in USP.ptId_aciChdIds:
+                        if aci  in USP.ptId_aciChdIds[part_id] and \
+                           aci2 in USP.ptId_aciChdIds[part_id]:
+                            matches += 1
+                            USP.match_q(q, part_id, aci, aci2)
 
-                    USP.match_q(q, part_id, aci, aci2)
+        if verbose:
+            print("Unparsed questions: {}".format(bad_qs))
+            print("Matched questions: {}".format(matches))
 
         return None
 
@@ -553,10 +568,10 @@ class USP(object):
         return ptId[:ptId.rfind(':')]
 
     def getArticleId(ptId):
-        return ptId[:ptId.lfind(':')]
+        return ptId[:ptId.index(':')]
 
     def getSentIdx(ptId):
-        return ptId[ptId.lfind(':')+1:ptId.rfind(':')]
+        return ptId[ptId.index(':')+1:ptId.rfind(':')]
 
     def getTknIdx(ptId):
         return int(ptId[ptId.rfind(':')+1:])
@@ -573,7 +588,7 @@ class USP(object):
         ans = USP.findAnsPrep(pid, pid_minPid)
 
         for a in ans:
-            na = SortedDict()
+            na = SortedSet()
             idx_prep = SortedDict()
 
             for i in a:
@@ -586,7 +601,7 @@ class USP(object):
                     for depChd in sent._tkn_children[tknIdx]:
                         if depChd[0] == 'det':
                             detIdx = depChd[1]
-                            na[detIdx] = 1
+                            na.add(detIdx)
                             break
 
                 if tknIdx in sent._tkn_par:
@@ -612,7 +627,7 @@ class USP(object):
                     pidx = idx_prep[next(iter(idx_prep))]
 
                     if i >= pidx:
-                        s = ' '.join([s, idx_prep.popitem(last=False)]).strip()
+                        s = ' '.join([s, idx_prep.popitem(0)]).strip()
 
                 word = sent._tokens[i].getForm()
                 xid = Utils.genTreeNodeId(aid, sIdx, i)
@@ -689,17 +704,20 @@ class USP(object):
                 isIgnored = False
 
                 for f in ts:
+                    z = SortedSet()
                     if f in ['the','of','in']:
                         continue
 
                     if f not in USP.form_lemma:
                         isIgnored = True
                         break
+                    else:
+                        ls = USP.form_lemma[f]
 
-                    # lemma_clustIdxs never gets used that I can see.
-
-                    # x.append(' '.join([l for l in USP.form_lemma[f] 
-                    #                      if l in USP.lemma_clustIdxs]))
+                        for l in ls:
+                            if l in USP.lemma_clustIdxs:
+                                z.update([str(ci) for ci in USP.lemma_clustIdxs[l]])
+                        x.append(' '.join(z))
 
                 if isIgnored:
                     ignoredQs.add(q)
@@ -708,14 +726,14 @@ class USP(object):
                 cis.append(x)
 
                 if len(ts) >= 2:
-                    z = SortedDict()
+                    z = SortedSet()
                     hs = USP.form_lemma[ts[-1]]
                     ds = USP.form_lemma[ts[-2]]
 
                     for h in hs:
                         for d in ds:
                             if (h, d) in USP.headDep_clustIdxs:
-                                z[USP.headDep_clustIdxs[(h, d)]] = 1
+                                z.add(USP.headDep_clustIdxs[(h, d)])
 
                     if len(z) > 0:
                         y = x[:-2]
@@ -803,8 +821,4 @@ if __name__ == '__main__':
         USP.evalDir = os.path.join(os.getcwd(), params['eval_dir'])
 
     run()
-
-
-
-
 
