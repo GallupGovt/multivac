@@ -2,8 +2,8 @@
 class Question(object):
     def __init__(self, rel, arg, dep):
         self._rel = rel
-        self._dep = arg
-        self._arg = dep
+        self._dep = dep
+        self._arg = arg
         self._argClustIdxSeq = None
 
     def __hash__(self):
@@ -11,6 +11,9 @@ class Question(object):
 
     def __eq__(self, other):
         return self.compareTo(other) == 0
+
+    def __lt__(self):
+        return self.compareTo(other) < 0
 
     def __str__(self):
         return self.toString()
@@ -25,19 +28,23 @@ class Question(object):
         return self._dep
 
     def compareTo(self, q):
-        this = sum([ord(x) for x in self._dep])
-        that = sum([ord(x) for x in q.getDep()])
-        result = this - that
+        result = 0
 
-        if result == 0:
-            this = sum([ord(x) for x in self._rel])
-            that = sum([ord(x) for x in q.getRel()])
-            result = this - that
-
-            if result == 0:
-                this = sum([ord(x) for x in self._arg])
-                that = sum([ord(x) for x in q.getArg()])
-                result = this - that
+        if self._dep != q.getDep():
+            if self._dep < q.getDep():
+                result -= 1
+            else:
+                result += 1
+        elif self._rel != q.getRel():
+            if self._rel < q.getRel():
+                result -= 1
+            else:
+                result += 1
+        elif self._arg != q.getArg():
+            if self._arg < q.getArg():
+                result -= 1
+            else:
+                result += 1
 
         return result
 

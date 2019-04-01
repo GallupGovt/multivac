@@ -4,17 +4,19 @@ import os
 import re
 # import spacy
 # nlp = spacy.load('en')
-import stanfordnlp
-nlp = stanfordnlp.Pipeline(processors='tokenize,lemma,pos')
+# import stanfordnlp
+# nlp = stanfordnlp.Pipeline(processors='tokenize,lemma,pos')
 
 import corenlp
 
-from collections import OrderedDict
+from sortedcontainers import SortedDict
 
 #from multivac import settings
 from utils import Utils
 from syntax.Nodes import Article, Sentence, Token
 from semantic import MLN, Part, Clust
+from syntax.Relations import RelType, ArgType
+from eval import Answer, Question
 
 class stanford_token():
     def __init__(self, text='', index=None, lemma_='', pos_='', 
@@ -29,7 +31,30 @@ class stanford_token():
         self.has_children = False
 
     def __repr__(self):
-        return self.text
+        return "{}:{}=>{}:{}".format(self.i, 
+                                     self.text, 
+                                     self.dep_, 
+                                     self.head)
+
+    def __hash__(self):
+        return hash(self.__repr__())
+
+    def __eq__(self, other):
+        return self.compareTo(other) == 0
+
+    def __lt__(self, other):
+        return self.compareTo(other) < 0
+
+    def compareTo(self, other):
+        result = 0
+
+        if self.__repr__() != other.__repr__():
+            if self.__repr__() < other.__repr__():
+                result -= 1
+            else:
+                result += 1
+
+        return result
 
 
 class stanford_parse():
@@ -67,8 +92,8 @@ class stanford_parse():
 
     def get_parse(sentence):
         anns = "tokenize ssplit pos lemma ner depparse"
-        with corenlp.CoreNLPClient(annotators=anns.split()) as client: 
-            ann = client.annotate(sentence, output_format='json')
+        with corenlp.CoreNLPClient(annotators=anns.split(), output_format='json') as client: 
+            ann = client.annotate(sentence)
 
         return ann['sentences'][0]
 
@@ -104,8 +129,8 @@ class USP(object):
     resultDir = ''
     dataDir = ''
     
-    qas = dict() # {Question: set(Answers)}
-    rel_qs = OrderedDict() # {str: list(Questions)}
+    qas = SortedDict() # {Question: set(Answers)}
+    rel_qs = SortedDict() # {str: list(Questions)}
     
     # Library of tokens
     qForms = set()
@@ -115,6 +140,7 @@ class USP(object):
     # Clusters, Argument Clusters, Parts
     headDep_clustIdxs = dict() # {(str,str): str}
     lemma_clustIdxs = dict() # {str: set(str)}
+    rel_clustIdx = dict() # {str: int}
     clustIdx_depArgClustIdx = dict() # {int: {str: int}}
     arg_cis = dict() # {str: list(list(str))}
     ptId_clustIdxStr = dict() # {str: (int, str)}
@@ -125,7 +151,7 @@ class USP(object):
     id_article = dict() # {str: Article}
 
     def readQuestions(verbose=False):
-        filename = USP.evalDir + "/questions.txt"
+        filename = USP.evalDir + "/questions_full.txt"
 
         with open(filename, "r") as f:
             lines = f.readlines()
@@ -133,7 +159,7 @@ class USP(object):
 #        questions = nlp('\n'.join(lines))
         questions = [stanford_parse(line) for line in lines]
 
-        for i, question in enumerate(questions):
+        for question in questions:
             if len(question.tokens) == 0:
                 continue
 
@@ -159,7 +185,7 @@ class USP(object):
                 USP.form_lemma[t.text] = t.lemma_
 
             for rel in verbs:
-                args = [t for t in question.get_children(rel) if t.pos_.startswith('N')]
+                args = [t for t in question.get_children(rel) if t.pos_.startswith('N') or 'subj' in t.dep_ or 'obj' in t.dep_]
 
                 if len(args) == 0:
                     args = [t for t in question.tokens if t.pos_.startswith('N')]
@@ -167,60 +193,65 @@ class USP(object):
                 arg = [t for t in args if t.dep_.startswith('nsubj')]
 
                 if len(arg) == 0:
-                    arg = [args[0]]
+                    try:
+                        arg = [args[0]]
+                    except IndexError:
+                        if verbose:
+                            print("Skipping question as unparsable: {}".format(' '.join([t.text for t in question.tokens])))
+                        continue
                     dep = 'nsubj'
                 else:
                     if len(args) > 1:
-                        dep = [t for t in args if t not in arg][0]
+                        dep = [t for t in args if t not in arg][0].dep_
                     else:
                         dep = 'dobj'
 
                 if verbose:
                     print("Main arguments: {} and {}".format(arg, dep))
 
-                if arg[-1].has_children:
+                if arg[0].has_children:
                     if verbose:
                         print("Argument has children; building sub-tree.")
-                    sub_tree = build_subtree(question, arg[-1], verbose=verbose)
-                    sub_tree = sorted(list(sub_tree), key=lambda k: k.i)
-                    arg += sub_tree
+                        arg += question.get_children(arg[0])
+                    # arg += sorted(USP.build_subtree(question, arg[0], 
+                    #               verbose=verbose), key=lambda k: k.i)
 
                 if verbose:
                     print("Arg sub-tree: {}".format(arg))
 
                 qu = Question(rel.text, ' '.join([t.text for t in arg]), dep)
 
-                if rel not in USP.rel_qs:
-                    USP.rel_qs[rel] = list()
+                if rel.text not in USP.rel_qs:
+                    USP.rel_qs[rel.text] = list()
 
-                USP.rel_qs[rel].append(qu)
-                USP.qForms.update(arg + [rel])
+                USP.rel_qs[rel.text].append(qu)
+                USP.qForms.update(arg + [rel.text])
 
-                # del arg
-                # del rel
-                # del dep
+                del arg
+                del rel
+                del dep
 
         return None
 
-    def build_subtree(q, parent, children=set(), verbose=False):
+    def build_subtree(q, parent, children=set()):
         if parent.has_children:
             for child in q.get_children(parent):
                 children.add(child)
-                children = children.union(build_subtree(q, child, children))
+                children = children.union(USP.build_subtree(q, child, children))
 
         return children
 
-    def graph_question(question):
-        edges = []
+    # def graph_question(question):
+    #     edges = []
 
-        for token in question:
-            for child in token.children:
-                if child.dep_ != 'punct':
-                    edges.append(('{0}-{1}'.format(token.lower_,token.i),
-                                  '{0}-{1}'.format(child.lower_,child.i)))
-        graph = nx.Graph(edges)
+    #     for token in question:
+    #         for child in token.children:
+    #             if child.dep_ != 'punct':
+    #                 edges.append(('{0}-{1}'.format(token.lower_,token.i),
+    #                               '{0}-{1}'.format(child.lower_,child.i)))
+    #     graph = nx.Graph(edges)
 
-        return graph
+    #     return graph
 
     def readSents(aid=None, filename=None):
         '''
@@ -244,7 +275,7 @@ class USP(object):
 
         return None
 
-    def readPart(filename=None):
+    def readPart():
         Part.clustIdx_partRootNodeIds = Part.clustIdx_partRootNodeIds
         USP.ptId_clustIdxStr = {k: (p.getClustIdx(), 
                                     p.getRelTreeRoot().getTreeStr()) 
@@ -272,9 +303,9 @@ class USP(object):
 
         return None
 
-    def procRelType(clustIdx, relType, POS, rel):
-        # if rel in USP.rel_qs and POS.startswith('V'):
-        #     Clust.relTypeIdx_clustIdx[relType] = clustIdx
+    def procRelType(clustIdx, POS, rel):
+        if rel in USP.rel_qs and POS.startswith('V'):
+            USP.rel_clustIdx[rel] = clustIdx
 
         if rel in USP.qLemmas:
             if rel not in USP.lemma_clustIdxs:
@@ -282,10 +313,10 @@ class USP(object):
 
             USP.lemma_clustIdxs[rel].add(str(clustIdx))
         else:
-            if ' ' in rel:
-                headdep = rel.split()
+            if ' (' in rel:
+                headdep = rel.split(' ', 1)
                 head = headdep[0]
-                dep = re.search(r'\(\w+:\w+\)', headdep[1]).group()
+                dep = re.search(r'\(\w+:\S+\)', headdep[1]).group()
                 
                 if len(dep) > 0:
                     dep = dep[dep.index(":")+1:-1]
@@ -295,7 +326,7 @@ class USP(object):
 
         return None
 
-    def readClust(filename=None):
+    def readClust():
 
         USP.clustIdx_depArgClustIdx = {} # ci int: {dep str: aci int}
 
@@ -304,13 +335,14 @@ class USP(object):
 
             for arg_clust_id, arg_clust in clust._argClusts.items():                
                 for ati in arg_clust._argTypeIdx_cnt:
-                    USP.clustIdx_depArgClustIdx[cid][ati] = arg_clust_id
+                    arg_type_str = ArgType.getArgType(ati).toString()[1:-1]
+                    USP.clustIdx_depArgClustIdx[cid][arg_type_str] = arg_clust_id
 
             for relType in clust._relTypeIdx_cnt:
                 rel_str = RelType.getRelType(relType).toString()
                 POS = rel_str[rel_str.index('(')+1:rel_str.index(':')]
                 rel = rel_str[rel_str.index(':')+1:rel_str.rfind(")")]
-                USP.procRelType(cid, relType, POS, rel)
+                USP.procRelType(cid, POS, rel)
 
         return None
 
@@ -331,7 +363,7 @@ class USP(object):
         return None
 
     def getTreeStr(ptId):
-        id_str = OrderedDict()
+        id_str = SortedDict()
 
         if ptId in USP.ptId_aciChdIds:
             for cids in USP.ptId_aciChdIds[ptId]:
@@ -348,7 +380,7 @@ class USP(object):
         return x
 
     def getTreeStrOld(ptId):
-        id_str = OrderedDict()
+        id_str = SortedDict()
 
         if ptId in USP.ptId_aciChdIds:
             for cids in USP.ptId_aciChdIds[ptId]:
@@ -380,7 +412,7 @@ class USP(object):
         return odict
 
     def getTreeCis(ptId):
-        cis = OrderedDict()
+        cis = SortedDict()
         cis[USP.ptId_clustIdxStr[ptId][0]] = 1
 
         if ptId in USP.ptId_aciChdIds:
@@ -438,7 +470,11 @@ class USP(object):
                 with those argument clusters
         '''
         for reltype, qs in USP.rel_qs.items():
-            clust_id = Clust.relTypeIdx_clustIdx[reltype]
+            if reltype not in USP.rel_clustIdx:
+                print("I don't understand this question: {}".format(qs[0].toString()))
+                continue
+
+            clust_id = USP.rel_clustIdx[reltype]
             part_ids = Part.clustIdx_partRootNodeIds[clust_id]
 
             for q in qs:
@@ -447,8 +483,39 @@ class USP(object):
                 if q.getDep() == 'nsubj':
                     dep2 = 'dobj'
 
-                aci  = USP.clustIdx_depArgClustIdx[clust_id][q.getDep()]
-                aci2 = USP.clustIdx_depArgClustIdx[clust_id][dep2]
+                try:
+                    if 'nsubj' in q.getDep():
+                        if 'nsubj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci  = USP.clustIdx_depArgClustIdx[clust_id]['nsubj']
+                        elif 'nsubjpass' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci  = USP.clustIdx_depArgClustIdx[clust_id]['nsubjpass']
+                    elif 'obj' in q.getDep():
+                        if 'dobj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci  = USP.clustIdx_depArgClustIdx[clust_id]['dobj']
+                        elif 'obj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci  = USP.clustIdx_depArgClustIdx[clust_id]['obj']
+                except KeyError:
+                    print("Error on dep with q: {}".format(q.__dict__))
+                    print(clust_id)
+                    print(USP.clustIdx_depArgClustIdx[clust_id])
+                    raise KeyError
+
+                try:
+                    if 'nsubj' in q.getDep2():
+                        if 'nsubj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['nsubj']
+                        elif 'nsubjpass' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['nsubjpass']
+                    elif 'obj' in q.getDep2():
+                        if 'dobj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['dobj']
+                        elif 'obj' in USP.clustIdx_depArgClustIdx[clust_id]:
+                            aci2  = USP.clustIdx_depArgClustIdx[clust_id]['obj']
+                except KeyError:
+                    print("Error on dep2 with q: {}".format(q.__dict__))
+                    print(clust_id)
+                    print(USP.clustIdx_depArgClustIdx[clust_id])
+                    raise KeyError
 
                 for part_id in part_ids:
                     if part_id not in USP.ptId_aciChdIds:
@@ -506,8 +573,8 @@ class USP(object):
         ans = USP.findAnsPrep(pid, pid_minPid)
 
         for a in ans:
-            na = OrderedDict()
-            idx_prep = OrderedDict()
+            na = SortedDict()
+            idx_prep = SortedDict()
 
             for i in a:
                 tknIdx = USP.getTknIdx(i)
@@ -569,7 +636,7 @@ class USP(object):
     def findAnsPrep(pid, pid_minPid):
         ans = list()
         curr = list()
-        z = OrderedDict()
+        z = SortedDict()
         z[pid] = 1
         curr.append(z)
         pid_minPid[pid] = pid
@@ -595,7 +662,7 @@ class USP(object):
 
                         for a in curr:
                             for b in y:
-                                c = OrderedDict(list(a.items())+list(b.items()))
+                                c = SortedDict(list(a.items())+list(b.items()))
                                 curr1.append(c)
                         curr = curr1
 
@@ -641,7 +708,7 @@ class USP(object):
                 cis.append(x)
 
                 if len(ts) >= 2:
-                    z = OrderedDict()
+                    z = SortedDict()
                     hs = USP.form_lemma[ts[-1]]
                     ds = USP.form_lemma[ts[-2]]
 
@@ -679,11 +746,11 @@ def run():
 
     MLN.load_mln("{}/mln.pkl".format(USP.results_dir))
 
-    USP.readQuestions()
-    USP.readMorph()
-    USP.readClust(cl_file)
-    USP.readPart(pr_file)
-    USP.readSents()
+    USP.readQuestions(verbose=True)
+    # USP.readMorph()
+    USP.readClust()
+    USP.readPart()
+    #USP.readSents()
     USP.preprocArgs()
     USP.match()
     USP.printAns()

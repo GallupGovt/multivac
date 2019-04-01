@@ -1,6 +1,6 @@
 
 
-from eval.Answer import Answer
-from eval.Question import Question
-from eval.USP import USP
+from . Answer import Answer
+from . Question import Question
+from . USP import USP
 

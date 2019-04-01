@@ -3,6 +3,7 @@
 /models/
 
 # environment
+multivac/
 .env
 
 # juypter notebook

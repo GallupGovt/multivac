@@ -1,20 +1,17 @@
-from pathlib import Path
-from dotenv import load_dotenv, find_dotenv
-from multivac.src import utilities
-from multivac import settings
-import pandas as pd
-import requests
-from bs4 import BeautifulSoup as bs
-from collections import OrderedDict
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import copy
-import re
 import feedparser
-import pubmed_parser
-import time
-import re
-import pickle
 import os
-import feedparser
+import pickle
+import requests
+import time
+
+from bs4 import BeautifulSoup as bs
+from dotenv import load_dotenv
+from pathlib import Path
+
+from multivac import settings
 
 
 env_path = Path('.') / '.env'
@@ -26,13 +23,6 @@ user_email = os.environ.get('USER_EMAIL')  # courtesy to NIH to include your ema
 
 wait_time = 3
 
-# ------------------------------------------------------------------------------
-# arxiv
-
-def prep_terms(terms):
-    """Format search terms to be compatible with Arxiv API query."""
-    return '+AND+'.join(['all:' + term for term in terms])
-
 
 def get_total_number_of_results(url, params):
     """Retrieve total number of results from Arxiv API query."""
@@ -40,42 +30,8 @@ def get_total_number_of_results(url, params):
     return int(bs(xml_text, 'lxml').find('opensearch:totalresults').contents[0])
 
 
-def query_api(url, terms, params, wait_time=3, verbose=False):
-    """Query Arxiv API to obtain metadata and lookup URLs of queried articles."""
-    # get total number of results
-    n_results = get_total_number_of_results(url, {'start': 0, 'max_results': 1})
-    if verbose: 
-        print('%s total results, %s second wait time between each call' % (str(n_results), str(wait_time)))
-    
-    # build list to iterate over
-    starts = list(range(0, n_results, params['max_results']))  # start, stop, step
-
-    metadata = []
-
-    # iterate over list to get all results
-    for ix, start in enumerate(starts):
-        if verbose:
-            print('*', end='')
-        params_ = copy.deepcopy(params) 
-        params_['start'] = start
-
-        # ping api and retrieve xml for all articles in page
-        xml_text = requests.get(url, params=params_).text
-
-        # process xml page feed 
-        page_feed = feedparser.parse(xml_text)
-        entries = page_feed['entries']
-        
-        if ix == 0:
-            metadata = entries
-        else:
-            metadata.extend(entries)
-        time.sleep(wait_time)
-    if verbose: print('')
-    return metadata
-
-def main():
-    # --------------------------------------------------------------------------
+def collect_get_main():
+    # ------------------------------------------------------------------------
     # arxiv
 
     # build query and get metadata of articles matching our search criteria
@@ -87,13 +43,16 @@ def main():
     arxiv_metadata = query_api(url, q, params, wait_time=1, verbose=True)
 
     # save pdfs of articles that matched our search criteria
-    # we use doi as the filename when that id is present; otherwise we use the arxiv id
+    # we use doi as the filename when that id is present; otherwise we use the
+    # arxiv id
     for ix, md in enumerate(arxiv_metadata):
         url = md['id']
         pdf_url = url.replace('/abs/', '/pdf/')
         article_fn = url.split('/abs/')[-1]
         article_fn = '_'.join(article_fn.split('/')) + '.pdf'
-        arxiv_metadata[ix]['fn'] = article_fn  # specify filename so we can associate each pdf with its metadata down the road
+        # specify filename so we can associate each pdf with its metadata down
+        # the road
+        arxiv_metadata[ix]['fn'] = article_fn
         dst = settings.raw_dir / 'arxiv' / article_fn
         if not os.path.exists(dst):
             r = requests.get(pdf_url)
@@ -107,7 +66,7 @@ def main():
     with open(dst, 'wb') as f:
         pickle.dump(arxiv_metadata, f)
 
-    # ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------
     # springer
 
     # build query to retrieve metadata
@@ -115,7 +74,11 @@ def main():
     q = make_q(settings.terms)
     base = 'http://api.springernature.com/openaccess/json?q='
     url = base + q
-    params = {'source': 'springer', 'openaccess': 'true', 'api_key': springer_api_key, 'p': 20, 's': 1}
+    params = {
+        'source': 'springer',
+        'openaccess': 'true',
+        'api_key': springer_api_key, 'p': 20, 's': 1
+    }
     params_ = copy.deepcopy(params)
 
     # retrieve metadata
@@ -130,7 +93,8 @@ def main():
     print('%s total Springer articles' % len(springer_metadata))
 
     # iterate over springer metadata and download html for each article
-    waits = (2**x for x in range(0,6))  # we use a generator to increase wait times with each connection error
+    # we use a generator to increase wait times with each connection error
+    waits = (2**x for x in range(0,6))
     for ix, md in enumerate(springer_metadata):
         fn = md['doi'].replace('/', '-')
         if len(fn) == 0:
@@ -154,11 +118,11 @@ def main():
     with open(dst, 'wb') as f:
         pickle.dump(springer_metadata, f)
 
-    # ------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------
     # pubmed
 
-    # search pubmed central for free full text articles containing selected query
-
+    # search pubmed central for free full text articles containing selected
+    # query
     # get the ids which we then use to get the xml text data
     replace = lambda s: s.replace(' ', '+')
     quote = lambda s: '%22' + s + '%22'
@@ -187,5 +151,48 @@ def main():
                 f.write(xml)
             time.sleep(0.5)
 
+
+def prep_terms(terms):
+    """Format search terms to be compatible with Arxiv API query."""
+    return '+AND+'.join(['all:' + term for term in terms])
+
+
+def query_api(url, terms, params, wait_time=3, verbose=False):
+    """Query Arxiv API to obtain metadata and lookup URLs of queried articles."""
+    # get total number of results
+    n_results = get_total_number_of_results(url, {'start': 0, 'max_results': 1})
+    if verbose:
+        print('%s total results, %s second wait time between each call' %
+              (str(n_results), str(wait_time)))
+
+    # build list to iterate over
+    # start, stop, step
+    starts = list(range(0, n_results, params['max_results']))
+
+    metadata = []
+
+    # iterate over list to get all results
+    for ix, start in enumerate(starts):
+        if verbose:
+            print('*', end='')
+        params_ = copy.deepcopy(params)
+        params_['start'] = start
+
+        # ping api and retrieve xml for all articles in page
+        xml_text = requests.get(url, params=params_).text
+
+        # process xml page feed
+        page_feed = feedparser.parse(xml_text)
+        entries = page_feed['entries']
+
+        if ix == 0:
+            metadata = entries
+        else:
+            metadata.extend(entries)
+        time.sleep(wait_time)
+    if verbose: print('')
+    return metadata
+
+
 if __name__ == '__main__':
-    main()
+    collect_get_main()

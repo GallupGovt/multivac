@@ -109,6 +109,7 @@ class StanfordParseReader(object):
         returned.
         '''
         blank = False
+        skip_sentence = False
         senId = 0
 
         currSent = this_doc.sentences[senId]
@@ -121,6 +122,7 @@ class StanfordParseReader(object):
 
                 if len(line) == 0:
                     if not blank:
+                        skip_sentence = False
                         senId += 1
 
                     blank = True
@@ -139,6 +141,9 @@ class StanfordParseReader(object):
 
                     continue
                 else:
+                    if skip_sentence:
+                        continue
+
                     if blank:
                         blank = False
                         currSent = this_doc.sentences[senId]
@@ -158,6 +163,7 @@ class StanfordParseReader(object):
                     except:
                         print("ERR: " + line)
                         print("Malformed dependency in " + dep_file)
+                        continue
 
                     gov = items[:item_split-2]
                     dep = items[item_split:]
@@ -171,12 +177,19 @@ class StanfordParseReader(object):
                         # increment sentences until we find the right one. 
                         while True:
                             senId += 1
+
+                            # If we reach the end of the document and no 
+                            # sentence contains our token(s) then this sentence
+                            # is unparsable, so we skip it.
                             try:
                                 nextSent = this_doc.sentences[senId]
                             except IndexError:
-                                print("Error from sentence {}, can't find"
-                                    " {} - {} combo in file.".format(badId, gov, dep))
-                                raise IndexError
+                                print('Unparsable sentence {} in article {}. Missing tokens {} and/or {}.'.format(badId,dep_file,gov,dep))
+                                senId = badId
+                                del this_doc.sentences[senId]
+                                senId -= 1
+                                skip_sentence = True
+                                break
 
                             if StanfordParseReader.tokens_in_sent(nextSent, gov, dep):
                                 # Then transfer any work we've done for the
@@ -194,6 +207,9 @@ class StanfordParseReader(object):
                                 # we left off. 
                                 currSent = nextSent
                                 break
+
+                    if skip_sentence:
+                        continue
 
                     if (rel.startswith('conj')) & (gov[0] == dep[0]):
                         continue

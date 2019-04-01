@@ -1,13 +1,16 @@
-from multivac.src.data import get
-from multivac.src.data import process
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from multivac.src.data.get import collect_get_main
+from multivac.src.data.process import collect_process_main
 
 
-def main():
+def collect_main():
     # query apis to obtain articles
-    get.main()
+    collect_get_main()
+
     # process article data for models
-    process.main()
+    collect_process_main()
 
 
 if __name__ == '__main__':
-    main()
+    collect_main()
