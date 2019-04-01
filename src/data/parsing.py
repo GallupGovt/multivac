@@ -70,11 +70,10 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
 
                 latexEquationId = token.text
 
-                (l_depTokens_latex_sub_tuples, l_posTokens_latex_sub,
-                 l_morTokens_latex_sub =
-                 eq.latexParsing(latexEquationId, int(token.index) +
+                l_depTokens_latex_sub_tuples, l_posTokens_latex_sub,\
+                    l_morTokens_latex_sub = eq.latexParsing(
+                         latexEquationId, int(token.index) +
                                  adjustedPosition)
-                )
 
                 # Need to adjust position so that it we add all the new tokens,
                 # then subtract 1 for LateXEquation##
@@ -151,20 +150,20 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
 
                     headTokenPosition =  token.governor
                     childTokenPosition = int(token.index)
-                    l_depTokens_tuples.append(
-                        (token.dependency_relation.replace(":",""),
-                            (tokenHeadText,
-                             headTokenPosition +
-                             get_adjustment_position(
+                    l_depTokens_tuples.append( 
+                        (token.dependency_relation.replace(":","") ,
+                            (tokenHeadText, headTokenPosition + 
+                            get_adjustment_position(
                                 headTokenPosition,
-                                (token.text,
-                                 childTokenPosition +
-                                 get_adjustment_position(
-                                    childTokenPosition, adjustmentDictionary
-                                 )
+                                adjustmentDictionary
                                 )
-                             )
-                            )
+                            ), 
+                            (token.text, childTokenPosition + 
+                            get_adjustment_position(
+                                childTokenPosition, 
+                                adjustmentDictionary
+                                )
+                            ) 
                         )
                     )
                     l_posTokens.append("{0}_{1}".format(token.text, token.upos))

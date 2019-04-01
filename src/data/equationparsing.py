@@ -311,11 +311,8 @@ def put_equation_tokens_in_text(m):
         tokens to the latexEquation## for recreating the text files.
     """
     token = m.group()
-    (
-        l_depTokens_latex_sub_tuples,
-        l_posTokens_latex_sub,
+    l_depTokens_latex_sub_tuples, l_posTokens_latex_sub, \
         l_morTokens_latex_sub = latexParsing(token, 0)
-    )
 
     return ' '.join(l_morTokens_latex_sub)
 
