@@ -2,16 +2,12 @@
 import argparse
 import os
 import re
-# import spacy
-# nlp = spacy.load('en')
-# import stanfordnlp
-# nlp = stanfordnlp.Pipeline(processors='tokenize,lemma,pos')
 
 import corenlp
 
 from sortedcontainers import SortedDict, SortedSet
 
-#from multivac import settings
+from multivac import settings
 from utils import Utils
 from syntax.Nodes import Article, Sentence, Token
 from semantic import MLN, Part, Clust
@@ -131,7 +127,7 @@ class USP(object):
     five_ws_and_h = ['who','what','where','when','why','how']
     evalDir = ''
     resultDir = ''
-    dataDir = ''
+    query_file = ''
     
     qas = SortedDict() # {Question: set(Answers)}
     rel_qs = SortedDict() # {str: list(Questions)}
@@ -155,12 +151,11 @@ class USP(object):
     id_article = dict() # {str: Article}
 
     def readQuestions(verbose=False):
-        filename = USP.evalDir + "/questions_full.txt"
+        filename = os.join.path(USP.evalDir, USP.query_file)
 
         with open(filename, "r") as f:
             lines = f.readlines()
 
-#        questions = nlp('\n'.join(lines))
         questions = [stanford_parse(line) for line in lines]
 
         for question in questions:
@@ -179,11 +174,6 @@ class USP(object):
 
             if verbose:
                 print("Key relations: {}".format(verbs))
-
-            # q_tok = [t for t in question.tokens if t.pos_=='WRB'][0]
-
-            # Get args by:
-            #       - what to do when two question words included?
 
             for t in question.tokens:
                 if t.text not in USP.form_lemma:
@@ -218,6 +208,7 @@ class USP(object):
                     else:
                         dep = 'dobj'
 
+                # Sub older version of the obl dependency type.
                 dep = dep.replace('nmod','obl')
 
                 if verbose:
@@ -254,18 +245,6 @@ class USP(object):
                 children = children.union(USP.build_subtree(q, child, children))
 
         return children
-
-    # def graph_question(question):
-    #     edges = []
-
-    #     for token in question:
-    #         for child in token.children:
-    #             if child.dep_ != 'punct':
-    #                 edges.append(('{0}-{1}'.format(token.lower_,token.i),
-    #                               '{0}-{1}'.format(child.lower_,child.i)))
-    #     graph = nx.Graph(edges)
-
-    #     return graph
 
     def readSents(aid=None, filename=None):
         '''
@@ -340,7 +319,6 @@ class USP(object):
         return None
 
     def readClust():
-
         USP.clustIdx_depArgClustIdx = {} # ci int: {dep str: aci int}
 
         for cid, clust in Clust.clusts.items():
@@ -375,58 +353,58 @@ class USP(object):
 
         return None
 
-    def getTreeStr(ptId):
-        id_str = SortedDict()
+    # def getTreeCis(ptId):
+    #     cis = SortedSet()
+    #     cis.add(str(USP.ptId_clustIdxStr[ptId][0]))
 
-        if ptId in USP.ptId_aciChdIds:
-            for cids in USP.ptId_aciChdIds[ptId]:
-                for cid in cids:
-                    if USP.ptId_parDep[cid] not in USP.allowedDeps:
-                        continue
-
-                    id_str[cid] = s + USP.getTreeStr(cid)
-
-        id_str[ptId] = str(USP.ptId_clustIdxStr[ptId][0])
-
-        x = ' '.join(id_str)
-
-        return x
-
-    def getTreeStrOld(ptId):
-        id_str = SortedDict()
-
-        if ptId in USP.ptId_aciChdIds:
-            for cids in USP.ptId_aciChdIds[ptId]:
-                for cid in cids:
-                    if USP.ptId_parDep[cid] not in USP.allowedDeps:
-                        continue
-
-                    id_str[cid] = s + USP.getTreeStrOld(cid)
-
-        x = ' '.join(id_str)
-
-        return x
-
-    def contains(cs, c):
-        if isinstance(cs, list):
-            return any([USP.contains(cs_i, str(c)) for cs_i in cs])
-        else:
-            return c in cs.split()
-
-    # def update_odict_all_cids(l, ptId, odict):
     #     if ptId in USP.ptId_aciChdIds:
     #         for cids in USP.ptId_aciChdIds[ptId].values():
     #             for cid in cids:
     #                 if USP.ptId_parDep[cid] not in USP.allowedDeps:
     #                     continue
 
-    #                 odict.update(l(cid))
-    
-    #     return odict
+    #                 cis = cis.update(USP.getTreeCis(cid))
+
+    #     return cis
+
+    # def isMatchFromHead(chdPtId, cis):
+    #     hci = USP.ptId_clustIdxStr[chdPtId][0]
+
+    #     if hci not in cis:
+    #         return False
+
+    #     tcis = USP.getTreeCis(chdPtId)
+
+    #     for x in cis:
+    #         ts = x.split()
+    #         if tcis.isdisjoint(ts):
+    #             return False
+
+    #     return True
+
+    # def isMatch(chdPtId, arg):
+    #     allcis = USP.arg_cis[arg]
+        
+    #     for cis in allcis:
+    #         if USP.isMatchFromHead(chdPtId, cis):
+    #             return True
+
+    #     if chdPtId in USP.ptId_aciChdIds:
+    #         for cids in USP.ptId_aciChdIds[chdPtId].values():
+    #             for cid in cids:
+    #                 dep = USP.ptId_parDep[cid]
+
+    #                 if (dep.startswith('conj') and not dep=='conj_negcc') or \
+    #                         dep == 'appos':
+    #                     for cis in allcis:
+    #                         if USP.isMatchFromHead(cid, cis):
+    #                             return True
+
+    #     return False
 
     def getTreeCis(ptId):
         cis = SortedSet()
-        cis.add(str(USP.ptId_clustIdxStr[ptId][0]))
+        cis.add(USP.ptId_clustIdxStr[ptId][0])
 
         if ptId in USP.ptId_aciChdIds:
             for cids in USP.ptId_aciChdIds[ptId].values():
@@ -441,24 +419,21 @@ class USP(object):
     def isMatchFromHead(chdPtId, cis):
         hci = USP.ptId_clustIdxStr[chdPtId][0]
 
-        if str(hci) not in cis:
+        if hci not in cis:
             return False
 
         tcis = USP.getTreeCis(chdPtId)
 
-        for x in cis:
-            ts = x.split()
-            if set(tcis).isdisjoint(ts):
-                return False
+        if tcis.isdisjoint(cis):
+            return False
 
         return True
 
     def isMatch(chdPtId, arg):
-        allcis = USP.arg_cis[arg]
+        cis = USP.arg_cis[arg]
         
-        for cis in allcis:
-            if USP.isMatchFromHead(chdPtId, cis):
-                return True
+        if USP.isMatchFromHead(chdPtId, cis):
+            return True
 
         if chdPtId in USP.ptId_aciChdIds:
             for cids in USP.ptId_aciChdIds[chdPtId].values():
@@ -467,9 +442,8 @@ class USP(object):
 
                     if (dep.startswith('conj') and not dep=='conj_negcc') or \
                             dep == 'appos':
-                        for cis in allcis:
-                            if USP.isMatchFromHead(cid, cis):
-                                return True
+                        if USP.isMatchFromHead(cid, cis):
+                            return True
 
         return False
 
@@ -580,7 +554,6 @@ class USP(object):
         sid = USP.getSentId(pid)
         aid = USP.getArticleId(pid)
         sIdx = USP.getSentIdx(pid)
-        art = USP.id_article[aid]
         sent = art._sentences[sIdx]
 
         pid_minPid = dict()
@@ -685,6 +658,67 @@ class USP(object):
 
         return ans
 
+    # def preprocArgs():
+    #     '''
+    #         For each verb and associated set of questions, 
+    #             for each question, get known argument if not already processed
+    #             get the lemma for that argument, get the list of ... NOT SURE
+    #     '''
+    #     for r, qs in USP.rel_qs.items():
+    #         ignoredQs = set()
+
+    #         for q in qs:
+    #             if q.getArg() in USP.arg_cis:
+    #                 continue
+
+    #             cis = []
+    #             x = []
+    #             ts = q.getArg().split()
+    #             isIgnored = False
+
+    #             for f in ts:
+    #                 z = SortedSet()
+    #                 if f in ['the','of','in']:
+    #                     continue
+
+    #                 if f not in USP.form_lemma:
+    #                     isIgnored = True
+    #                     break
+    #                 else:
+    #                     ls = USP.form_lemma[f]
+
+    #                     for l in ls:
+    #                         if l in USP.lemma_clustIdxs:
+    #                             z.update([str(ci) for ci in USP.lemma_clustIdxs[l]])
+    #                     x.append(' '.join(z))
+
+    #             if isIgnored:
+    #                 ignoredQs.add(q)
+    #                 continue
+
+    #             cis.append(x)
+
+    #             if len(ts) >= 2:
+    #                 z = SortedSet()
+    #                 hs = USP.form_lemma[ts[-1]]
+    #                 ds = USP.form_lemma[ts[-2]]
+
+    #                 for h in hs:
+    #                     for d in ds:
+    #                         if (h, d) in USP.headDep_clustIdxs:
+    #                             z.add(USP.headDep_clustIdxs[(h, d)])
+
+    #                 if len(z) > 0:
+    #                     y = x[:-2]
+    #                     y.append(' '.join(z))
+    #                     cis.append(y)
+
+    #             USP.arg_cis[q.getArg()] = cis
+
+    #         qs = [x for x in qs if x not in ignoredQs]
+
+    #     return None
+
     def preprocArgs():
         '''
             For each verb and associated set of questions, 
@@ -698,13 +732,11 @@ class USP(object):
                 if q.getArg() in USP.arg_cis:
                     continue
 
-                cis = []
-                x = []
+                cis = SortedSet()
                 ts = q.getArg().split()
                 isIgnored = False
 
                 for f in ts:
-                    z = SortedSet()
                     if f in ['the','of','in']:
                         continue
 
@@ -716,59 +748,36 @@ class USP(object):
 
                         for l in ls:
                             if l in USP.lemma_clustIdxs:
-                                z.update([str(ci) for ci in USP.lemma_clustIdxs[l]])
-                        x.append(' '.join(z))
+                                cis.update(USP.lemma_clustIdxs[l])
 
                 if isIgnored:
                     ignoredQs.add(q)
                     continue
 
-                cis.append(x)
-
                 if len(ts) >= 2:
-                    z = SortedSet()
                     hs = USP.form_lemma[ts[-1]]
                     ds = USP.form_lemma[ts[-2]]
 
                     for h in hs:
                         for d in ds:
                             if (h, d) in USP.headDep_clustIdxs:
-                                z.add(USP.headDep_clustIdxs[(h, d)])
-
-                    if len(z) > 0:
-                        y = x[:-2]
-                        y.append(' '.join(z))
-                        cis.append(y)
+                                cis.add(USP.headDep_clustIdxs[(h, d)])
 
                 USP.arg_cis[q.getArg()] = cis
 
             qs = [x for x in qs if x not in ignoredQs]
+            USP.rel_qs[r] = qs
 
         return None
 
-    def removeThirdPerson(v):
-        if v[-2] != 'e':
-            pass
-        elif v[-3] == 'i':
-            v = v[:-3]+'y'
-        elif v[-4:-2] == 'ss' or v[-4:-2] == 'sh':
-            v = v[:-2]
-
-        return v
-
 
 def run():
-#    fid = os.path.basename(os.path.dirname(USP.dataDir))
-#    cl_file = "{}/{}.mln".format(USP.results_dir, fid)
-#    pr_file = "{}/{}.parse".format(USP.results_dir, fid)
 
     MLN.load_mln("{}/mln.pkl".format(USP.results_dir))
 
     USP.readQuestions(verbose=True)
-    # USP.readMorph()
     USP.readClust()
     USP.readPart()
-    #USP.readSents()
     USP.preprocArgs()
     USP.match()
     USP.printAns()
@@ -778,37 +787,29 @@ def run():
 if __name__ == '__main__':
     prs = argparse.ArgumentParser(description='Answer questions using an MLN '
                                      'knowledge base. \n'
-                                     'Usage: python -m USP.py [-d data_dir] '
-                                     '[-r results_dir] [-e eval_dir]')
-    prs.add_argument('-d', '--data_dir', 
-                        help='Directory of source files. If not specified, '
-                        'defaults to the current working directory.')
+                                     'Usage: python -m USP.py [-r results_dir] '
+                                     ' [-e eval_dir]')
     prs.add_argument('-r', '--results_dir', 
-                        help='Directory to save results files. If not specified,'
-                        ' defaults to the current working directory.')
+                        help='Directory of MLN results to read in from.')
     prs.add_argument('-p', '--eval_dir', 
-                        help='Directory for evaluation files. If not specified,'
-                        ' defaults to the current working directory.')
-    prs.add_argument('-c', '--priorNumConj', 
-                        help='Prior on number of conjunctive parts assigned to '
-                        'same cluster. If not specified, defaults to 10.')
+                        help='Directory to output evaluation files.')
+    prs.add_argument('-q', '--query_file',
+                        help='File containing the queries to test. Defaults '
+                        'to "output_questions_QG-Net.pt.txt.prob.txt".')
 
     args = vars(prs.parse_args())
 
     # Default argument values
     params = {'eval_dir': settings.eval_dir,
-              'data_dir': settings.data_dir,
-              'results_dir': settings.results_dir}
+              'results_dir': settings.results_dir
+              'query_file': 'output_questions_QG-Net.pt.txt.prob.txt'}
 
     # If specified in call, override defaults
     for par in params:
         if args[par] is not None:
             params[par] = args[par]
 
-    if os.path.isabs(params['data_dir']):
-        USP.dataDir = params['data_dir']
-    else:
-        USP.dataDir = os.path.join(os.getcwd(), params['data_dir'])
+    USP.query_file = params['query_file']
 
     if os.path.isabs(params['results_dir']):
         USP.resultDir = params['results_dir']
