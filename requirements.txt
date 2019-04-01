@@ -1,3 +1,4 @@
+antlr4-python3-runtime==4.7.2
 beautifulsoup4==4.7.1
 corenlp==0.0.14
 feedparser==5.2.1

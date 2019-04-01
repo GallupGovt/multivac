@@ -24,12 +24,6 @@ user_email = os.environ.get('USER_EMAIL')  # courtesy to NIH to include your ema
 wait_time = 3
 
 
-def get_total_number_of_results(url, params):
-    """Retrieve total number of results from Arxiv API query."""
-    xml_text = requests.get(url, params=params).text
-    return int(bs(xml_text, 'lxml').find('opensearch:totalresults').contents[0])
-
-
 def collect_get_main():
     # ------------------------------------------------------------------------
     # arxiv
@@ -150,6 +144,12 @@ def collect_get_main():
             with open(dst, 'w') as f:
                 f.write(xml)
             time.sleep(0.5)
+
+
+def get_total_number_of_results(url, params):
+    """Retrieve total number of results from Arxiv API query."""
+    xml_text = requests.get(url, params=params).text
+    return int(bs(xml_text, 'lxml').find('opensearch:totalresults').contents[0])
 
 
 def prep_terms(terms):
