@@ -25,4 +25,4 @@ MULTIVAC’s MLN knowledge base is built to map natural language queries to mode
 ## Conclusion
 The MULTIVAC system is still in development along several lines of effort, with a target date of April 1st, 2019, for an “alpha” code release. Subsequent to that milestone the development process will expose MULTIVAC to expert epidemiological research community for evaluation and improvement. Additionally, Gallup will explore a variety of avenues for optimization and improvements in terms of computational efficiencies, semantic representational precision and accuracy, and usability. MULTIVAC’s prototype iterations will be largely command line driven, but a more fully formed version should include web and/or graphical interfaces to encourage a broader user community across domains.
 
-For more information please contact Lead Data Scientist Benjamin Ryan (ben_ryan@gallup.com).
+For more information please contact Principal Investigator, Benjamin Ryan (ben_ryan@gallup.com).

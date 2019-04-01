@@ -1,7 +1,21 @@
-requests
-xmljson
-beautifulsoup4
-lxml
-python-dotenv
--e git://github.com/titipata/pubmed_parser.git#egg=pubmed_parser
--e git://github.com/pgr-gallup/slate.git#egg=slate
+beautifulsoup4==4.7.1
+corenlp==0.0.14
+feedparser==5.2.1
+interruptingcow==0.8
+lxml==4.3.3
+numpy==1.16.2
+pandas==0.24.2
+pathlib==1.0.1
+python-dotenv==0.10.1
+scipy==1.2.1
+scikit_learn==0.20.3
+sortedcontainers==2.1.0
+spacy==2.1.3
+stanfordnlp==0.1.2
+sympy==1.3
+requests==2.21.0
+unidecode==1.0.23
+xmljson==0.2.0
+
+-e git://github.com/titipata/pubmed_parser.git#egg=pubmed_parser==0.2.1
+-e git://github.com/pgr-gallup/slate.git#egg=slate==0.5.2
