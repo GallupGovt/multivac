@@ -773,7 +773,7 @@ class USP(object):
 
 def run():
 
-    MLN.load_mln("{}/mln.pkl".format(USP.results_dir))
+    MLN.load_mln("{}/mln.pkl".format(USP.resultDir))
 
     USP.readQuestions(verbose=True)
     USP.readClust()
@@ -800,9 +800,9 @@ if __name__ == '__main__':
     args = vars(prs.parse_args())
 
     # Default argument values
-    params = {'eval_dir': settings.eval_dir,
-              'results_dir': settings.results_dir
-              'query_file': 'output_questions_QG-Net.pt.txt.prob.txt'}
+    params = {'eval_dir': settings.models_dir,
+              'results_dir': settings.mln_dir,
+              'query_file': 'output_questions_QG-Net.pt.txt'}
 
     # If specified in call, override defaults
     for par in params:

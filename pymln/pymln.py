@@ -97,7 +97,7 @@ def mln_main(args_dict):
         print("{}: {} final clusters, with {} argument clusters."
               .format(datetime.now(), len(Clust.clusts), num_arg_clusts))
 
-    MLN.save_mln(data_dir / "mln.pkl")
+    MLN.save_mln(results_dir / "mln.pkl")
     MLN.printModel(results_dir)
 
     if verbose:
