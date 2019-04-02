@@ -8,14 +8,14 @@ import corenlp
 from sortedcontainers import SortedDict, SortedSet
 
 from multivac import settings
-from utils import Utils
-from syntax.Nodes import Article, Sentence, Token
-from semantic import MLN, Part, Clust
-from syntax.Relations import RelType, ArgType
-from eval import Answer, Question
+from multivac.pymln.utils import Utils
+from multivac.pymln.syntax.Nodes import Article, Sentence, Token
+from multivac.pymln.semantic import MLN, Part, Clust
+from multivac.pymln.syntax.Relations import RelType, ArgType
+from multivac.pymln.eval import Answer, Question
 
 class stanford_token():
-    def __init__(self, text='', index=None, lemma_='', pos_='', 
+    def __init__(self, text='', index=None, lemma_='', pos_='',
                  ner='', dep_='', head=None):
         self.i = index
         self.text = text
@@ -27,9 +27,9 @@ class stanford_token():
         self.has_children = False
 
     def __repr__(self):
-        return "{}:{}=>{}:{}".format(self.i, 
-                                     self.text, 
-                                     self.dep_, 
+        return "{}:{}=>{}:{}".format(self.i,
+                                     self.text,
+                                     self.dep_,
                                      self.head)
 
     def __hash__(self):
@@ -64,7 +64,7 @@ class stanford_parse():
         self.deps = sorted(sentence[deptype], key=lambda k: k['dependent'])
 
         for i, w in enumerate(sentence['tokens']):
-            tok = stanford_token(text=w['originalText'], 
+            tok = stanford_token(text=w['originalText'],
                                  index=w['index'],
                                  lemma_=w['lemma'],
                                  pos_=w['pos'],
@@ -88,7 +88,7 @@ class stanford_parse():
 
     def get_parse(sentence):
         anns = "tokenize ssplit pos lemma ner depparse"
-        with corenlp.CoreNLPClient(annotators=anns.split(), output_format='json') as client: 
+        with corenlp.CoreNLPClient(annotators=anns.split(), output_format='json') as client:
             ann = client.annotate(sentence)
 
         return ann['sentences'][0]
@@ -107,10 +107,10 @@ class stanford_parse():
             retval['heads'] = {x['dependentGloss']: x['governorGloss'] for x in deps}
             retval['governors'] = {x['dependent']: x['governorGloss'] for x in deps}
             retval['dependents'] = {x['dependent']: x['dependentGloss'] for x in deps}
-            retval['text'] = ["{}({}-{}, {}-{})".format(x['dep'], 
-                                                x['governorGloss'], 
-                                                x['governor'], 
-                                                x['dependentGloss'], 
+            retval['text'] = ["{}({}-{}, {}-{})".format(x['dep'],
+                                                x['governorGloss'],
+                                                x['governor'],
+                                                x['dependentGloss'],
                                                 x['dependent']) for x in deps]
         return retval
 
@@ -128,15 +128,15 @@ class USP(object):
     evalDir = ''
     resultDir = ''
     query_file = ''
-    
+
     qas = SortedDict() # {Question: set(Answers)}
     rel_qs = SortedDict() # {str: list(Questions)}
-    
+
     # Library of tokens
     qForms = set()
     qLemmas = set()
     form_lemma = dict() # {str: set(str)}
-    
+
     # Clusters, Argument Clusters, Parts
     headDep_clustIdxs = dict() # {(str,str): str}
     lemma_clustIdxs = dict() # {str: set(str)}
@@ -146,7 +146,7 @@ class USP(object):
     ptId_clustIdxStr = dict() # {str: (int, str)}
     ptId_aciChdIds = dict() # {str: {int: set(str)}}
     ptId_parDep = dict() # {str: str}
-    
+
     id_sent = dict() # {str: str}
     id_article = dict() # {str: Article}
 
@@ -165,7 +165,7 @@ class USP(object):
             if verbose:
                 print(' '.join([t.text for t in question.tokens]))
 
-            verbs = [t for t in question.tokens if t.pos_.startswith('V') 
+            verbs = [t for t in question.tokens if t.pos_.startswith('V')
                                                and t.has_children
                                                and not t.dep_.startswith('aux')
                                                and not t.dep_ in ['cop','dep']]
@@ -182,9 +182,9 @@ class USP(object):
                 USP.form_lemma[t.text].add(t.lemma_)
 
             for rel in verbs:
-                args = [t for t in question.get_children(rel) 
-                                if t.pos_.startswith('N') 
-                                or 'subj' in t.dep_ 
+                args = [t for t in question.get_children(rel)
+                                if t.pos_.startswith('N')
+                                or 'subj' in t.dep_
                                 or 'obj' in t.dep_]
 
                 if len(args) == 0:
@@ -218,7 +218,7 @@ class USP(object):
                     if verbose:
                         print("Argument has children; building sub-tree.")
                         arg += question.get_children(arg[0])
-                    # arg += sorted(USP.build_subtree(question, arg[0], 
+                    # arg += sorted(USP.build_subtree(question, arg[0],
                     #               verbose=verbose), key=lambda k: k.i)
 
                 if verbose:
@@ -270,12 +270,12 @@ class USP(object):
 
     def readPart():
         Part.clustIdx_partRootNodeIds = Part.clustIdx_partRootNodeIds
-        USP.ptId_clustIdxStr = {k: (p.getClustIdx(), 
-                                    p.getRelTreeRoot().getTreeStr()) 
+        USP.ptId_clustIdxStr = {k: (p.getClustIdx(),
+                                    p.getRelTreeRoot().getTreeStr())
                                 for k, p in Part.rootNodeId_part.items()}
 
         for pid, part in Part.rootNodeId_part.items():
-            USP.ptId_clustIdxStr[pid] = (part.getClustIdx(), 
+            USP.ptId_clustIdxStr[pid] = (part.getClustIdx(),
                                          part.getRelTreeRoot().getTreeStr())
 
             if part._parPart is not None:
@@ -309,7 +309,7 @@ class USP(object):
             headdep = rel.split(' ', 1)
             head = headdep[0]
             dep = re.search(r'\(\w+:\S+\)', headdep[1]).group()
-            
+
             if len(dep) > 0:
                 dep = dep[dep.index(":")+1:-1]
 
@@ -324,7 +324,7 @@ class USP(object):
         for cid, clust in Clust.clusts.items():
             USP.clustIdx_depArgClustIdx[cid] = {}
 
-            for arg_clust_id, arg_clust in clust._argClusts.items():                
+            for arg_clust_id, arg_clust in clust._argClusts.items():
                 for ati in arg_clust._argTypeIdx_cnt:
                     arg_type_str = ArgType.getArgType(ati).toString()[1:-1]
                     USP.clustIdx_depArgClustIdx[cid][arg_type_str] = arg_clust_id
@@ -338,7 +338,7 @@ class USP(object):
         return None
 
     def printAns(answer_file='Answers.txt'):
-        with open('{}/Answers.txt'.format(USP.evalDir), 'w') as f:        
+        with open('{}/Answers.txt'.format(USP.evalDir), 'w') as f:
             for q, a_s in USP.qas.items():
                 for ans in a_s:
                     sid = ans.getSentId()
@@ -384,7 +384,7 @@ class USP(object):
 
     # def isMatch(chdPtId, arg):
     #     allcis = USP.arg_cis[arg]
-        
+
     #     for cis in allcis:
     #         if USP.isMatchFromHead(chdPtId, cis):
     #             return True
@@ -431,7 +431,7 @@ class USP(object):
 
     def isMatch(chdPtId, arg):
         cis = USP.arg_cis[arg]
-        
+
         if USP.isMatchFromHead(chdPtId, cis):
             return True
 
@@ -449,11 +449,11 @@ class USP(object):
 
     def match(verbose=False):
         '''
-            For each question set, get the cluster ID for the verb/relation, and 
-            the associated Parts for that cluster. 
+            For each question set, get the cluster ID for the verb/relation, and
+            the associated Parts for that cluster.
             For each question in the set, get the argument cluster for the type
             specified by getDep() and the one specified by getDep2()
-                for each part associated with the question, check for a match 
+                for each part associated with the question, check for a match
                 with those argument clusters
         '''
         bad_qs = 0
@@ -660,7 +660,7 @@ class USP(object):
 
     # def preprocArgs():
     #     '''
-    #         For each verb and associated set of questions, 
+    #         For each verb and associated set of questions,
     #             for each question, get known argument if not already processed
     #             get the lemma for that argument, get the list of ... NOT SURE
     #     '''
@@ -721,7 +721,7 @@ class USP(object):
 
     def preprocArgs():
         '''
-            For each verb and associated set of questions, 
+            For each verb and associated set of questions,
                 for each question, get known argument if not already processed
                 get the lemma for that argument, get the list of ... NOT SURE
         '''
@@ -789,9 +789,9 @@ if __name__ == '__main__':
                                      'knowledge base. \n'
                                      'Usage: python -m USP.py [-r results_dir] '
                                      ' [-e eval_dir]')
-    prs.add_argument('-r', '--results_dir', 
+    prs.add_argument('-r', '--results_dir',
                         help='Directory of MLN results to read in from.')
-    prs.add_argument('-p', '--eval_dir', 
+    prs.add_argument('-p', '--eval_dir',
                         help='Directory to output evaluation files.')
     prs.add_argument('-q', '--query_file',
                         help='File containing the queries to test. Defaults '

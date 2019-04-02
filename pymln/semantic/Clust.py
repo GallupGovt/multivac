@@ -1,16 +1,16 @@
-    
+
 
 #
 # Clust
-# 
+#
 
-from semantic import ArgClust
-from syntax.Relations import RelType
+from multivac.pymln.semantic import ArgClust
+from multivac.pymln.syntax.Relations import RelType
 
 class Clust(object):
     nxtClustIdx = 1
 
-    # Dictionary mapping 
+    # Dictionary mapping
     pairClustIdx_conjCnt = {}
     # Dictionary mapping {int: {(int, int): int}}
     clustIdx_parArgs = {}
@@ -146,7 +146,7 @@ class Clust(object):
 
         Clust.clusts[self._clustIdx] = self
 
-        
+
     def __str__(self):
         return self.toString()
 
@@ -338,7 +338,7 @@ class Clust(object):
         return None
 
     def toString(self):
-        rts = ['{}:{}'.format(RelType.getRelType(x).toString(), y) 
+        rts = ['{}:{}'.format(RelType.getRelType(x).toString(), y)
                 for x, y in self._relTypeIdx_cnt.items()]
         s = ',\t'.join(rts)
         s = '[' + s + ']'

@@ -2,13 +2,13 @@
 import os
 import re
 from sortedcontainers import SortedSet
-from syntax.Nodes import Article, Sentence, Token
+from multivac.pymln.syntax.Nodes import Article, Sentence, Token
 
 
 class StanfordParseReader(object):
-    ''' 
-    Replicates StanfordParseReader.java from USP implementation found at 
-    http://alchemy.cs.washington.edu/usp/ 
+    '''
+    Replicates StanfordParseReader.java from USP implementation found at
+    http://alchemy.cs.washington.edu/usp/
 
     Given a set of dependency, POS, and morphology files parsed from source
     documents, this compiles lists of tokens and dictionary mappings defining
@@ -26,23 +26,23 @@ class StanfordParseReader(object):
     ignored_deps.add("predet")
     ignored_deps.add("punct")
     ignored_deps.add("quantmod")
-    
+
     ignored_deps.add("expl")
     ignored_deps.add("mark")
 #    ignored_deps.add("parataxis")
 
-    def __init__(self): 
+    def __init__(self):
         return None
 
 
     def readParse(fileName, data_dir, ignoreDep=True):
         '''
-        Given a filename of the type "$FILENAME.dep" gets the file and 
-        corresponding *.morph and *.input files and reads the Tokens and 
+        Given a filename of the type "$FILENAME.dep" gets the file and
+        corresponding *.morph and *.input files and reads the Tokens and
         Dependency relationships by sentence in those files. Each file in such
-        a trio should contain the same number of sentences represented as blocks 
-        of text with each dependency/token on its own line, separated by blank 
-        lines. 
+        a trio should contain the same number of sentences represented as blocks
+        of text with each dependency/token on its own line, separated by blank
+        lines.
         '''
         file = os.path.splitext(fileName)[0]
         morph_file = os.path.join(data_dir, file + '.morph')
@@ -59,8 +59,8 @@ class StanfordParseReader(object):
     def readTokens(this_doc, morph_file, input_file):
         '''
         Reads a morphology (lemmas) and input (POS tagged words) file
-        simultaneously, parsing single tokens from each line into a Token() 
-        object and appending each Token to its respective Sentence() object, 
+        simultaneously, parsing single tokens from each line into a Token()
+        object and appending each Token to its respective Sentence() object,
         which are collected in an Article() object "this_doc" and returned.
         '''
         isNew = True
@@ -103,8 +103,8 @@ class StanfordParseReader(object):
 
     def readDeps(this_doc, dep_file, ignoreDep):
         '''
-        Reads a dependency relationships file and adds these relationships to 
-        their respective Sentence() objects in an Article() in the form of 
+        Reads a dependency relationships file and adds these relationships to
+        their respective Sentence() objects in an Article() in the form of
         reciprocal python dictionaries. The updated Article() "doc" is then
         returned.
         '''
@@ -174,11 +174,11 @@ class StanfordParseReader(object):
                     # If we are on the wrong sentence:
                     if not StanfordParseReader.tokens_in_sent(currSent, gov, dep):
                         badId = senId
-                        # increment sentences until we find the right one. 
+                        # increment sentences until we find the right one.
                         while True:
                             senId += 1
 
-                            # If we reach the end of the document and no 
+                            # If we reach the end of the document and no
                             # sentence contains our token(s) then this sentence
                             # is unparsable, so we skip it.
                             try:
@@ -193,18 +193,18 @@ class StanfordParseReader(object):
 
                             if StanfordParseReader.tokens_in_sent(nextSent, gov, dep):
                                 # Then transfer any work we've done for the
-                                # wrong one to the right one, 
+                                # wrong one to the right one,
                                 nextSent._tkn_children = currSent._tkn_children
                                 nextSent._tkn_par = currSent._tkn_par
 
-                                # and clear that work from the wrong one. 
+                                # and clear that work from the wrong one.
                                 currSent._tkn_children = {0: SortedSet()}
                                 currSent._tkn_par = {}
                                 this_doc.sentences[badId] = currSent
                                 currSent = None
 
-                                # Finally, pick up with the right one where 
-                                # we left off. 
+                                # Finally, pick up with the right one where
+                                # we left off.
                                 currSent = nextSent
                                 break
 

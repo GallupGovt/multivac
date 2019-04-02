@@ -1,5 +1,5 @@
 
-from syntax.Relations import RelType
+from multivac.pymln.syntax.Relations import RelType
 
 class ArgType(object):
     argTypes = []
@@ -66,7 +66,7 @@ class ArgType(object):
                         result = -1
                     else:
                         result = this - that
-        
+
         return result
 
     def toString(self):

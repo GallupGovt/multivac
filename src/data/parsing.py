@@ -389,7 +389,7 @@ def nlp_parse_main(args_dict):
                 with timeout(300, exception=RuntimeError):
                     nlpifiedDoc = nlp(doc)
                     thisDocumentData = create_parse_files(
-                        nlpifiedDoc, i, True, settings.data_dir]
+                        nlpifiedDoc, i, True, settings.data_dir
                     )
             except RuntimeError:
                 print("Didn't finish document #{} within five minutes. Moving to next one.".format(i))

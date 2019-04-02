@@ -1,7 +1,7 @@
 
 # from collections import OrderedDict
 from sortedcontainers import SortedSet
-from syntax.Relations import ArgType
+from multivac.pymln.syntax.Relations import ArgType
 
 class ArgClust(object):
     def __init__(self):

@@ -1,15 +1,15 @@
 from sortedcontainers import SortedSet
-from syntax.Nodes.Token import Token
+from multivac.pymln.syntax.Nodes.Token import Token
 
 class Sentence(object):
     def __init__(self):
-        ''' 
+        '''
         Each sentence consists of:
-        _tokens: A list of individual tokens in the sentence, containing POS, 
+        _tokens: A list of individual tokens in the sentence, containing POS,
         lemma, and actual form of the word/item.
-        _tkn_children: A dictionary mapping parents (denoted by the integer 
+        _tkn_children: A dictionary mapping parents (denoted by the integer
         keys) to children (sets of integer, string tuples).
-        _tkn_par: A dictionary mapping children (denoted by integer keys) to 
+        _tkn_par: A dictionary mapping children (denoted by integer keys) to
         parents (tuples of string, integer values)
         '''
         self._tokens = []
@@ -56,7 +56,7 @@ class Sentence(object):
 
     def get_children(self, parent=None):
         '''
-        Return the child/children of the parent specified by the given key. If 
+        Return the child/children of the parent specified by the given key. If
         no key specified, return them all.
         '''
         if parent is not None:

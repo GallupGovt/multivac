@@ -4,8 +4,8 @@ from sortedcontainers import SortedSet
 from datetime import datetime
 import math
 import pickle
-from semantic import Part, Clust, SearchOp, ParseParams
-from utils import Utils
+from multivac.pymln.semantic import Part, Clust, SearchOp, ParseParams
+from multivac.pymln.utils import Utils
 
 class Agenda(object):
     def __init__(self, parse):
@@ -35,7 +35,7 @@ class Agenda(object):
 
     def load_agenda(path, prs):
         '''
-            Given a Parse object, load the saved state of an Agenda and 
+            Given a Parse object, load the saved state of an Agenda and
             attach it, returning the updated Parse object.
         '''
         with open(path, 'rb') as f:
@@ -66,13 +66,13 @@ class Agenda(object):
             if verbose:
                 i += 1
                 done = math.floor(i*10/clust_cnt)
-                
+
                 if done in milestones:
                     milestones.remove(done)
                     print("{}% complete.".format(done*10))
 
         # self.logc.close()
-                
+
         return None
 
     def addAgendaForNewClust(self, newClustIdx, verbose=False):
@@ -122,8 +122,8 @@ class Agenda(object):
 
         kids_1 = part_1.getArguments()
         kids_2 = part_2.getArguments()
-        # # self.logc.write("\tAdding to agenda for kids of {} and {} in {}\n".format(part_1.getRelTreeRoot().getId(), 
-        #                                                                           part_2.getRelTreeRoot().getId(), 
+        # # self.logc.write("\tAdding to agenda for kids of {} and {} in {}\n".format(part_1.getRelTreeRoot().getId(),
+        #                                                                           part_2.getRelTreeRoot().getId(),
         #                                                                           clustIdx))
 
         for kid1 in kids_1.values():
@@ -182,7 +182,7 @@ class Agenda(object):
                     del self._compose_cnt[op]
                 else:
                     self._compose_cnt[op] += 1
-                
+
                 ## self.logc.write("\t\tCompose Op: {}; compose_cnt: {}, agendaToScore: {}\n".format(op, len(self._compose_cnt), len(self._agendaToScore)))
 
         return None
@@ -425,7 +425,7 @@ class Agenda(object):
             self._clustIdx_agenda[op._clustIdx2].discard(op)
         elif op._op == SearchOp.OP_COMPOSE:
             self._clustIdx_agenda[op._parClustIdx].discard(op)
-            self._clustIdx_agenda[op._chdClustIdx].discard(op)           
+            self._clustIdx_agenda[op._chdClustIdx].discard(op)
 
         return None
 

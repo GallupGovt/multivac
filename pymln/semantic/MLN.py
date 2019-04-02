@@ -1,6 +1,6 @@
 
-from semantic import Clust, ArgClust, Part
-from syntax.Relations import ArgType, RelType
+from multivac.pymln.semantic import Clust, ArgClust, Part
+from multivac.pymln.syntax.Relations import ArgType, RelType
 
 import json
 import pickle
@@ -8,7 +8,7 @@ import os
 
 class MLN(object):
     '''
-    Class for simply outputting the MLN structure parsed from source 
+    Class for simply outputting the MLN structure parsed from source
     documents.
 
     NEEDS FILE OUTPUT COMPONENT STILL
@@ -37,7 +37,7 @@ class MLN(object):
                 out_str += "\t{}\t{}\t{}\n".format(aci, ac.toString(), ac._ttlArgCnt)
 
         if path is not None:
-            dst = "{}/{}.clustering".format(path, 
+            dst = "{}/{}.clustering".format(path,
                                             os.path.basename(os.path.dirname(path)))
             with open(dst, 'w') as f:
                 f.write(out_str)
@@ -59,7 +59,7 @@ class MLN(object):
                          'argTypeStr_idx': ArgType.argTypeStr_idx,
                          'rootNodeId_part': Part.rootNodeId_part,
                          'clustIdx_partRootNodeIds': Part.clustIdx_partRootNodeIds,
-                         'pairClustIdxs_pairPartRootNodeIds': Part.pairClustIdxs_pairPartRootNodeIds}, 
+                         'pairClustIdxs_pairPartRootNodeIds': Part.pairClustIdxs_pairPartRootNodeIds},
                         f)
 
         return None
@@ -100,22 +100,22 @@ class MLN(object):
                 ac = cl._argClusts[aci]
                 out_str += "\t{}: ".format(aci)
 
-                out_str += "\t".join(["{}: {}".format(k, v) 
+                out_str += "\t".join(["{}: {}".format(k, v)
                                       for k, v in ac._argNum_cnt.items()])
                 out_str += "\n\t"
-                out_str += "\t".join(["{}: {}: {}".format(k, 
-                                                          ArgType.getArgType(k).toString(), 
-                                                          v) 
+                out_str += "\t".join(["{}: {}: {}".format(k,
+                                                          ArgType.getArgType(k).toString(),
+                                                          v)
                                       for k, v in ac._argTypeIdx_cnt.items()])
                 out_str += "\n\t"
-                out_str += "\t".join(["{}: {}: {}".format(k, 
-                                                          Clust.getClust(k), 
-                                                          v) 
+                out_str += "\t".join(["{}: {}: {}".format(k,
+                                                          Clust.getClust(k),
+                                                          v)
                                       for k, v in ac._chdClustIdx_cnt.items()])
                 out_str += "\n"
 
         if path is not None:
-            dst = "{}/{}.mln".format(path, 
+            dst = "{}/{}.mln".format(path,
                                      os.path.basename(os.path.dirname(path)))
 
             with open(dst, 'w') as f:
@@ -146,7 +146,7 @@ class MLN(object):
                                                    ArgType.getArgType(arg._path.getArgType()))
 
         if path is not None:
-            dst = "{}/{}.parse".format(path, 
+            dst = "{}/{}.parse".format(path,
                                        os.path.basename(os.path.dirname(path)))
             with open(dst, 'w') as f:
                 f.write(out_str)
