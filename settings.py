@@ -27,7 +27,6 @@ models_dir = cfg['PATHS'].get('models_dir', root_dir/'models')
 stanf_nlp_dir = cfg['PATHS'].get('stanf_nlp_dir',
                                  root_dir/'stanford_nlp_models')
 mln_dir = cfg['PATHS'].get('mln_dir', root_dir/'mln_models')
-results_dir = cfg['PATHS'].get('results_dir', root_dir/'results_dir')
 
 # Get search and filter settings; default to empty lists
 terms = eval(cfg['SEARCH'].get('terms', '[]'))
@@ -44,7 +43,6 @@ dirs = [
     models_dir,
     stanf_nlp_dir,
     mln_dir,
-    results_dir,
 ]
 dirs += [raw_dir / x for x in sources]
 for _dir in dirs:

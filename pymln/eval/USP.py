@@ -801,7 +801,7 @@ if __name__ == '__main__':
 
     # Default argument values
     params = {'eval_dir': settings.models_dir,
-              'results_dir': settings.results_dir,
+              'results_dir': settings.mln_dir,
               'query_file': 'output_questions_QG-Net.pt.txt'}
 
     # If specified in call, override defaults
