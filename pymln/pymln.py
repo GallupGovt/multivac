@@ -28,14 +28,14 @@ def mln_main(args_dict):
     verbose = args_dict['verbose']
     data_dir = settings.data_dir
     results_dir = settings.mln_dir
-    parser = Parse(args_dict['priorNumParam'], args_dict['priorNumConj'])
+    parser = Parse(args_dict['prior_num_param'], args_dict['prior_num_conj'])
 
     # read in inputs
     input_files = read_input_files(data_dir)
     input_files.sort()
 
     # set final parameter
-    if 'subset' in args:
+    if 'subset' in args_dict:
         subset = args_dict['subset']
     else:
         subset = len(input_files)
@@ -97,7 +97,7 @@ def mln_main(args_dict):
         print("{}: {} final clusters, with {} argument clusters."
               .format(datetime.now(), len(Clust.clusts), num_arg_clusts))
 
-    MLN.save_mln(data_dir + "/mln.pkl")
+    MLN.save_mln(data_dir / "mln.pkl")
     MLN.printModel(results_dir)
 
     if verbose:

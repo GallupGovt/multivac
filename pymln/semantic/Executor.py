@@ -1,6 +1,6 @@
 
-from semantic import SearchOp, Clust, Part, Scorer
-from syntax.Relations import RelType
+from multivac.pymln.semantic import SearchOp, Clust, Part, Scorer
+from multivac.pymln.syntax.Relations import RelType
 
 class Executor(object):
     def __init__(self, parse):
@@ -19,7 +19,7 @@ class Executor(object):
     def execMC(self, op):
         #
         # Get clusters associated with our op
-        # 
+        #
 
         cluster1 = Clust.getClust(op._clustIdx1)
         cluster2 = Clust.getClust(op._clustIdx2)
@@ -40,7 +40,7 @@ class Executor(object):
         #
         # Align the argument clusters based on scores, and then map over
         # any remaining argument clusters from cluster 2 to cluster 1.
-        # 
+        #
 
         aci2_aci1 = dict()
         scorer = self._parse.scorer
@@ -63,7 +63,7 @@ class Executor(object):
 
         #
         # Finally, remap the Parts in cluster 2 to cluster 1 as well.
-        # 
+        #
 
         part_ids = set()
         part_ids.update(Part.getPartRootNodeIds(cluster2.getId()))
@@ -90,7 +90,7 @@ class Executor(object):
 
         #
         # If either cluster are None, return -1
-        # 
+        #
         if Clust.getClust(parClustIdx) is None or Clust.getClust(chdClustIdx) is None:
             return -1
 
@@ -154,7 +154,7 @@ class Executor(object):
 
             #
             # Connect the child part's arguments directly to the parent part now
-            # 
+            #
 
             for argIdx, arg in child_part.getArguments().items():
                 child_part.unsetArgClust(argIdx)
@@ -174,7 +174,7 @@ class Executor(object):
 
             #
             # Remove the old child part
-            # 
+            #
 
             deleted_parts.append(child_part.getRelTreeRoot().getId())
             child_part.destroy()

@@ -1,11 +1,11 @@
 
 from datetime import datetime
 from sortedcontainers import SortedDict
-from semantic import Argument, Clust, Part, Agenda, Executor, Scorer
-from syntax.StanfordParseReader import StanfordParseReader
-from syntax.Nodes import TreeNode
-from syntax.Relations import Path
-from utils import genTreeNodeID
+from multivac.pymln.semantic import Argument, Clust, Part, Agenda, Executor, Scorer
+from multivac.pymln.syntax.StanfordParseReader import StanfordParseReader
+from multivac.pymln.syntax.Nodes import TreeNode
+from multivac.pymln.syntax.Relations import Path
+from multivac.pymln.utils import genTreeNodeID
 
 class Parse(object):
     def __init__(self, priorNumParam=None, priorNumConj=None):
@@ -22,21 +22,21 @@ class Parse(object):
         self.executor = Executor(self)
         self.agenda = Agenda(self)
 
-    def createArgs(self, art_id, sent_id, sent, parent_id, 
+    def createArgs(self, art_id, sent_id, sent, parent_id,
                    done=set(), verbose=False):
         '''
-            For each token, get the TreeNode, Part, Cluster and (based on 
+            For each token, get the TreeNode, Part, Cluster and (based on
             sentence dependencies) the children tokens.
 
-            For each child token, use the dependency relationship to define 
+            For each child token, use the dependency relationship to define
             a Path and then argument type and Argument defining the parent-
             child relationship. Then add/create an ArgClust before recursing
-            on any grand-child tokens. 
+            on any grand-child tokens.
 
             #
-            ## CHECK TOKENS SO WE DON'T GET STUCK IN A RECURSIVE LOOP IF 
+            ## CHECK TOKENS SO WE DON'T GET STUCK IN A RECURSIVE LOOP IF
             ## DEPENDENCIES ARE MALFORMED
-            # 
+            #
         '''
         parent_node_id = genTreeNodeID(art_id, sent_id, parent_id)
         parent = TreeNode.getTreeNode(parent_node_id)
@@ -58,20 +58,20 @@ class Parse(object):
                 if child_part is None:
                     if verbose:
                         print("Child node id {} has no part".format(child_node_id))
-                
+
                 if child_part.getParPart() is not None:
                     if verbose:
                         print("Child node id {} already has "
                               "parent {}".format(child_node_id,
                                                  child_part.getParPart().getRelTreeRoot().getId()))
                     continue
-                
+
                 arg = Argument(parent, path, child_part)
                 arg_id = parent_part.addArgument(arg)
                 child_part.setParent(parent_part, arg_id)
 
                 arg_clust_ids = parent_clust.getArgClustIdxs(arg_type_id)
-                
+
                 if arg_clust_ids is None:
                     arg_clust_id = parent_clust.createArgClust(arg_type_id)
                 else:
@@ -81,7 +81,7 @@ class Parse(object):
 
                 #done.add(child_node_id)
                 self.createArgs(art_id, sent_id, sent, child_id)
-        
+
         #done.add(parent_node_id)
 
         return None
@@ -111,7 +111,7 @@ class Parse(object):
             Create TreeNode, Part, and Clust for each token in a sentence,
             also adding/assigning RelTypes.
             Increment the root count for the cluster assigned to the root
-            token (tokens with a parent of ROOT). 
+            token (tokens with a parent of ROOT).
             Finally, run CreateArgs() to define the parent-child relation-
             ships. This call is recursive, traversing the whole dependency
             tree for each sentence.
@@ -136,7 +136,7 @@ class Parse(object):
 
             if node_part is None:
                 continue
-            
+
             ncl = Clust.getClust(node_part.getClustIdx())
             ncl.incRootCnt()
             self.createArgs(ai, sj, sent, idx, verbose)
@@ -152,7 +152,7 @@ class Parse(object):
 
                 if clustIdxs is not None:
                     clustIdx = next(iter(clustIdxs))
-                else: 
+                else:
                     clustIdx = Clust.createClust(relTypeIdx)
 
                 part.setClust(clustIdx)
@@ -164,7 +164,7 @@ class Parse(object):
 
         while True:
             parent = sent.get_parent(k)
-            
+
             if parent is None:
                 break
             elif parent in done:
@@ -177,7 +177,7 @@ class Parse(object):
 
     def mergeArgs(self, verbose=False):
         '''
-            For each cluster, count up all the arguments for each ArgClust. 
+            For each cluster, count up all the arguments for each ArgClust.
             Iterating from most args to least, for each ArgClust score whether
             merging it makes sense.
         '''
@@ -222,7 +222,7 @@ class Parse(object):
 
             if verbose:
                 if i%100==0:
-                    print("{} MergeArgs: {} clusters processed.".format(datetime.now(), 
+                    print("{} MergeArgs: {} clusters processed.".format(datetime.now(),
                                                                         i))
 
         return None

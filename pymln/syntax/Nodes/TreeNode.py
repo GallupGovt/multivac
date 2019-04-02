@@ -1,7 +1,7 @@
 
 # from collections import OrderedDict
 from sortedcontainers import SortedDict, SortedSet
-from syntax.Nodes import Token
+from multivac.pymln.syntax.Nodes import Token
 
 class TreeNode(object):
     # map {str: TreeNode}

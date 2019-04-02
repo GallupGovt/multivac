@@ -1,10 +1,10 @@
 
-from syntax.Nodes import Token, TreeNode
+from multivac.pymln.syntax.Nodes import Token, TreeNode
 
 class RelType(object):
     relTypes = []
-    # Dictionary mapping {str: int} tracking RelType strings and 
-    # their unique indices. 
+    # Dictionary mapping {str: int} tracking RelType strings and
+    # their unique indices.
     relTypeStr_idx = {}
 
     def __init__(self, target):

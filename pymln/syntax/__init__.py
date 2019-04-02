@@ -1,5 +1,5 @@
 
-from syntax.Nodes import Article, Sentence, Token
-from syntax.Relations import ArgType, Path, RelType
-from syntax import StanfordParseReader
+from multivac.pymln.syntax.Nodes import Article, Sentence, Token
+from multivac.pymln.syntax.Relations import ArgType, Path, RelType
+from multivac.pymln.syntax import StanfordParseReader
 

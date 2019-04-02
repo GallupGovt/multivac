@@ -15,8 +15,8 @@ try:
 except NameError:
     cfg.read(cfgDIR / 'multivac.cfg')
 
-root_dir = cfg['PATHS'].get('root_dir', cfgDIR/'multivac')
-qgnet_dir = cfg['PATHS'].get('qgnet_dir', cfgDIR/'qgnet')
+root_dir = cfg['PATHS'].get('root_dir', cfgDIR)
+qgnet_dir = cfg['PATHS'].get('qgnet_dir', root_dir / '..' / 'qgnet')
 
 data_dir = cfg['PATHS'].get('data_dir', root_dir/'data')
 raw_dir = cfg['PATHS'].get('raw_dir', data_dir/'raw')

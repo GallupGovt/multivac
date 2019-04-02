@@ -2,11 +2,11 @@
 
 #
 # Part class
-# 
+#
 #from collections import OrderedDict
 from sortedcontainers import SortedSet, SortedDict
-from semantic import Clust, Argument, ArgClust
-from syntax.Relations import RelType
+from multivac.pymln.semantic import Clust, Argument, ArgClust
+from multivac.pymln.syntax.Relations import RelType
 
 class Part(object):
     # SortedDict mapping {str: Part}
@@ -26,12 +26,12 @@ class Part(object):
         if parClustIdx is None and chdClustIdx is None:
             return Part.pairClustIdxs_pairPartRootNodeIds
         elif parClustIdx is None:
-            return {k: v for k, v in 
-                        Part.pairClustIdxs_pairPartRootNodeIds.items() 
+            return {k: v for k, v in
+                        Part.pairClustIdxs_pairPartRootNodeIds.items()
                         if k[1]==chdClustIdx}
         elif chdClustIdx is None:
-            return {k: v for k, v in 
-                        Part.pairClustIdxs_pairPartRootNodeIds.items() 
+            return {k: v for k, v in
+                        Part.pairClustIdxs_pairPartRootNodeIds.items()
                         if k[0]==parClustIdx}
         else:
             if (parClustIdx, chdClustIdx) in Part.pairClustIdxs_pairPartRootNodeIds:
@@ -295,7 +295,7 @@ class Part(object):
         self._parArgIdx = parArgIdx
         clustIdx = self.getClustIdx()
         parClustID = parPart.getClustIdx()
-        
+
         assert (parClustID >= 0) & (clustIdx >= 0)
 
         pcci = (parClustID, clustIdx)

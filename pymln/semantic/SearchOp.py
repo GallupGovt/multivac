@@ -1,5 +1,5 @@
 
-from semantic import Clust
+from multivac.pymln.semantic import Clust
 
 class SearchOp(object):
     # Why are these strings instead of just integers?
@@ -34,7 +34,7 @@ class SearchOp(object):
         this = sum([ord(x) for x in self.toString()])
         that = sum([ord(x) for x in z.toString()])
         result = this - that
-        
+
         return result
 
     def toString(self):
@@ -51,8 +51,8 @@ class SearchOp(object):
             c2 = Clust.getClust(self._clustIdx2)
             self._str += "{} == {}".format(c1.toString(), c2.toString())
         elif self._op == SearchOp.OP_MERGE_ROLE:
-            self._str += "{}:{}:{}".format(self._clustIdx, 
-                                           self._argIdx1, 
+            self._str += "{}:{}:{}".format(self._clustIdx,
+                                           self._argIdx1,
                                            self._argIdx2)
         elif self._op == SearchOp.OP_COMPOSE:
             rc = Clust.getClust(self._parClustIdx)

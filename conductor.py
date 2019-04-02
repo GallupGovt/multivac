@@ -29,6 +29,7 @@ from multivac.src.data.glove import glove_main
 from multivac.src.data.make import collect_main
 from multivac.src.data.parsing import nlp_parse_main
 from multivac.src.data.qgnet import qgnet_main
+from multivac.pymln.pymln import mln_main
 
 
 def conduct(args_dict):

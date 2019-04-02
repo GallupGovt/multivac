@@ -5,8 +5,10 @@ import os
 import subprocess
 
 from multivac import settings
-from multivac.src.data.processing import load_data
-from qgnet.test.preprocessing_pdf import create_tf_idf, preprocess_pdf
+from multivac.src.data.parsing import load_data
+from qgnet.test.testinput.preprocessing_pdf import (
+    create_tf_idf, preprocess_pdf
+)
 
 
 os.environ["CORENLP_HOME"] = ('{}/stanford-corenlp-full-2018-10-05'

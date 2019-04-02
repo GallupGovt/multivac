@@ -1,5 +1,5 @@
 
-from syntax.Relations import RelType, ArgType
+from multivac.pymln.syntax.Relations import RelType, ArgType
 
 class Path(object):
     def __init__(self, dep, treeRoot=None, argNode=None, dep2=None):
