@@ -162,7 +162,7 @@ def query_api(url, terms, params, wait_time=3, verbose=False):
     # get total number of results
     n_results = get_total_number_of_results(url, {'start': 0, 'max_results': 1})
     if verbose:
-        print('%s total results, %s second wait time between each call' %
+        print('%s total arXiv results, %s second wait time between each call' %
               (str(n_results), str(wait_time)))
 
     # build list to iterate over

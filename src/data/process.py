@@ -40,7 +40,7 @@ def aggregate_pubmed(srcs, verbose=False):
                 print('Error: %s' % src)
             pass
     dst = settings.metadata_dir / 'pubmed.pkl'
-    with open(dst, 'w') as f:
+    with open(dst, 'wb') as f:
         pickle.dump(pubmed_metadata, f)
     return pubmed_data
 
@@ -171,7 +171,7 @@ def save_outputs(output, dst_dir=None, fn_prefix=None):
     if fn_prefix is not None:
         fn = fn_prefix + '_' + fn
     dst = dst_dir / fn
-    with open(dst, 'w') as f:
+    with open(dst, 'wb') as f:
         json.dump(output, f)
 
 

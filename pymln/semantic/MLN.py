@@ -74,8 +74,8 @@ class MLN(object):
             _ = len(RelType.relTypes)
             _ = len(Part.rootNodeId_part)
         except NameError:
-            from semantic import Clust, Part
-            from syntax.Relations import ArgType, RelType
+            from multivac.pymln.semantic import Clust, Part
+            from multivac.pymln.syntax.Relations import ArgType, RelType
         finally:
             Clust.clusts = mln['clusts']
             Clust.relTypeIdx_clustIdx = mln['relTypeIdx_clustIdx']

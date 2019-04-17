@@ -151,7 +151,7 @@ class USP(object):
     id_article = dict() # {str: Article}
 
     def readQuestions(verbose=False):
-        filename = os.join.path(USP.evalDir, USP.query_file)
+        filename = os.path.join(USP.evalDir, USP.query_file)
 
         with open(filename, "r") as f:
             lines = f.readlines()
