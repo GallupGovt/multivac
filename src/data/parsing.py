@@ -326,7 +326,7 @@ def nlp_parse_main(args_dict):
                                pos_batch_size=3000)
 
     ## Load documents
-    jsonObj, allDocs = load_data(settings.processed_dir / 'data')
+    jsonObj, allDocs = load_data(settings.processed_dir / 'data.json')
 
     ## Process and Clean documents
     try:

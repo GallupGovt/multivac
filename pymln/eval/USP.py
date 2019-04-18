@@ -54,6 +54,14 @@ class stanford_token():
 
 
 class stanford_parse():
+    nlp_client = corenlp.CoreNLPClient(annotators="tokenize ssplit pos lemma ner depparse", 
+                                       output_format='json', 
+                                       properties={'timeout': '50000'})
+    try:
+        _ = stanford_parse.nlp_client.annotate("The quick brown fox jumped over the lazy dog.")
+    except:
+        pass
+
     def __init__(self, sentence, deptype='basicDependencies'):
         self.tokens = []
         self.root = 0
@@ -87,10 +95,7 @@ class stanford_parse():
         return self.tokens[self.root]
 
     def get_parse(sentence):
-        anns = "tokenize ssplit pos lemma ner depparse"
-        with corenlp.CoreNLPClient(annotators=anns.split(), output_format='json') as client:
-            ann = client.annotate(sentence)
-
+        ann = stanford_parse.nlp_client.annotate(sentence)
         return ann['sentences'][0]
 
     def get_deps(sentence, deptype='basicDependencies', ret='asis'):
@@ -150,7 +155,7 @@ class USP(object):
     id_sent = dict() # {str: str}
     id_article = dict() # {str: Article}
 
-    def readQuestions(verbose=False):
+    def readQuestions(nlp=None, verbose=False):
         filename = os.path.join(USP.evalDir, USP.query_file)
 
         with open(filename, "r") as f:
@@ -773,7 +778,22 @@ class USP(object):
 
 def run():
 
-    MLN.load_mln("{}/mln.pkl".format(USP.resultDir))
+    mln = MLN.load_mln("{}/mln.pkl".format(USP.resultDir), ret=True)
+
+    if len(Clust.clusts) == 0:
+        Clust.clusts = mln['clusts']
+
+    if len(Clust.relTypeIdx_clustIdx) == 0:
+        Clust.relTypeIdx_clustIdx = mln['relTypeIdx_clustIdx']
+
+    if len(Part.rootNodeId_part) == 0:
+        Part.rootNodeId_part = mln['rootNodeId_part']
+
+    if len(Part.clustIdx_partRootNodeIds) == 0:
+        Part.clustIdx_partRootNodeIds = mln['clustIdx_partRootNodeIds']
+
+    if len(Part.pairClustIdxs_pairPartRootNodeIds) == 0:
+        Part.pairClustIdxs_pairPartRootNodeIds = mln['pairClustIdxs_pairPartRootNodeIds']
 
     USP.readQuestions(verbose=True)
     USP.readClust()

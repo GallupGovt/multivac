@@ -11,8 +11,6 @@ class MLN(object):
     Class for simply outputting the MLN structure parsed from source
     documents.
 
-    NEEDS FILE OUTPUT COMPONENT STILL
-
     '''
     def __init__(self):
         return None
@@ -64,7 +62,7 @@ class MLN(object):
 
         return None
 
-    def load_mln(path):
+    def load_mln(path, ret=False):
         with open(path, 'rb') as f:
             mln = pickle.load(f)
 
@@ -76,18 +74,21 @@ class MLN(object):
         except NameError:
             from multivac.pymln.semantic import Clust, Part
             from multivac.pymln.syntax.Relations import ArgType, RelType
-        finally:
-            Clust.clusts = mln['clusts']
-            Clust.relTypeIdx_clustIdx = mln['relTypeIdx_clustIdx']
-            RelType.relTypes = mln['relTypes']
-            RelType.relTypeStr_idx = mln['relTypeStr_idx']
-            ArgType.argTypes = mln['argTypes']
-            ArgType.argTypeStr_idx = mln['argTypeStr_idx']
-            Part.rootNodeId_part = mln['rootNodeId_part']
-            Part.clustIdx_partRootNodeIds = mln['clustIdx_partRootNodeIds']
-            Part.pairClustIdxs_pairPartRootNodeIds = mln['pairClustIdxs_pairPartRootNodeIds']
 
-        return None
+        Clust.clusts = mln['clusts']
+        Clust.relTypeIdx_clustIdx = mln['relTypeIdx_clustIdx']
+        RelType.relTypes = mln['relTypes']
+        RelType.relTypeStr_idx = mln['relTypeStr_idx']
+        ArgType.argTypes = mln['argTypes']
+        ArgType.argTypeStr_idx = mln['argTypeStr_idx']
+        Part.rootNodeId_part = mln['rootNodeId_part']
+        Part.clustIdx_partRootNodeIds = mln['clustIdx_partRootNodeIds']
+        Part.pairClustIdxs_pairPartRootNodeIds = mln['pairClustIdxs_pairPartRootNodeIds']
+
+        if ret:
+            return mln
+        else:
+            return None
 
     def printMLN(path=None):
         out_str = ""
