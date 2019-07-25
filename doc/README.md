@@ -10,6 +10,7 @@ This page serves as an index of system design, theory, and walk through document
 - <a href='https://github.com/GallupGovt/multivac/tree/master/precooked_replication.ipynb'>Piece-by-Piece Execution</a>
 ### Query Mapping
 - <a href='https://github.com/GallupGovt/multivac/tree/master/prepared_output.ipynb'>Query Mapping Execution</a>
+<br>
 
 ## Phase II Development
 - MULTIVAC in the <a href='https://github.com/GallupGovt/multivac/blob/master/doc/aske_context.md'>ASKE Context</a>
@@ -25,4 +26,10 @@ This page serves as an index of system design, theory, and walk through document
 ## Related Research and Resources
 - GANs for Text Generation: <a href='https://paperswithcode.com/search?q=gan+text'>paperswithcode.com</a>
 - Markov Logic Networks <a href='https://paperswithcode.com/search?q=markov+logic+network'>paperswithcode.com</a>
+
+
 For more information please contact Principal Investigator, Benjamin Ryan (ben_ryan@gallup.com).
+
+## Acknowledgements
+This work is supported by the Defense Advanced Research Projects Agency (DARPA) under Agreement No. HR00111990008.
+
