@@ -72,6 +72,7 @@ THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON AND CONTRIBUTORS "AS I
 
 
 For more information please contact Principal Investigator, Benjamin Ryan (ben_ryan@gallup.com).
+
 ---
 ## Acknowledgements
 This work is supported by the Defense Advanced Research Projects Agency (DARPA) under Agreement No. HR00111990008.
