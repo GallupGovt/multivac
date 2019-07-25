@@ -28,6 +28,8 @@ The MULTIVAC system is still in development along several lines of effort. Subse
 
 For more information please contact Principal Investigator, Benjamin Ryan (ben_ryan@gallup.com).
 
+---
+
 ## Acknowledgements
 This work is supported by the Defense Advanced Research Projects Agency (DARPA) under Agreement No. HR00111990008.
 
