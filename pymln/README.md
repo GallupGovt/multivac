@@ -1,4 +1,4 @@
-# pymln
+# Unsupervised Semantic Parsing in Python
 Python implementation of unsupervised semantic parsing and markov logic network knowledgebase induction. This work is funded through DARPA’s <a href='https://www.darpa.mil/program/automating-scientific-knowledge-extraction'>ASKE</a> program (Automating Scientific Knowledge Extraction) as part of Gallup's <a href='https://github.com/GallupGovt/multivac'>MULTIVAC</a> project. This is a work in progress. 
 
 ## Overview
@@ -35,8 +35,7 @@ The result is a domain ontology represented as a Markov Logic Network grounded o
 
 <hr>
 
-### This software is derived from the USP (Beta Version) Software by the University of Washington, available here: http://alchemy.cs.washington.edu/usp/ 
-
+This software is derived from the USP (Beta Version) Software by the University of Washington, available here: http://alchemy.cs.washington.edu/usp/ 
 
 
 All of the documentation and software included in the USP (Beta Version) Software is copyrighted by Hoifung Poon and Pedro Domingos.
@@ -69,4 +68,12 @@ Redistribution and use in source and binary forms, with or without modification,
 
 
 THIS SOFTWARE IS PROVIDED BY THE UNIVERSITY OF WASHINGTON AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE UNIVERSITY OF WASHINGTON OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+For more information please contact Principal Investigator, Benjamin Ryan (ben_ryan@gallup.com).
+
+---
+## Acknowledgements
+This work is supported by the Defense Advanced Research Projects Agency (DARPA) under Agreement No. HR00111990008.
 
