@@ -1,4 +1,4 @@
-# pymln
+# Unsupervised Semantic Parsing in Python
 Python implementation of unsupervised semantic parsing and markov logic network knowledgebase induction. This work is funded through DARPA’s <a href='https://www.darpa.mil/program/automating-scientific-knowledge-extraction'>ASKE</a> program (Automating Scientific Knowledge Extraction) as part of Gallup's <a href='https://github.com/GallupGovt/multivac'>MULTIVAC</a> project. This is a work in progress. 
 
 ## Overview
@@ -35,8 +35,7 @@ The result is a domain ontology represented as a Markov Logic Network grounded o
 
 <hr>
 
-### This software is derived from the USP (Beta Version) Software by the University of Washington, available here: http://alchemy.cs.washington.edu/usp/ 
-
+This software is derived from the USP (Beta Version) Software by the University of Washington, available here: http://alchemy.cs.washington.edu/usp/ 
 
 
 All of the documentation and software included in the USP (Beta Version) Software is copyrighted by Hoifung Poon and Pedro Domingos.
