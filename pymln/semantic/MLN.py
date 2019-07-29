@@ -95,7 +95,7 @@ class MLN(object):
 
         for ci in Clust.clusts:
             cl = Clust.getClust(ci)
-            out_str = "{}\t{}\n".format(cl._clustIdx,cl)
+            out_str += "{}\t{}\n".format(cl._clustIdx,cl)
 
             for aci in cl._argClusts:
                 ac = cl._argClusts[aci]
