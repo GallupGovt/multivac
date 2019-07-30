@@ -303,8 +303,8 @@ def load_data(jsonPath, picklePath = None):
 
         ## These were some bad files - nothing substantive in them, or they
         ## were retrieved in bad format
-        for e in ['1805.10677v1', '0911.5378v1']:
-            datastore.pop(e)
+        bad_files = ['1805.10677v1', '0911.5378v1']
+        datastore = {k: v for k, v in datastore.items() if k not in bad_files}
 
         ## Extract texts
         l_docs = [value['text'] for key,value in
