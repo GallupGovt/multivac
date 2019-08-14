@@ -2,6 +2,15 @@
 /data/
 /models/
 
+# pycharm files
+.idea/
+
+# scratch notebook directories
+scratch_notebooks/peter/
+
+# downloaded stanford nlp models
+stanford_nlp_models/
+
 # environment
 multivac/
 .env
