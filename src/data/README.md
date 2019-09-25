@@ -110,20 +110,18 @@ python extract_text.py --input example-dir-with-pdfs/ --output example-dir-to-du
 
 $ python clean_text.py -h
 
-usage: clean_text.py [-h] --infile INFILE --outdir OUTDIR
+usage: clean_text.py [-h] --indir INDIR --outdir OUTDIR
 
 Parser for XMLized scholarly publications.
 
 optional arguments:
   -h, --help       show this help message and exit
-  --infile INFILE  Path to the directory containing XML to process.
+  --indir INDIR    Path to the directory containing XMLs to process.
   --outdir OUTDIR  Path to output directory for processed files.
-
 ```
 
 ```bash
 ## typical usage
-python clean_text.py --infile dir-to/something.tei.xml --outdir dir-out/
-
+python clean_text.py --indir dir-to-tei-xmls/ --outdir dir-out/
 ```
 

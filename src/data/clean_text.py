@@ -1,5 +1,6 @@
 import argparse
 import bs4
+import datetime
 import json
 import os
 
@@ -75,53 +76,79 @@ def get_formulas(soup):
     return formulas_list
 
 
+def get_title(soup):
+
+    title_element = soup.find('titleStmt')
+    title = title_element.text
+
+    return title
+
+
 def run(args_dict):
 
-    fin = open(args_dict['infile'], 'r')
-    content = fin.read()
-    fin.close()
+    indir = os.path.abspath(args_dict['indir'])
+    files = [x for x in os.walk(indir)][0][2]
 
-    soup = bs4.BeautifulSoup(content, 'xml')
+    complete_list = []
+    for f in files:
 
-    tmp_content = get_content(soup)
-    content = ' '.join(tmp_content)
-    raw_content = '////'.join(tmp_content)
+        fin = f'{indir}/{f}'
 
-    abstract = get_abstract(soup)
-    authors = get_authors(soup)
-    references = get_references(soup)
-    formulas = get_formulas(soup)
+        if fin.endswith('.tei.xml'):
 
-    # need to strip all the fluff from the
-    # cleaned content
-    for ref in references:
-        content = content.replace(ref, '')
+            tmpf = open(fin, 'r')
+            content = tmpf.read()
+            tmpf.close()
 
-    for frm in formulas:
-        content = content.replace(frm, '')
+            soup = bs4.BeautifulSoup(content, 'xml')
 
-    for atr in authors:
-        content = content.replace(atr, '')
+            tmp_content = get_content(soup)
+            content = ' '.join(tmp_content)
+            raw_content = '////'.join(tmp_content)
 
-    content = content.replace(abstract, '')
+            abstract = get_abstract(soup)
+            authors = get_authors(soup)
+            references = get_references(soup)
+            formulas = get_formulas(soup)
+            title = get_title(soup)
 
-    data = {
-        'abstract': abstract,
-        'authors': authors,
-        'clean_content': content,
-        'raw_content': raw_content,
-        'references': references,
-        'formulas': formulas
-    }
+            # need to strip all the fluff from the
+            # cleaned content
+            for ref in references:
+                content = content.replace(ref, '')
+
+            for frm in formulas:
+                content = content.replace(frm, '')
+
+            for atr in authors:
+                content = content.replace(atr, '')
+
+            content = content.replace(abstract, '')
+
+            structure = {
+                f: {
+                    'meta': {
+                        'abstract': abstract,
+                        'authors': authors,
+                        'title': title
+                    },
+                    'text': content
+                }
+            }
+
+            complete_list.append(structure)
+
+        else:
+
+            pass
 
     outdir = os.path.abspath(args_dict['outdir'])
-
-    tmp = args_dict['infile'].split('/')[-1]
-    fname = f'{tmp}.json'
+    stamp = datetime.datetime.now().strftime('%Y%M%d_%H%M%S')
+    fname = f'output_{stamp}.json'
     fout = f'{outdir}/{fname}'
 
     f = open(fout, 'w')
-    json.dump(data, f)
+    json.dump(complete_list, f)
     f.close()
 
 
@@ -130,9 +157,9 @@ if __name__ == "__main__":
         description="Parser for XMLized scholarly publications."
     )
     parser.add_argument(
-        "--infile",
+        "--indir",
         required=True,
-        help="Path to the directory containing XML to process."
+        help="Path to the directory containing XMLs to process."
     )
     parser.add_argument(
         "--outdir",
