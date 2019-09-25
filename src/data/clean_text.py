@@ -8,9 +8,9 @@ import os
 def get_abstract(soup):
 
     abstract_element = soup.find('abstract').find('p')
-    abstract_text = abstract_element.text if abstract_element is not None else '**NONE**'
+    abstract_text = abstract_element.text if abstract_element else '**NONE**'
 
-    # some cleanup.. this is not smart, rather very naive
+    # needs to be smarter
     if 'Abstract' in abstract_text:
         abstract_text = abstract_text.replace('Abstract', '').strip()
     if abstract_text.startswith('.'):
@@ -32,7 +32,7 @@ def get_authors(soup):
         last = lastname.text if lastname else '**NONE**'
         out = f'{first} {last}'
 
-        # some cleanup.. this is not smart, rather very naive
+        # needs to be smarter
         if out.startswith('&amp;'):
             out = out.replace('&amp;', '').strip()
 
@@ -46,10 +46,8 @@ def get_authors(soup):
 def get_content(soup):
 
     paragraph_elements = soup.find_all('p')
-
-    paragraphs_list = []
-    for para in paragraph_elements:
-        paragraphs_list.append(para.text)
+    paragraphs_list = [e.text for e in paragraph_elements]
+    # potentially more cleaning here
 
     return paragraphs_list
 
@@ -57,10 +55,8 @@ def get_content(soup):
 def get_references(soup):
 
     reference_elements = soup.find_all('ref')
-
-    references_list = []
-    for ref in reference_elements:
-        references_list.append(ref.text)
+    references_list = [e.text for e in reference_elements]
+    # potentially more cleaning here
 
     return references_list
 
@@ -68,10 +64,8 @@ def get_references(soup):
 def get_formulas(soup):
 
     formula_elements = soup.find_all('formula')
-
-    formulas_list = []
-    for formula in formula_elements:
-        formulas_list.append(formula.text)
+    formulas_list = [e.text for e in formula_elements]
+    # potentially more cleaning here
 
     return formulas_list
 
@@ -79,7 +73,7 @@ def get_formulas(soup):
 def get_title(soup):
 
     title_element = soup.find('titleStmt')
-    title = title_element.text
+    title = title_element.text.strip('\n')
 
     return title
 
@@ -87,13 +81,18 @@ def get_title(soup):
 def run(args_dict):
 
     indir = os.path.abspath(args_dict['indir'])
+
+    # get all files in specified directory
     files = [x for x in os.walk(indir)][0][2]
 
+    # temporary placeholder for all data
     complete_list = []
     for f in files:
 
+        # full path to input file
         fin = f'{indir}/{f}'
 
+        # only operate on proper files from extract_text module
         if fin.endswith('.tei.xml'):
 
             tmpf = open(fin, 'r')
@@ -102,27 +101,22 @@ def run(args_dict):
 
             soup = bs4.BeautifulSoup(content, 'xml')
 
-            tmp_content = get_content(soup)
-            content = ' '.join(tmp_content)
-            raw_content = '////'.join(tmp_content)
-
+            # gather all parsed data
             abstract = get_abstract(soup)
             authors = get_authors(soup)
             references = get_references(soup)
             formulas = get_formulas(soup)
             title = get_title(soup)
 
-            # need to strip all the fluff from the
-            # cleaned content
-            for ref in references:
-                content = content.replace(ref, '')
+            # comes in as list, combine to full text
+            tmp_content = get_content(soup)
+            content = ' '.join(tmp_content)
+            raw_content = '////'.join(tmp_content)
 
-            for frm in formulas:
-                content = content.replace(frm, '')
-
-            for atr in authors:
-                content = content.replace(atr, '')
-
+            # cleaning fluff from main content
+            for ref in references: content = content.replace(ref, '')
+            for frm in formulas: content = content.replace(frm, '')
+            for atr in authors: content = content.replace(atr, '')
             content = content.replace(abstract, '')
 
             structure = {
@@ -142,6 +136,7 @@ def run(args_dict):
 
             pass
 
+    # file outpu handling
     outdir = os.path.abspath(args_dict['outdir'])
     stamp = datetime.datetime.now().strftime('%Y%M%d_%H%M%S')
     fname = f'output_{stamp}.json'
