@@ -44,3 +44,84 @@ For more information please contact Principal Investigator, Benjamin Ryan (ben_r
 ---
 ## Acknowledgements
 This work is supported by the Defense Advanced Research Projects Agency (DARPA) under Agreement No. HR00111990008.
+
+------
+
+
+## Extraction Tool - GROBID:
+
+
+### Installation:
+
+https://grobid.readthedocs.io/en/latest/Install-Grobid/
+
+
+#### GROBID Client:
+
+Credit to: https://github.com/kermitt2/grobid-client-python
+
+
+### Usage:
+
+```bash
+$ python extract_text.py -h
+
+usage: extract_text.py [-h] [--input INPUT] [--output OUTPUT]
+                       [--config CONFIG] [--n N] [--generateIDs]
+                       [--consolidate_header] [--consolidate_citations]
+                       [--force] [--teiCoordinates]
+                       service
+
+Client for GROBID services
+
+positional arguments:
+  service               one of [processFulltextDocument,
+                        processHeaderDocument, processReferences]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --input INPUT         path to the directory containing PDF to process
+  --output OUTPUT       path to the directory where to put the results
+                        (optional)
+  --config CONFIG       path to the config file, default is ./config.json
+  --n N                 concurrency for service usage
+  --generateIDs         generate random xml:id to textual XML elements of the
+                        result files
+  --consolidate_header  call GROBID with consolidation of the metadata
+                        extracted from the header
+  --consolidate_citations
+                        call GROBID with consolidation of the extracted
+                        bibliographical references
+  --force               force re-processing pdf input files when tei output
+                        files already exist
+  --teiCoordinates      add the original PDF coordinates (bounding boxes) to
+                        the extracted elements
+```
+
+```bash
+## typical usage
+python extract_text.py --input example-dir-with-pdfs/ --output example-dir-to-dump/ --consolidate_header --consolidate_citations processFulltextDocument
+
+```
+
+## Cleaning:
+
+```bash
+
+$ python clean_text.py -h
+
+usage: clean_text.py [-h] --indir INDIR --outdir OUTDIR
+
+Parser for XMLized scholarly publications.
+
+optional arguments:
+  -h, --help       show this help message and exit
+  --indir INDIR    Path to the directory containing XMLs to process.
+  --outdir OUTDIR  Path to output directory for processed files.
+```
+
+```bash
+## typical usage
+python clean_text.py --indir dir-to-tei-xmls/ --outdir dir-out/
+```
+
