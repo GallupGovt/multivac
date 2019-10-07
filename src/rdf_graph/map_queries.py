@@ -1,20 +1,83 @@
 
-
 import argparse
 import glob
 import json
-from textdistance import cosine
-import matplotlib.pyplot as plt
-import networkx as nx
+# import matplotlib.pyplot as plt
+# import networkx as nx
 import numpy as np
 import os
 import pandas as pd
 import re
 import tensorflow as tf
+import sys
 
 from datetime import datetime
-
+from multivac.settings import models_dir
+from numpy import array
 from OpenKE import config, models
+from rdf_parse import StanfordParser, stanford_parse
+
+def get_best_score(x):
+    if isinstance(x, tuple):
+        return np.nan
+
+    scores = [tup[-1] for tup in x if tup[0] != tup[2]]
+
+    return min(scores)
+
+def get_avg_score(x):
+    if isinstance(x, tuple):
+        return np.nan
+        
+    scores = [tup[-1] for tup in x if tup[0] != tup[2]]
+
+    return np.mean(scores)
+
+def loadGloveModel(gloveFile=None, verbose=False):
+    if gloveFile is None:
+        gloveFile = os.path.join(models_dir, "glove.42B.300d.txt")
+
+    model = {}
+
+    with open(gloveFile,'r') as f:
+        if verbose:
+            print("Reading GloVe embeddings...")
+        lines = f.readlines()
+        if verbose:
+            print("Done.")
+            print("Indexing embeddings...")
+
+    indices = [x[:x.index(' ')] for x in lines]
+    deciles = set([x/10 for x in range(1, 10)])
+
+    for i, word in enumerate(indices):
+        if verbose and round(i/len(indices), 2) in deciles:
+            deciles.remove(round(i/len(indices), 2))
+            print("\r{}% done".format(round(i/len(indices)*100)), end=' ')
+
+        model[word] = np.fromstring(lines[i][lines[i].index(' '):], sep=' ')
+
+    if verbose:
+        print("\rDone.             ")
+
+    return model
+
+def avg_embed(x, glove):
+    if isinstance(x, str):
+        x = x.split()
+
+    if not isinstance(x, list):
+        return np.zeros(len(next(iter(glove.values()))))
+
+    rows = len(x)
+    cols = len(next(iter(glove.values())))
+    result = np.zeros((rows, cols))
+
+    for i, word in enumerate(x):
+        if word.lower() in glove:
+            result[i, :] = glove[word.lower()]
+
+    return np.average(np.vstack(result), axis=0)
 
 def predict(con, h, r, t, num_top_rel=10, threshold=.1):
     if sum([x == -1 for x in (h, r, t)]) > 1:
@@ -39,32 +102,22 @@ def predict(con, h, r, t, num_top_rel=10, threshold=.1):
         for tail in tails:
             result.append(((h, r, tail), con.predict_triple(h, tail, r)))
     else:
-        result = [(h,r,t), con.predict_triple(h, t, r, threshold)]
+        result = [((h,r,t), con.predict_triple(h, t, r, threshold))]
 
     return result
 
-def cos_sim(x, test):
-    if pd.notnull(x):
-        x = x.split(" | ")
-        return max([cosine.normalized_similarity(test, item) for item in x])
-    else:
-        return x
+def cos_sim(u, v):
 
-def get_answers(con, query, num_top_rel=10, threshold=.1):
-    """
-        This function takes a query to the knowledge graph and outputs
-        predicted relationships that have the highest accuracy. 
+    if all([x==0 for x in u]) or all([x==0 for x in v]):
+        return 0
 
-        1) this function finds subjects that relate to the query. 
-        2) it iterates through all the relationships and finds the highest 
-           probable object based on the relationships. 
-        3) it outputs the predicted relationships with the highest accuracy. 
+    result = np.dot(u,v) / \
+        (np.sqrt(np.sum(np.square(u))) * np.sqrt(np.sum(np.square(v))))
+    
+    return result
 
-        The user can also specify the number of top relationships (num_top_rel) 
-        based on the relationships with highest accuracy. The threshold 
-        argument (default=0.1) determines the similarity cutoff to identify 
-        relationships in the network graph.
-    """
+def get_answers(con, query, glove, entities, relations, 
+                num_top_rel=10, threshold=.75):
 
     if 'subject' not in query:
         query['subject'] = ""
@@ -73,35 +126,33 @@ def get_answers(con, query, num_top_rel=10, threshold=.1):
     if 'relation' not in query:
         query['relation'] = ""
 
-    direc = con.get_in_path()
-
     top_subj = np.ones(num_top_rel)*-1
     top_rel  = np.ones(num_top_rel)*-1
     top_obj  = np.ones(num_top_rel)*-1
 
-    # identify files for use
-    files = glob.glob(os.path.join(direc,'*.txt'))
-    rel_file = max([file for file in files if re.search('relation', file)],
-                   key=os.path.getctime)
-    ent_file = max([file for file in files if re.search('entity', file)],
-                   key=os.path.getctime)
-
-    entities = pd.read_csv(ent_file, sep='\t', names=["Ent","Id"], skiprows=1)
-    relations = pd.read_csv(rel_file, sep='\t', names=["Rel","Id"], skiprows=1)
-
     if len(query['subject']) > 0:
-        subj_scores = entities.Ent.apply(lambda x: cos_sim(x, query['subject']))
+        subj = avg_embed(query['subject'], glove)
+        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, glove), 
+                                                           subj))
 
         if subj_scores.max() < threshold:
             subj_id = -1
         else:
             # Potentially use np.argmax() for multiple max results
-            subj_id = entities.Id.iloc[subj_scores.idxmax()]
+            try:
+                subj_id = entities.Id.iloc[subj_scores.idxmax()]
+            except:
+                print(query['subject'])
+                print(subj)
+                print(subj_scores)
+                raise
     else:
         subj_id = -1
 
     if len(query['object']) > 0:
-        obj_scores = entities.Ent.apply(lambda x: cos_sim(x, query['object']))
+        obj = avg_embed(query['object'], glove)
+        obj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, glove), 
+                                                          obj))
 
         if obj_scores.max() < threshold:
             obj_id = -1
@@ -112,7 +163,9 @@ def get_answers(con, query, num_top_rel=10, threshold=.1):
         obj_id = -1
 
     if len(query['relation']) > 0:
-        rel_scores = relations.Rel.apply(lambda x: cos_sim(x, query['relation']))
+        rel = avg_embed(query['relation'], glove)
+        rel_scores = relations.Rel.apply(lambda x: cos_sim(avg_embed(x, glove), 
+                                                           rel))
 
         if rel_scores.max() < threshold:
             rel_id = -1
@@ -122,20 +175,21 @@ def get_answers(con, query, num_top_rel=10, threshold=.1):
     else:
         rel_id = -1
 
-    #
-    # YOU'VE GOT YOUR TOP MATCHES - WHAT DO YOU DO NOW??
-    #
+    result = predict(con, subj_id, rel_id, obj_id, num_top_rel)
 
-    # Apply this to each cell:
+    if any([x == -1 for x in result[0][0]]):
+        return result[0]
 
-    try:
-        result = predict(con, subj_id, rel_id, obj_id, num_top_rel, threshold)
-    except:
-        print(query)
-        print((subj_id, rel_id, obj_id))
-        raise Exception
+    readable_result = []
 
-    return result
+    for tup in result:
+        subj = entities.Ent[entities.Id==tup[0][0]].iloc[0]
+        rel = relations.Rel[relations.Id==tup[0][1]].iloc[0]
+        obj = entities.Ent[entities.Id==tup[0][2]].iloc[0]
+        score = float(tup[1])
+        readable_result.append((subj, rel, obj, score))
+
+    return readable_result
 
 
 def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
@@ -166,9 +220,6 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
                        key=os.path.getctime)
         entity = max([file for file in files if re.search('entity', file)],
                        key=os.path.getctime)
-        print(files)
-        print(relation)
-        print(entity)
 
     with open(relation, 'r') as rel_file:
         # skips first line in text
@@ -239,6 +290,7 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
 def run(args_dict):
     # setup
     timestamp = datetime.now().strftime('%d%b%Y-%H:%M:%S')
+    verbose = args_dict['verbose']
 
     if args_dict['threshold'] is None:
         threshold = 0.1
@@ -313,23 +365,37 @@ def run(args_dict):
         if not args_dict['search']:
             raise Exception('You need to provide a search term.')
         else:
+            parser = StanfordParser()
+
+            glove = loadGloveModel(args_dict['glove'], verbose)
+
+            # identify files for use
+            files = glob.glob(os.path.join(con.get_in_path(),'*.txt'))
+            rel_file = max([file for file in files if re.search('relation', file)],
+                           key=os.path.getctime)
+            ent_file = max([file for file in files if re.search('entity', file)],
+                           key=os.path.getctime)
+
+            entities = pd.read_csv(ent_file, sep='\t', 
+                                   names=["Ent","Id"], skiprows=1)
+            relations = pd.read_csv(rel_file, sep='\t', 
+                                    names=["Rel","Id"], skiprows=1)
+
             if os.path.exists(args_dict['search']):
                 queries = pd.read_csv(args_dict['search'])
 
-                query = lambda z: {x:y 
-                                   for x, y 
-                                   in zip(['subject','relation','object'],
-                                          z.split()[:3])}
+                parse = lambda z: stanford_parse(parser, z).get_rdfs(use_tokens=False, 
+                                                                     how='list')[0]
+                triples = queries.Query.apply(parse)
 
-                triples = queries.Annotations.apply(lambda x: query(x))
-                results = triples.apply(lambda x: get_answers(con, x, 
+                results = triples.apply(lambda x: get_answers(con, x, glove, 
+                                                              entities, 
+                                                              relations,
                                                               num_top_rel, 
                                                               threshold))
-                # results = triples.apply(lambda x: predict(con, 
-                #                                           *x, 
-                #                                           num_top_rel, 
-                #                                           threshold))
-                results.to_csv(os.path.join(args_dict['dir'],"results.csv"))
+                queries['results'] = results
+                queries.to_csv(os.path.join(args_dict['dir'],
+                               "query_results.csv"), index=False)
             else:
                 predicted_object(con, 
                                  args_dict['search'], 
@@ -338,6 +404,11 @@ def run(args_dict):
 
 
 
+            #
+            # Keeping in comments for now - not sure what visuals we may want 
+            # with our output.
+            # 
+            
             # # create network graph
             # with open(os.path.join(args_dict['out'],'network_{}_{}.json'
             #           .format(args_dict['search'].replace(' ', '-'),
@@ -383,7 +454,7 @@ def set_model_choice(model):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Map queries to knowledge graph.')
-    parser.add_argument('-d', '--dir', required=True, help='Path to data '
+    parser.add_argument('-d', '--dir', required=True, help='Path to index data '
                         'directory.')
     parser.add_argument('-f', '--filetime', required=False, help='Timestamp '
                         'appended to desired file for use; if none, the '
@@ -392,13 +463,17 @@ if __name__ == '__main__':
                         'complex', 'distmult', 'hole', 'rescal', 'transd',
                         'transe', 'transh', 'transr'], help='Model selection '
                         'for knowledge embedding.')
-    parser.add_argument('-o', '--out', required=True, help='Path to output '
-                        'directory.')
+    parser.add_argument('-o', '--out', required=True, help='Path to models '
+                        'output directory.')
+    parser.add_argument('-g', '--glove', required=False, help='Path to GloVe '
+                        'embeddings model file.')
     parser.add_argument('-r', '--run', required=True, choices=['fit', 'model'],
                         help='Identify choice of action, fitting a model or '
                         'predicting from it.')
     parser.add_argument('-t', '--threshold', required=False, 
                         help='Threshold accuracy for matches; default is 0.1.')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Print verbose output on progress.')
     parser.add_argument('-n', '--num_top_rel', required=False, 
                         help='Number of top matches to return; default is 10.')
     parser.add_argument('-s', '--search', required=False, 
