@@ -42,9 +42,6 @@ def run(args_dict):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fetcher to retrieve articles '
                                      'for modeling.')
-    parser.add_argument('-p', '--pubmed', required=False, nargs=2, help='API '
-                        'keys needed to access Pubmed; enter as email address '
-                        'and API key.')
     parser.add_argument('-s', '--sources', required=True, choices=['pubmed',
                         'arxiv'], nargs='*', help='Select a source for article '
                         'retrieval.')
