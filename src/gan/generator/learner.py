@@ -70,8 +70,8 @@ class Learner(object):
                     tgt_action_seq = inputs[1]
                     tgt_action_seq_type = inputs[2]
 
-                    for i in xrange(cur_batch_size):
-                        for t in xrange(tgt_action_seq[i].shape[0]):
+                    for i in range(cur_batch_size):
+                        for t in range(tgt_action_seq[i].shape[0]):
                             if tgt_action_seq_type[i, t, 2] == 1:
                                 # can only be copied
                                 if tgt_action_seq_type[i, t, 1] == 0:
@@ -92,7 +92,7 @@ class Learner(object):
                 if batch_index == 4:
                     elapsed = time.time() - begin_time
                     eta = nb_train_sample / (cum_nb_examples / elapsed)
-                    print ', eta %ds' % (eta)
+                    print((', eta %ds' % (eta)))
                     sys.stdout.flush()
 
                 if cum_updates % config.valid_per_batch == 0:
@@ -186,7 +186,7 @@ class DataIterator:
 
         return batch, batch_ids
 
-    def next(self):
+    def __next__(self):
         if self.buffer:
             return self.next_batch()
         else:

@@ -1,4 +1,4 @@
-from __future__ import division
+
 import copy
 
 import nltk
@@ -35,7 +35,7 @@ class Action(object):
 
     def __repr__(self):
         data_str = self.data if not isinstance(self.data, dict) else \
-            ', '.join(['%s: %s' % (k, v) for k, v in self.data.iteritems()])
+            ', '.join(['%s: %s' % (k, v) for k, v in list(self.data.items())])
         repr_str = 'Action{%s}[%s]' % (ACTION_NAMES[self.act_type], data_str)
 
         return repr_str
@@ -77,13 +77,13 @@ class Vocab(object):
         return len(self.token_id_map)
 
     def __iter__(self):
-        return self.token_id_map.iterkeys()
+        return iter(list(self.token_id_map.keys()))
 
     def iteritems(self):
-        return self.token_id_map.iteritems()
+        return iter(list(self.token_id_map.items()))
 
     def complete(self):
-        self.id_token_map = dict((v, k) for (k, v) in self.token_id_map.iteritems())
+        self.id_token_map = dict((v, k) for (k, v) in list(self.token_id_map.items()))
 
     def get_token(self, token_id):
         return self.id_token_map[token_id]
@@ -112,10 +112,10 @@ def gen_vocab(tokens, vocab_size=3000, freq_cutoff=5):
     for token in tokens:
         word_freq[token] += 1
 
-    print 'total num. of tokens: %d' % len(word_freq)
+    print(('total num. of tokens: %d' % len(word_freq)))
 
     words_freq_cutoff = [w for w in word_freq if word_freq[w] >= freq_cutoff]
-    print 'num. of words appear at least %d: %d' % (freq_cutoff, len(words_freq_cutoff))
+    print(('num. of words appear at least %d: %d' % (freq_cutoff, len(words_freq_cutoff))))
 
     ranked_words = sorted(words_freq_cutoff, key=word_freq.get, reverse=True)[:vocab_size-2]
     ranked_words = set(ranked_words)
@@ -177,7 +177,7 @@ class DataSet:
             example_copy = self.examples[eid].copy()
             dataset.add(example_copy)
 
-        for k, v in self.data_matrix.iteritems():
+        for k, v in list(self.data_matrix.items()):
             dataset.data_matrix[k] = v[ids]
 
         return dataset
@@ -585,7 +585,7 @@ def check_terminals():
                     invalid_terminals.add(leaf_token)
             else:
                 if isinstance(leaf_token, str):
-                    print leaf_token
+                    print(leaf_token)
 
         # if not_included:
         #     print str(i) + '---' + ', '.join(not_included)
@@ -668,7 +668,7 @@ def canonicalize_example(query, code):
     canonical_query, str_map = canonicalize_query(query)
     canonical_code = code
 
-    for str_literal, str_repr in str_map.iteritems():
+    for str_literal, str_repr in list(str_map.items()):
         canonical_code = canonical_code.replace(str_literal, '\'' + str_repr + '\'')
 
     canonical_code = make_it_compilable(canonical_code)
@@ -717,7 +717,7 @@ def process_query(query, code):
     # clean the annotation
     # query = query.replace('.', ' . ')
 
-    for k, v in str_map.iteritems():
+    for k, v in list(str_map.items()):
         if k == '\'%s\'' or k == '\"%s\"':
             query = query.replace(v, k)
             code = code.replace('\'' + v + '\'', k)
@@ -761,13 +761,13 @@ def preprocess_dataset(annot_file, code_file):
             f_annot.write('example# %d\n' % idx)
             f_annot.write(' '.join(clean_query_tokens) + '\n')
             f_annot.write('%d\n' % len(str_map))
-            for k, v in str_map.iteritems():
+            for k, v in list(str_map.items()):
                 f_annot.write('%s ||| %s\n' % (k, v))
 
             f_code.write('example# %d\n' % idx)
             f_code.write(clean_code + '\n')
         except:
-            print code
+            print(code)
             err_num += 1
 
         idx += 1
@@ -777,8 +777,8 @@ def preprocess_dataset(annot_file, code_file):
 
     # serialize_to_file(examples, 'django.cleaned.bin')
 
-    print 'error num: %d' % err_num
-    print 'preprocess_dataset: cleaned example num: %d' % len(examples)
+    print(('error num: %d' % err_num))
+    print(('preprocess_dataset: cleaned example num: %d' % len(examples)))
 
     return examples
 

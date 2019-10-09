@@ -1,6 +1,6 @@
-from __future__ import absolute_import
 
-import cPickle
+
+import pickle
 import h5py
 import numpy as np
 from collections import defaultdict
@@ -73,14 +73,14 @@ def load_array(name):
     return a
 
 
-def serialize_to_file(obj, path, protocol=cPickle.HIGHEST_PROTOCOL):
+def serialize_to_file(obj, path, protocol=pickle.HIGHEST_PROTOCOL):
     f = open(path, 'wb')
-    cPickle.dump(obj, f, protocol=protocol)
+    pickle.dump(obj, f, protocol=protocol)
     f.close()
 
 
 def deserialize_from_file(path):
     f = open(path, 'rb')
-    obj = cPickle.load(f)
+    obj = pickle.load(f)
     f.close()
     return obj

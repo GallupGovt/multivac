@@ -46,7 +46,7 @@ def run(args_dict):
     # This may signal some weirdness with this "config" module...
     # 
     config_module = sys.modules['config']
-    for name, value in vars(args_dict).iteritems():
+    for name, value in list(vars(args_dict).items()):
         setattr(config_module, name, value)
 
     # get dataset statistics
@@ -125,7 +125,7 @@ def run(args_dict):
         assert model is not None
 
         while True:
-            cmd = raw_input('example id or query: ')
+            cmd = eval(input('example id or query: '))
             if args_dict['mode'] == 'dataset':
                 try:
                     example_id = int(cmd)
@@ -145,7 +145,7 @@ def run(args_dict):
 
             if hasattr(example, 'parse_tree'):
                 print('gold parse tree:')
-                print(example.parse_tree)
+                print((example.parse_tree))
 
             cand_list = model.decode(example, train_data.grammar, 
                                      train_data.terminal_vocab,
@@ -154,29 +154,29 @@ def run(args_dict):
                                      log=True)
 
             has_grammar_error = any([c for c in cand_list if c.has_grammar_error])
-            print('has_grammar_error: ', has_grammar_error)
+            print(('has_grammar_error: ', has_grammar_error))
 
             for cid, cand in enumerate(cand_list[:5]):
-                print('*' * 60)
-                print('cand #%d, score: %f' % (cid, cand.score))
+                print(('*' * 60))
+                print(('cand #%d, score: %f' % (cid, cand.score)))
 
                 try:
                     ast_tree = decode_tree_to_python_ast(cand.tree)
                     code = astor.to_source(ast_tree)
-                    print('code: ', code)
-                    print('decode log: ', cand.log)
+                    print(('code: ', code))
+                    print(('decode log: ', cand.log))
                 except:
                     print("Exception in converting tree to code:")
-                    print('-' * 60)
-                    print('raw_id: %d, beam pos: %d' % (example.raw_id, cid))
+                    print(('-' * 60))
+                    print(('raw_id: %d, beam pos: %d' % (example.raw_id, cid)))
                     traceback.print_exc(file=sys.stdout)
-                    print('-' * 60)
+                    print(('-' * 60))
                 finally:
                     print('* parse tree *')
-                    print(cand.tree.__repr__())
-                    print('n_timestep: %d' % cand.n_timestep)
-                    print('ast size: %d' % cand.tree.size)
-                    print('*' * 60)
+                    print((cand.tree.__repr__()))
+                    print(('n_timestep: %d' % cand.n_timestep))
+                    print(('ast size: %d' % cand.tree.size))
+                    print(('*' * 60))
 
 
 if __name__ == '__main__':

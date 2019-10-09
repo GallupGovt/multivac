@@ -1,4 +1,4 @@
-from __future__ import absolute_import
+
 import numpy as np
 import time
 import sys
@@ -27,23 +27,23 @@ def make_tuple(*args):
 def printv(v, prefix=''):
     if type(v) == dict:
         if 'name' in v:
-            print(prefix + '#' + v['name'])
+            print((prefix + '#' + v['name']))
             del v['name']
         prefix += '...'
-        for nk, nv in v.items():
+        for nk, nv in list(v.items()):
             if type(nv) in [dict, list]:
-                print(prefix + nk + ':')
+                print((prefix + nk + ':'))
                 printv(nv, prefix)
             else:
-                print(prefix + nk + ':' + str(nv))
+                print((prefix + nk + ':' + str(nv)))
     elif type(v) == list:
         prefix += '...'
         for i, nv in enumerate(v):
-            print(prefix + '#' + str(i))
+            print((prefix + '#' + str(i)))
             printv(nv, prefix)
     else:
         prefix += '...'
-        print(prefix + str(v))
+        print((prefix + str(v)))
 
 
 def make_batches(size, batch_size):

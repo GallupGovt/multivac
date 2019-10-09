@@ -22,15 +22,15 @@ def decode_python_dataset(model, dataset, verbose=True):
                 exg_decode_results.append((cid, cand, ast_tree, code))
             except:
                 if verbose:
-                    print "Exception in converting tree to code:"
-                    print '-' * 60
-                    print 'raw_id: %d, beam pos: %d' % (example.raw_id, cid)
+                    print("Exception in converting tree to code:")
+                    print(('-' * 60))
+                    print(('raw_id: %d, beam pos: %d' % (example.raw_id, cid)))
                     traceback.print_exc(file=sys.stdout)
-                    print '-' * 60
+                    print(('-' * 60))
 
         cum_num += 1
         if cum_num % 50 == 0 and verbose:
-            print '%d examples so far ...' % cum_num
+            print(('%d examples so far ...' % cum_num))
 
         decode_results.append(exg_decode_results)
 
@@ -54,15 +54,15 @@ def decode_ifttt_dataset(model, dataset, verbose=True):
                 exg_decode_results.append((cid, cand))
             except:
                 if verbose:
-                    print "Exception in converting tree to code:"
-                    print '-' * 60
-                    print 'raw_id: %d, beam pos: %d' % (example.raw_id, cid)
+                    print("Exception in converting tree to code:")
+                    print(('-' * 60))
+                    print(('raw_id: %d, beam pos: %d' % (example.raw_id, cid)))
                     traceback.print_exc(file=sys.stdout)
-                    print '-' * 60
+                    print(('-' * 60))
 
         cum_num += 1
         if cum_num % 50 == 0 and verbose:
-            print '%d examples so far ...' % cum_num
+            print(('%d examples so far ...' % cum_num))
 
         decode_results.append(exg_decode_results)
 

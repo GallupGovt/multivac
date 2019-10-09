@@ -41,7 +41,7 @@ class Grammar(object):
         for gid, rule in enumerate(rules, start=0):
             self.rule_to_id[rule] = gid
 
-        self.id_to_rule = OrderedDict((v, k) for (k, v) in self.rule_to_id.items())
+        self.id_to_rule = OrderedDict((v, k) for (k, v) in list(self.rule_to_id.items()))
 
         logging.info('num. rules: %d', len(self.rules))
         logging.info('num. types: %d', len(self.node_type_to_id))

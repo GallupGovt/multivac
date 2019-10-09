@@ -9,9 +9,8 @@ class MetaConfig(type):
         config._config[key] = value
 
 
-class config(object):
+class config(object, metaclass=MetaConfig):
     _config = {}
-    __metaclass__ = MetaConfig
 
     @staticmethod
     def set(key, val):
@@ -24,5 +23,5 @@ class config(object):
 
         logging.info('use configuration: %s', file)
         data = {}
-        execfile(file, data)
+        exec(compile(open(file, "rb").read(), file, 'exec'), data)
         config._config = data['config']

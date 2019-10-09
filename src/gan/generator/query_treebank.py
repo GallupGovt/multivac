@@ -1,18 +1,16 @@
 
 import argparse
 import re
-import spacy
-from benepar.spacy_plugin import BeneparComponent
 
 from NL2code.lang.eng.grammar import EnglishGrammar
 from NL2code.astnode import *
 
-nlp = spacy.load('en')
-nlp.add_pipe(BeneparComponent('benepar_en'))
+from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+
 
 def check_parse(query):
     parseable = True
-    toks = [x.pos_.upper() for x in query]
+    toks = [x.pos_.upper() for x in query.tokens]
 
     if 'AUX' in toks:
         pass
@@ -27,7 +25,7 @@ def clean_queries(queries, verbose=False):
     clean_queries = list()
 
     if verbose:
-        print("Performing basic clean on {} queries.".format(len(queries)))
+        print(("Performing basic clean on {} queries.".format(len(queries))))
 
     for text in queries:
         text = re.sub(r"^\W+|[^\w{W}(?<!?)]+$", "", text)
@@ -36,7 +34,7 @@ def clean_queries(queries, verbose=False):
             clean_queries.append(text)
 
     if verbose:
-        print("{} cleaned queries remaining.".format(len(queries)))
+        print(("{} cleaned queries remaining.".format(len(queries))))
 
     return clean_queries
 
@@ -62,18 +60,18 @@ def get_eng_tree(text, depth=0, debug=False):
         you)) (VP (VBP are) (ADJP (JJ near))))))) (. ?))'
     '''
 
-    if debug: print("\t" * depth + "String: '{}'".format(text))
+    if debug: print(("\t" * depth + "String: '{}'".format(text)))
 
     try:
         tree_str = text[text.index("(") + 1:text.rfind(")")]
     except ValueError:
-        print("Malformatted parse string: '{}'".format(text))
+        print(("Malformatted parse string: '{}'".format(text)))
         raise ValueError
 
     next_idx = tree_str.index(" ") + 1
 
     tree = ASTNode(tree_str[:next_idx - 1])
-    if debug: print("\t" * depth + "Type: '{}'".format(tree.type))
+    if debug: print(("\t" * depth + "Type: '{}'".format(tree.type)))
 
     if "(" in tree_str:
         while "(" in tree_str:
@@ -85,7 +83,7 @@ def get_eng_tree(text, depth=0, debug=False):
             tree_str = tree_str[next_idx:]
     else:
         tree.value = tree_str[next_idx:]
-        if debug: print("\t" * depth + "Value: " + tree.value)
+        if debug: print(("\t" * depth + "Value: " + tree.value))
 
     return tree
 
@@ -102,23 +100,17 @@ def get_grammar(parse_trees, verbose=False):
     grammar = EnglishGrammar(rules)
 
     if verbose:
-        print('num. rules: %d', len(rules))
+        print(('num. rules: %d', len(rules)))
 
     return grammar
-
-def get_parse(s):
-    if isinstance(s, str):
-        s = list(nlp(s).sents)[0]
-
-    parse_string = "(ROOT " + s._.parse_string + ")"
-
-    return parse_string
 
 
 def run(args_dict):
     verbose = args_dict['verbose']
     parse_trees = list()
     rules = set()
+
+    parser = StanfordParser(annots = "tokenize pos lemma ner parse")
 
     with open(args_dict['queries'], 'r') as f:
         queries = f.readlines()
@@ -129,20 +121,20 @@ def run(args_dict):
     if verbose:
         print("Performing constituency parsing of queries")
 
-    doc = nlp('\n'.join(queries))
+    for query in queries:
+        query = stanford_parse(parser, query)
 
-    for query in doc.sents:
         if not check_parse(query):
             continue
 
         try:
-            parse_trees.append(get_eng_tree(get_parse(query)))
+            parse_trees.append(get_eng_tree(query.parse_string))
         except:
-            print("Could not parse query: '{}'".format(query))
+            print(("Could not parse query: '{}'".format(query)))
             continue
 
     if verbose:
-        print("{} queries successfully parsed.".format(len(parse_trees)))
+        print(("{} queries successfully parsed.".format(len(parse_trees))))
         print("Extracting grammar production rules.")
 
     for parse_tree in parse_trees:

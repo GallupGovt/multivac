@@ -1,6 +1,6 @@
 # -*- coding: UTF-8 -*-
 
-from __future__ import division
+
 import os
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 import logging
@@ -136,7 +136,7 @@ def evaluate_decode_results(dataset, decode_results, verbose=True):
             pred_code_for_bleu = de_canonicalize_code(code, example.meta_data['raw_code'])
             # ref_code_for_bleu = de_canonicalize_code(ref_code_for_bleu, example.meta_data['raw_code'])
             # convert canonicalized code to raw code
-            for literal, place_holder in example.meta_data['str_map'].iteritems():
+            for literal, place_holder in list(example.meta_data['str_map'].items()):
                 pred_code_for_bleu = pred_code_for_bleu.replace('\'' + place_holder + '\'', literal)
                 # ref_code_for_bleu = ref_code_for_bleu.replace('\'' + place_holder + '\'', literal)
         elif config.data_type == 'hs':
@@ -173,7 +173,7 @@ def evaluate_decode_results(dataset, decode_results, verbose=True):
         #    pass
 
         if verbose:
-            print 'raw_id: %d, bleu_score: %f' % (example.raw_id, bleu_score)
+            print(('raw_id: %d, bleu_score: %f' % (example.raw_id, bleu_score)))
 
             f_decode.write('-' * 60 + '\n')
             f_decode.write('example_id: %d\n' % example.raw_id)
@@ -218,7 +218,7 @@ def evaluate_decode_results(dataset, decode_results, verbose=True):
                 if config.data_type == 'django':
                     pred_code_for_bleu = de_canonicalize_code(code, example.meta_data['raw_code'])
                     # convert canonicalized code to raw code
-                    for literal, place_holder in example.meta_data['str_map'].iteritems():
+                    for literal, place_holder in list(example.meta_data['str_map'].items()):
                         pred_code_for_bleu = pred_code_for_bleu.replace('\'' + place_holder + '\'', literal)
                 elif config.data_type == 'hs':
                     pred_code_for_bleu = code
@@ -355,7 +355,7 @@ def analyze_decode_results(dataset, decode_results, verbose=True):
             pred_code_for_bleu = de_canonicalize_code(code, example.meta_data['raw_code'])
             # ref_code_for_bleu = de_canonicalize_code(ref_code_for_bleu, example.meta_data['raw_code'])
             # convert canonicalized code to raw code
-            for literal, place_holder in example.meta_data['str_map'].iteritems():
+            for literal, place_holder in list(example.meta_data['str_map'].items()):
                 pred_code_for_bleu = pred_code_for_bleu.replace('\'' + place_holder + '\'', literal)
                 # ref_code_for_bleu = ref_code_for_bleu.replace('\'' + place_holder + '\'', literal)
         elif config.data_type == 'hs':
@@ -379,7 +379,7 @@ def analyze_decode_results(dataset, decode_results, verbose=True):
         #    pass
 
         if verbose:
-            print 'raw_id: %d, bleu_score: %f' % (example.raw_id, bleu_score)
+            print(('raw_id: %d, bleu_score: %f' % (example.raw_id, bleu_score)))
 
             f_decode.write('-' * 60 + '\n')
             f_decode.write('example_id: %d\n' % example.raw_id)
@@ -420,7 +420,7 @@ def analyze_decode_results(dataset, decode_results, verbose=True):
                 if config.data_type == 'django':
                     pred_code_for_bleu = de_canonicalize_code(code, example.meta_data['raw_code'])
                     # convert canonicalized code to raw code
-                    for literal, place_holder in example.meta_data['str_map'].iteritems():
+                    for literal, place_holder in list(example.meta_data['str_map'].items()):
                         pred_code_for_bleu = pred_code_for_bleu.replace('\'' + place_holder + '\'', literal)
                 elif config.data_type == 'hs':
                     pred_code_for_bleu = code
@@ -468,7 +468,7 @@ def analyze_decode_results(dataset, decode_results, verbose=True):
         avg_acc = np.average([t[1] for t in entry])
         avg_oracle_bleu = np.average([t[2] for t in entry])
         avg_oracle_acc = np.average([t[3] for t in entry])
-        print binned_key, avg_bleu, avg_acc, avg_oracle_bleu, avg_oracle_acc, len(entry)
+        print((binned_key, avg_bleu, avg_acc, avg_oracle_bleu, avg_oracle_acc, len(entry)))
 
         Y[0].append(avg_bleu)
         Y[1].append(avg_acc)
@@ -537,7 +537,7 @@ def evaluate_seq2seq_decode_results(dataset, seq2seq_decode_file, seq2seq_ref_fi
     ref_code_data = [l.strip() for l in f_seq2seq_ref.readlines()]
 
     if is_nbest:
-        for i in xrange(len(decode_file_data)):
+        for i in range(len(decode_file_data)):
             d = decode_file_data[i].split(' ||| ')
             decode_file_data[i] = (int(d[0]), d[1])
 
@@ -555,7 +555,7 @@ def evaluate_seq2seq_decode_results(dataset, seq2seq_decode_file, seq2seq_ref_fi
 
         if is_nbest:
             # find the best-scored well-formed code from the n-best list
-            n_best_list = filter(lambda x: x[0] == eid, decode_file_data)
+            n_best_list = [x for x in decode_file_data if x[0] == eid]
             code = top_scored_code = n_best_list[0][1]
             for _, hyp in n_best_list:
                 if is_well_formed_python_code(hyp):
@@ -563,10 +563,10 @@ def evaluate_seq2seq_decode_results(dataset, seq2seq_decode_file, seq2seq_ref_fi
                     break
 
             if top_scored_code != code:
-                print '*' * 60
-                print top_scored_code
-                print code
-                print '*' * 60
+                print(('*' * 60))
+                print(top_scored_code)
+                print(code)
+                print(('*' * 60))
 
             code = n_best_list[0][1]
         else:
@@ -585,7 +585,7 @@ def evaluate_seq2seq_decode_results(dataset, seq2seq_decode_file, seq2seq_ref_fi
             pred_code_for_bleu = code # de_canonicalize_code(code, example.meta_data['raw_code'])
             # ref_code_for_bleu = de_canonicalize_code(ref_code_for_bleu, example.meta_data['raw_code'])
             # convert canonicalized code to raw code
-            for literal, place_holder in example.meta_data['str_map'].iteritems():
+            for literal, place_holder in list(example.meta_data['str_map'].items()):
                 pred_code_for_bleu = pred_code_for_bleu.replace('\'' + place_holder + '\'', literal)
                 # ref_code_for_bleu = ref_code_for_bleu.replace('\'' + place_holder + '\'', literal)
         elif config.data_type == 'hs':
@@ -650,7 +650,7 @@ def evaluate_seq2tree_sample_file(sample_file, id_file, dataset):
         #     print i, ref_repr
 
         if i in rare_word_map:
-            for unk_id, w in rare_word_map[i].iteritems():
+            for unk_id, w in list(rare_word_map[i].items()):
                 ref_repr = ref_repr.replace(' str{}{unk_%s} ' % unk_id, ' str{}{%s} ' % w)
                 predict_repr = predict_repr.replace(' str{}{unk_%s} ' % unk_id, ' str{}{%s} ' % w)
 
@@ -658,8 +658,8 @@ def evaluate_seq2tree_sample_file(sample_file, id_file, dataset):
             parse_tree = seq2tree_repr_to_ast_tree(predict_repr)
             merge_broken_value_nodes(parse_tree)
         except:
-            print 'error when converting:'
-            print predict_repr
+            print('error when converting:')
+            print(predict_repr)
             convert_error_num += 1
             continue
 
@@ -676,11 +676,11 @@ def evaluate_seq2tree_sample_file(sample_file, id_file, dataset):
             ast_tree = decode_tree_to_python_ast(parse_tree)
             code = astor.to_source(ast_tree).strip()
         except:
-            print "Exception in converting tree to code:"
-            print '-' * 60
-            print 'line id: %d' % i
+            print("Exception in converting tree to code:")
+            print(('-' * 60))
+            print(('line id: %d' % i))
             traceback.print_exc(file=sys.stdout)
-            print '-' * 60
+            print(('-' * 60))
             convert_error_num += 1
             continue
 
@@ -688,7 +688,7 @@ def evaluate_seq2tree_sample_file(sample_file, id_file, dataset):
             ref_code_for_bleu = example.meta_data['raw_code']
             pred_code_for_bleu = de_canonicalize_code(code, example.meta_data['raw_code'])
             # convert canonicalized code to raw code
-            for literal, place_holder in example.meta_data['str_map'].iteritems():
+            for literal, place_holder in list(example.meta_data['str_map'].items()):
                 pred_code_for_bleu = pred_code_for_bleu.replace('\'' + place_holder + '\'', literal)
         elif config.data_type == 'hs':
             ref_code_for_bleu = ref_code
@@ -761,7 +761,7 @@ def evaluate_ifttt_results(dataset, decode_results, verbose=True):
             if exact_match:
                 exact_match_ids.append(example.raw_id)
 
-            print 'raw_id: %d, prod_f1: %f' % (example.raw_id, prod_f1)
+            print(('raw_id: %d, prod_f1: %f' % (example.raw_id, prod_f1)))
 
             f_decode.write('-' * 60 + '\n')
             f_decode.write('example_id: %d\n' % example.raw_id)

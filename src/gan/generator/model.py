@@ -359,7 +359,7 @@ class Model:
                 src_token_id[i] = -1
             else: token_set.add(tid)
 
-        for t in xrange(max_time_step):
+        for t in range(max_time_step):
             hyp_num = len(hyp_samples)
             # print 'time step [%d]' % t
             decoder_prev_state = np.array([hyp.state for hyp in hyp_samples]).astype('float32')
@@ -413,7 +413,7 @@ class Model:
             cand_copy_probs = []
             unk_words = []
 
-            for k in xrange(live_hyp_num):
+            for k in range(live_hyp_num):
                 hyp = hyp_samples[k]
 
                 # if k == 0:
@@ -588,13 +588,13 @@ class Model:
         return OrderedDict((p.name, p) for p in self.params)
 
     def pull_params(self):
-        return OrderedDict([(p_name, p.get_value(borrow=False)) for (p_name, p) in self.params_dict.iteritems()])
+        return OrderedDict([(p_name, p.get_value(borrow=False)) for (p_name, p) in list(self.params_dict.items())])
 
     def save(self, model_file, **kwargs):
         logging.info('save model to [%s]', model_file)
 
         weights_dict = self.pull_params()
-        for k, v in kwargs.iteritems():
+        for k, v in list(kwargs.items()):
             weights_dict[k] = v
 
         np.savez(model_file, **weights_dict)
@@ -605,7 +605,7 @@ class Model:
 
         # assert len(weights_dict.files) == len(self.params_dict)
 
-        for p_name, p in self.params_dict.iteritems():
+        for p_name, p in list(self.params_dict.items()):
             if p_name not in weights_dict:
                 raise RuntimeError('parameter [%s] not in saved weights file', p_name)
             else:
