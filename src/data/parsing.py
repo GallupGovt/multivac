@@ -4,7 +4,6 @@ import copy
 import json
 import pickle
 import re as reg
-import spacy
 import stanfordnlp
 
 import multivac.src.data.equationparsing as eq
@@ -319,8 +318,7 @@ def nlp_parse_main(args_dict):
     ''' Main run file that orchestrates everything
     '''
 
-    ## Load NLP engines
-    spacynlp = spacy.load('en_core_web_sm')
+    ## Load NLP engine
     nlp = stanfordnlp.Pipeline(models_dir=settings.stanf_nlp_dir,
                                treebank='en_ewt', use_gpu=False,
                                pos_batch_size=3000)
@@ -338,7 +336,7 @@ def nlp_parse_main(args_dict):
         for i, doc in enumerate(allDocs):
             if i%10==0:
                 print(i)
-            allDocsClean.append(clean_doc(doc, spacynlp))
+            allDocsClean.append(clean_doc(doc))
 
         with open('allDocsClean.pkl', 'wb') as f:
             pickle.dump(allDocsClean, f)

@@ -3,7 +3,7 @@
 import re as reg
 
 
-def clean_doc(doc, spacynlp):
+def clean_doc(doc):
     '''
     Clean individual documents and remove citations, URLs, emails, other
     trivial content. Returns cleaned doc
@@ -51,23 +51,6 @@ def clean_doc(doc, spacynlp):
     for m in reg.finditer(re_sponsors, doc):
         if m.start()>(len(doc)/2):
             doc = reg.sub(re_sponsors, ' ', doc)
-
-    #Handling hyphens - 2-28-2018
-    for m in reg.finditer(re_hyphenatedWords, doc):
-        match=m.group(0)
-
-        mergedWord = match.replace(' ', '').replace('-','')
-        if mergedWord in spacynlp.vocab:
-
-            doc = doc.replace(match, mergedWord)
-        else:
-            allWords = True
-            for i in match.replace(' ', '').split('-'):
-                allWords = allWords and (i in spacynlp.vocab)
-            if allWords:
-                doc = doc.replace(match,(match.replace(' ', '')) )
-            else:
-                doc = doc.replace(match, mergedWord)
 
     #De-dup for PUBMED articles, where the main text is sometimes duplicated
     sliceText = doc[0:500]
