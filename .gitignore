@@ -16,6 +16,8 @@ multivac/
 .env
 src/pubmed-parser
 src/slate
+venv/
+env/
 
 # juypter notebook
 .ipynb_checkpoints

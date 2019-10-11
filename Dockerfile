@@ -5,7 +5,7 @@ FROM ubuntu:latest
 ENV DEBIAN_FRONTEND=noninteractive
 
 # install R and python
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential r-base r-cran-randomforest python3.7 python3-pip python3-setuptools python3-dev git
+RUN apt-get update && apt-get install -y --no-install-recommends build-essential r-base python3.7 python3-pip python3-setuptools python3-dev git
 
 # set working directory to /app
 WORKDIR /app
@@ -13,8 +13,8 @@ WORKDIR /app
 # copy requirements over to application
 COPY requirements.txt /app/requirements.txt
 
-# dummy R installation for testing purposes
-RUN Rscript -e "install.packages('data.table')"
+# set up bdist_wheel
+RUN pip3 install wheel
 
 # install Python dependencies
 RUN pip3 install -r requirements.txt
@@ -26,7 +26,9 @@ RUN git clone https://github.com/thunlp/OpenKE && \
 
 COPY . /app
 
+EXPOSE 5000
+
 ENTRYPOINT ["python3"]
 
 # run
-CMD ["-m", "http.server", "5050"]
+CMD ["app.py"]

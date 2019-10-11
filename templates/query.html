@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}
+<div>
+	<h1>Gallup - MULTIVAC</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div>
+	<form method="GET" action="/results">
+	  Input1:<br>
+	  <input type="text" name="input-1"><br><br>
+	  Input2:<br>
+	  <input type="text" name="input-2"><br><br>
+	  <input type="submit">
+	</form>
+</div>
+{% endblock %}

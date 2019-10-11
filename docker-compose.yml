@@ -3,13 +3,13 @@ services:
   multivac:
     build: .
     ports:
-    - "5050:5050"
+    - 5000:5000
   stanfordnlp:
     image: graham3333/corenlp-complete
     ports:
-    - "9000:9000"
+    - 9000:9000
   grobid:
     image: lfoppiano/grobid:0.5.5
     ports:
-    - "8070:8070"
-    - "8071:8071"
+    - 8070:8070
+    - 8071:8071
