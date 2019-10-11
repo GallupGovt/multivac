@@ -20,9 +20,7 @@ RUN pip3 install wheel
 RUN pip3 install -r requirements.txt
 
 # install do
-RUN git clone https://github.com/thunlp/OpenKE && \
-    cd OpenKE && \
-    sh make.sh
+RUN git clone https://github.com/thunlp/OpenKE && cd OpenKE && sh make.sh
 
 COPY . /app
 
