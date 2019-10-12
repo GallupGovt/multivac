@@ -1,8 +1,10 @@
 from collections import OrderedDict, defaultdict
 import logging
 
-from NL2code.astnode import ASTNode
-from NL2code.lang.util import typename
+#from NL2code.astnode import ASTNode
+from src.gan.generator.astnode import ASTNode
+#from NL2code.lang.util import typename
+from src.gan.generator.lang.util import typename
 
 class Grammar(object):
     def __init__(self, rules):

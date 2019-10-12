@@ -2,7 +2,7 @@ from collections import namedtuple
 from collections import Iterable, OrderedDict, defaultdict
 from io import StringIO
 
-from .lang.util import typename
+from lang.util import typename
 
 class ASTNode(object):
     def __init__(self, node_type, label=None, value=None, children=None):

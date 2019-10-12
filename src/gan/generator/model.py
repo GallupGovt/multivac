@@ -17,12 +17,12 @@ import nn.initializations as initializations
 from nn.activations import softmax
 from nn.utils.theano_utils import *
 
-from config import config_info
+#from config import config_info
 import config
 from lang.grammar import Grammar
 from parse import *
 from astnode import *
-from util import is_numeric
+#from util import is_numeric
 from components import Hyp, PointerNet, CondAttLSTM
 
 sys.setrecursionlimit(50000)

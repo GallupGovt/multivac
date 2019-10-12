@@ -188,8 +188,9 @@ if __name__ == '__main__':
                         help='Config file with updated parameters for generator;'
                              'defaults to "config.cfg" in this directory '
                              'otherwise.')
+    import ipdb; ipdb.set_trace()
 
-    args = parser.parse_args()
+    args_dict = parser.parse_args()
 
     cfg = configparser.ConfigParser()
     cfgDIR = os.path.dirname(os.path.realpath(__file__))
