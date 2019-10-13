@@ -25,10 +25,7 @@ def run(args_dict):
         os.makedirs(args_dict['output_dir'])
 
     np.random.seed(args_dict['random_seed'])
-    init_logging(os.path.join(args_dict['output_dir'], 'parser.log'), logging.INFO)
-    logging.info('command line: %s', ' '.join(sys.argv))
 
-    logging.info('loading dataset [%s]', args_dict['data'])
     train_data, dev_data, test_data = deserialize_from_file(args_dict['data'])
 
     if not args_dict['source_vocab_size']:
@@ -40,24 +37,12 @@ def run(args_dict):
     if not args_dict['node_num']:
         args_dict['node_num'] = len(train_data.grammar.node_type_to_id)
 
-    logging.info('current config: %s', args_dict)
-
     # 
     # This may signal some weirdness with this "config" module...
     # 
     config_module = sys.modules['config']
     for name, value in list(vars(args_dict).items()):
         setattr(config_module, name, value)
-
-    # get dataset statistics
-    avg_action_num = np.average([len(e.actions) for e in train_data.examples])
-    logging.info('avg_action_num: %d', avg_action_num)
-
-    logging.info('grammar rule num.: %d', len(train_data.grammar.rules))
-    logging.info('grammar node type num.: %d', len(train_data.grammar.node_type_to_id))
-
-    logging.info('source vocab size: %d', train_data.annot_vocab.size)
-    logging.info('target vocab size: %d', train_data.terminal_vocab.size)
 
     if args_dict['operation'] in ['train', 'decode', 'interactive']:
         model = Model()
@@ -197,7 +182,7 @@ if __name__ == '__main__':
     if args_dict['config'] is not None:
         cfg.read(args_dict['config'])
     else:
-        cfg.read(os.path.join(cfgDIR / 'config.cfg'))
+        cfg.read(os.path.join(cfgDIR, 'config.cfg'))
 
     cfg_dict = cfg['ARGS']
 

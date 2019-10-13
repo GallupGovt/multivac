@@ -1,8 +1,46 @@
 from collections import OrderedDict, defaultdict
-import logging
 
-from NL2code.astnode import ASTNode
-from NL2code.lang.util import typename
+from multivac.src.gan.generator.astnode import ASTNode
+from multivac.src.gan.generator.lang.util import typename
+
+TERMINAL_TYPES = {
+    'CC',    # Coordinating conjunction
+    'CD',    # Cardinal number
+    'DT',    # Determiner
+    'EX',    # Existential there
+    'FW',    # Foreign word
+    'IN',    # Preposition or subordinating conjunction
+    'JJ',    # Adjective
+    'JJR',   # Adjective, comparative
+    'JJS',   # Adjective, superlative
+    'LS',    # List item marker
+    'MD',    # Modal
+    'NN',    # Noun, singular or mass
+    'NNS',   # Noun, plural
+    'NNP',   # Proper noun, singular
+    'NNPS',  # Proper noun, plural
+    'PDT',   # Predeterminer
+    'POS',   # Possessive ending
+    'PRP',   # Personal pronoun
+    'PRP$',  # Possessive pronoun (prolog version PRP-S)
+    'RB',    # Adverb
+    'RBR',   # Adverb, comparative
+    'RBS',   # Adverb, superlative
+    'RP',    # Particle
+    'SYM',   # Symbol
+    'TO',    # to
+    'UH',    # Interjection
+    'VB',    # Verb, base form
+    'VBD',   # Verb, past tense
+    'VBG',   # Verb, gerund or present participle
+    'VBN',   # Verb, past participle
+    'VBP',   # Verb, non-3rd person singular present
+    'VBZ',   # Verb, 3rd person singular present
+    'WDT',   # Wh-determiner
+    'WP',    # Wh-pronoun
+    'WP$',   # Possessive wh-pronoun (prolog version WP-S)
+    'WRB'    # Wh-adverb
+}
 
 class Grammar(object):
     def __init__(self, rules):
@@ -16,6 +54,7 @@ class Grammar(object):
         node_types = set()
         lhs_nodes = set()
         rhs_nodes = set()
+
         for rule in self.rules:
             self.rule_index[rule.parent].append(rule)
 
@@ -24,6 +63,7 @@ class Grammar(object):
                 node_types.add(typename(node.type))
 
             lhs_nodes.add(rule.parent)
+
             for child in rule.children:
                 rhs_nodes.add(child.as_type_node)
 
@@ -33,6 +73,7 @@ class Grammar(object):
 
         self.terminal_nodes = rhs_nodes - lhs_nodes
         self.terminal_types = set([n.type for n in self.terminal_nodes])
+        self.terminal_types.update(TERMINAL_TYPES)
 
         self.node_type_to_id = OrderedDict()
         for i, type in enumerate(node_types, start=0):
@@ -42,11 +83,6 @@ class Grammar(object):
             self.rule_to_id[rule] = gid
 
         self.id_to_rule = OrderedDict((v, k) for (k, v) in list(self.rule_to_id.items()))
-
-        logging.info('num. rules: %d', len(self.rules))
-        logging.info('num. types: %d', len(self.node_type_to_id))
-        logging.info('root: %s', self.root_node)
-        logging.info('terminals: %s', ', '.join(repr(n) for n in self.terminal_nodes))
 
     def __iter__(self):
         return self.rules.__iter__()
@@ -77,4 +113,4 @@ class Grammar(object):
         return node.type in self.terminal_types
 
     def is_value_node(self, node):
-        raise NotImplementedError
+        return node.type in self.terminal_types

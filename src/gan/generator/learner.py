@@ -41,8 +41,6 @@ class Learner(object):
         history_valid_acc = []
         best_model_params = best_model_by_acc = best_model_by_bleu = None
 
-        # train_data_iter = DataIterator(self.train_data, batch_size)
-
         for epoch in range(nb_epoch):
             # train_data_iter.reset()
             # if shuffle:
@@ -57,7 +55,6 @@ class Learner(object):
             loss = 0.0
 
             for batch_index, (batch_start, batch_end) in enumerate(batches):
-            # for batch_index, (examples, batch_ids) in enumerate(train_data_iter):
                 cum_updates += 1
 
                 batch_ids = index_array[batch_start:batch_end]
@@ -98,32 +95,28 @@ class Learner(object):
                 if cum_updates % config.valid_per_batch == 0:
                     logging.info('begin validation')
 
-                    if config.data_type == 'ifttt':
-                        decode_results = decoder.decode_ifttt_dataset(self.model, self.val_data, verbose=False)
-                        channel_acc, channel_func_acc, prod_f1 = evaluation.evaluate_ifttt_results(self.val_data, decode_results, verbose=False)
+                    # Need ENGLISH version of this!!
+                    decode_results = decoder.decode_python_dataset(self.model, 
+                                                                   self.val_data, 
+                                                                   verbose=False)
+                    bleu, accuracy = evaluation.evaluate_decode_results(self.val_data, 
+                                                                        decode_results, 
+                                                                        verbose=False)
 
-                        val_perf = channel_func_acc
-                        logging.info('channel accuracy: %f', channel_acc)
-                        logging.info('channel+func accuracy: %f', channel_func_acc)
-                        logging.info('prod F1: %f', prod_f1)
-                    else:
-                        decode_results = decoder.decode_python_dataset(self.model, self.val_data, verbose=False)
-                        bleu, accuracy = evaluation.evaluate_decode_results(self.val_data, decode_results, verbose=False)
+                    val_perf = eval(config.valid_metric)
 
-                        val_perf = eval(config.valid_metric)
+                    logging.info('avg. example bleu: %f', bleu)
+                    logging.info('accuracy: %f', accuracy)
 
-                        logging.info('avg. example bleu: %f', bleu)
-                        logging.info('accuracy: %f', accuracy)
+                    if len(history_valid_acc) == 0 or accuracy > np.array(history_valid_acc).max():
+                        best_model_by_acc = self.model.pull_params()
+                        # logging.info('current model has best accuracy')
+                    history_valid_acc.append(accuracy)
 
-                        if len(history_valid_acc) == 0 or accuracy > np.array(history_valid_acc).max():
-                            best_model_by_acc = self.model.pull_params()
-                            # logging.info('current model has best accuracy')
-                        history_valid_acc.append(accuracy)
-
-                        if len(history_valid_bleu) == 0 or bleu > np.array(history_valid_bleu).max():
-                            best_model_by_bleu = self.model.pull_params()
-                            # logging.info('current model has best accuracy')
-                        history_valid_bleu.append(bleu)
+                    if len(history_valid_bleu) == 0 or bleu > np.array(history_valid_bleu).max():
+                        best_model_by_bleu = self.model.pull_params()
+                        # logging.info('current model has best accuracy')
+                    history_valid_bleu.append(bleu)
 
                     if len(history_valid_perf) == 0 or val_perf > np.array(history_valid_perf).max():
                         best_model_params = self.model.pull_params()
@@ -159,46 +152,3 @@ class Learner(object):
 
             logging.info('save the best model by bleu')
             np.savez(os.path.join(config.output_dir, 'model.best_bleu.npz'), **best_model_by_bleu)
-
-
-class DataIterator:
-    def __init__(self, dataset, batch_size=10):
-        self.dataset = dataset
-        self.batch_size = batch_size
-        self.index_array = np.arange(self.dataset.count)
-        self.ptr = 0
-        self.buffer_size = batch_size * 5
-        self.buffer = []
-
-    def reset(self):
-        self.ptr = 0
-        self.buffer = []
-        np.random.shuffle(self.index_array)
-
-    def __iter__(self):
-        return self
-
-    def next_batch(self):
-        batch = self.buffer[:self.batch_size]
-        del self.buffer[:self.batch_size]
-
-        batch_ids = [e.eid for e in batch]
-
-        return batch, batch_ids
-
-    def __next__(self):
-        if self.buffer:
-            return self.next_batch()
-        else:
-            if self.ptr >= self.dataset.count:
-                raise StopIteration
-
-            self.buffer = self.index_array[self.ptr:self.ptr + self.buffer_size]
-
-            # sort buffer contents
-            examples = self.dataset.get_examples(self.buffer)
-            self.buffer = sorted(examples, key=lambda e: len(e.actions))
-
-            self.ptr += self.buffer_size
-
-            return self.next_batch()

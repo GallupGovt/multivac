@@ -4,9 +4,8 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 import numpy as np
 
 from collections import OrderedDict
-import logging
 import copy
-import heapq
+# import heapq
 import sys
 
 from nn.layers.embeddings import Embedding
@@ -17,48 +16,38 @@ import nn.initializations as initializations
 from nn.activations import softmax
 from nn.utils.theano_utils import *
 
-from config import config_info
+# from config import config_info
 import config
 from lang.grammar import Grammar
-from parse import *
+# from parse import *
 from astnode import *
-from util import is_numeric
+# from util import is_numeric
 from components import Hyp, PointerNet, CondAttLSTM
 
 sys.setrecursionlimit(50000)
 
-class Model:
-    def __init__(self):
+class Generator(nn.Module):
+    '''Generator'''
+    def __init__(self, config):
         # self.node_embedding = Embedding(config.node_num, config.node_embed_dim, name='node_embed')
 
         self.query_embedding = Embedding(config.source_vocab_size, config.word_embed_dim, name='query_embed')
-
-        if config.encoder == 'bilstm':
-            self.query_encoder_lstm = BiLSTM(config.word_embed_dim, config.encoder_hidden_dim / 2, return_sequences=True,
-                                             name='query_encoder_lstm')
-        else:
-            self.query_encoder_lstm = LSTM(config.word_embed_dim, config.encoder_hidden_dim, return_sequences=True,
-                                           name='query_encoder_lstm')
-
+        self.query_encoder_lstm = BiLSTM(config.word_embed_dim, config.encoder_hidden_dim / 2, return_sequences=True,
+                                         name='query_encoder_lstm')
         self.decoder_lstm = CondAttLSTM(config.rule_embed_dim + config.node_embed_dim + config.rule_embed_dim,
                                         config.decoder_hidden_dim, config.encoder_hidden_dim, config.attention_hidden_dim,
                                         name='decoder_lstm')
 
         self.src_ptr_net = PointerNet()
-
         self.terminal_gen_softmax = Dense(config.decoder_hidden_dim, 2, activation='softmax', name='terminal_gen_softmax')
-
         self.rule_embedding_W = initializations.get('normal')((config.rule_num, config.rule_embed_dim), name='rule_embedding_W', scale=0.1)
         self.rule_embedding_b = shared_zeros(config.rule_num, name='rule_embedding_b')
-
         self.node_embedding = initializations.get('normal')((config.node_num, config.node_embed_dim), name='node_embed', scale=0.1)
-
         self.vocab_embedding_W = initializations.get('normal')((config.target_vocab_size, config.rule_embed_dim), name='vocab_embedding_W', scale=0.1)
         self.vocab_embedding_b = shared_zeros(config.target_vocab_size, name='vocab_embedding_b')
 
         # decoder_hidden_dim -> action embed
         self.decoder_hidden_state_W_rule = Dense(config.decoder_hidden_dim, config.rule_embed_dim, name='decoder_hidden_state_W_rule')
-
         # decoder_hidden_dim -> action embed
         self.decoder_hidden_state_W_token= Dense(config.decoder_hidden_dim + config.encoder_hidden_dim, config.rule_embed_dim,
                                                  name='decoder_hidden_state_W_token')
@@ -72,120 +61,130 @@ class Model:
         self.srng = RandomStreams()
 
     def build(self):
-        # (batch_size, max_example_action_num, action_type)
+        #
+        # Build Query Encoder LSTM Component
+        #
+        # tokens: (batch_size, max_query_length) -> 
+        #    embed: (batch_size, max_query_length, query_token_embed_dim)
+        #    mask:  (batch_size, max_query_length)
+        query_tokens = ndim_itensor(2, 'query_tokens')
+        query_token_embed, query_token_embed_mask = 
+            self.query_embedding(query_tokens, mask_zero=True)
+
+        # input shape:  (batch_size, max_query_length, query_token_embed_dim)
+        # output shape: (batch_size, max_query_length, query_embed_dim)
+        query_embed = self.query_encoder_lstm(query_token_embed, 
+                                              mask=query_token_embed_mask,
+                                              dropout=config.dropout, 
+                                              srng=self.srng)
+
+        #
+        # Build Decoder LSTM Component
+        # 
+        # Dim 3 tensors: (batch_size, max_example_action_num, action_type)
+        # Dim 2 tensors: (batch_size, max_example_action_num)
         tgt_action_seq = ndim_itensor(3, 'tgt_action_seq')
-
-        # (batch_size, max_example_action_num, action_type)
         tgt_action_seq_type = ndim_itensor(3, 'tgt_action_seq_type')
-
-        # (batch_size, max_example_action_num)
+        tgt_par_rule_seq = ndim_itensor(2, 'tgt_par_rule_seq')
+        tgt_par_t_seq = ndim_itensor(2, 'tgt_par_t_seq')
         tgt_node_seq = ndim_itensor(2, 'tgt_node_seq')
 
-        # (batch_size, max_example_action_num)
-        tgt_par_rule_seq = ndim_itensor(2, 'tgt_par_rule_seq')
-
-        # (batch_size, max_example_action_num)
-        tgt_par_t_seq = ndim_itensor(2, 'tgt_par_t_seq')
-
-        # (batch_size, max_example_action_num, symbol_embed_dim)
-        # tgt_node_embed = self.node_embedding(tgt_node_seq, mask_zero=False)
-        tgt_node_embed = self.node_embedding[tgt_node_seq]
-
-        # (batch_size, max_query_length)
-        query_tokens = ndim_itensor(2, 'query_tokens')
-
-        # (batch_size, max_query_length, query_token_embed_dim)
-        # (batch_size, max_query_length)
-        query_token_embed, query_token_embed_mask = self.query_embedding(query_tokens, mask_zero=True)
-
-        # if WORD_DROPOUT > 0:
-        #     logging.info('used word dropout for source, p = %f', WORD_DROPOUT)
-        #     query_token_embed, query_token_embed_intact = WordDropout(WORD_DROPOUT, self.srng)(query_token_embed, False)
-
-        batch_size = tgt_action_seq.shape[0]
-        max_example_action_num = tgt_action_seq.shape[1]
-
-        # previous action embeddings
-        # (batch_size, max_example_action_num, action_embed_dim)
-        tgt_action_seq_embed = T.switch(T.shape_padright(tgt_action_seq[:, :, 0] > 0),
-                                        self.rule_embedding_W[tgt_action_seq[:, :, 0]],
-                                        self.vocab_embedding_W[tgt_action_seq[:, :, 1]])
+            # Action Sequence Embeddings
+            #
+        # in:  (batch_size, max_example_action_num, action_type) ->
+        # out: (batch_size, max_example_action_num, action_embed_dim)
+        tgt_action_seq_embed = 
+            T.switch(
+                T.shape_padright(tgt_action_seq[:, :, 0] > 0), 
+                                 self.rule_embedding_W[tgt_action_seq[:,:,0]], 
+                                 self.vocab_embedding_W[tgt_action_seq[:,:,1]]
+                    )
 
         tgt_action_seq_embed_tm1 = tensor_right_shift(tgt_action_seq_embed)
-
+        # (batch_size, max_example_action_num)
+        tgt_action_seq_mask = T.any(tgt_action_seq_type, axis=-1)
+        
+            # Rule Embeddings
+            #
         # parent rule application embeddings
         tgt_par_rule_embed = T.switch(tgt_par_rule_seq[:, :, None] < 0,
                                       T.alloc(0., 1, config.rule_embed_dim),
                                       self.rule_embedding_W[tgt_par_rule_seq])
 
-        if not config.frontier_node_type_feed:
-            tgt_node_embed *= 0.
-
         if not config.parent_action_feed:
             tgt_par_rule_embed *= 0.
 
-        # (batch_size, max_example_action_num, action_embed_dim + symbol_embed_dim + action_embed_dim)
-        decoder_input = T.concatenate([tgt_action_seq_embed_tm1, tgt_node_embed, tgt_par_rule_embed], axis=-1)
+            # Node Embeddings
+            #
+        # node seq: (batch_size, max_example_action_num) ->
+        #    embeds: (batch_size, max_example_action_num, symbol_embed_dim)
+        tgt_node_embed = self.node_embedding[tgt_node_seq]
 
-        # (batch_size, max_query_length, query_embed_dim)
-        query_embed = self.query_encoder_lstm(query_token_embed, mask=query_token_embed_mask,
-                                              dropout=config.dropout, srng=self.srng)
+        if not config.frontier_node_type_feed:
+            tgt_node_embed *= 0.
 
-        # (batch_size, max_example_action_num)
-        tgt_action_seq_mask = T.any(tgt_action_seq_type, axis=-1)
-        
+        decoder_input = T.concatenate([tgt_action_seq_embed_tm1, 
+                                       tgt_node_embed, 
+                                       tgt_par_rule_embed], axis=-1)
+
+        # input dims: (batch_size, 
+        #              max_example_action_num, 
+        #              action_embed_dim + symbol_embed_dim + action_embed_dim)
+        # output dims: 
         # decoder_hidden_states: (batch_size, max_example_action_num, lstm_hidden_state)
         # ctx_vectors: (batch_size, max_example_action_num, encoder_hidden_dim)
-        decoder_hidden_states, _, ctx_vectors = self.decoder_lstm(decoder_input,
-                                                                  context=query_embed,
-                                                                  context_mask=query_token_embed_mask,
-                                                                  mask=tgt_action_seq_mask,
-                                                                  parent_t_seq=tgt_par_t_seq,
-                                                                  dropout=config.dropout,
-                                                                  srng=self.srng)
-
-        # if DECODER_DROPOUT > 0:
-        #     logging.info('used dropout for decoder output, p = %f', DECODER_DROPOUT)
-        #     decoder_hidden_states = Dropout(DECODER_DROPOUT, self.srng)(decoder_hidden_states)
+        H, _, C = self.decoder_lstm(decoder_input,
+                                    context=query_embed,
+                                    context_mask=query_token_embed_mask,
+                                    mask=tgt_action_seq_mask,
+                                    parent_t_seq=tgt_par_t_seq,
+                                    dropout=config.dropout,
+                                    srng=self.srng)
 
         # ====================================================
         # apply additional non-linearity transformation before
         # predicting actions
         # ====================================================
 
-        decoder_hidden_state_trans_rule = self.decoder_hidden_state_W_rule(decoder_hidden_states)
-        decoder_hidden_state_trans_token = self.decoder_hidden_state_W_token(T.concatenate([decoder_hidden_states, ctx_vectors], axis=-1))
+        batch_size = tgt_action_seq.shape[0]
+        max_example_action_num = tgt_action_seq.shape[1]
+        ptr_net_decoder_state = T.concatenate([H, C], axis=-1)
+
+        decoder_hidden_state_trans_rule = self.decoder_hidden_state_W_rule(H)
+        decoder_hidden_state_trans_token = self.decoder_hidden_state_W_token(ptr_net_decoder_state)
 
         # (batch_size, max_example_action_num, rule_num)
-        rule_predict = softmax(T.dot(decoder_hidden_state_trans_rule, T.transpose(self.rule_embedding_W)) + self.rule_embedding_b)
-
-        # (batch_size, max_example_action_num, 2)
-        terminal_gen_action_prob = self.terminal_gen_softmax(decoder_hidden_states)
-
-        # (batch_size, max_example_action_num, target_vocab_size)
-        vocab_predict = softmax(T.dot(decoder_hidden_state_trans_token, T.transpose(self.vocab_embedding_W)) + self.vocab_embedding_b)
-
-        # (batch_size, max_example_action_num, lstm_hidden_state + encoder_hidden_dim)
-        ptr_net_decoder_state = T.concatenate([decoder_hidden_states, ctx_vectors], axis=-1)
-
-        # (batch_size, max_example_action_num, max_query_length)
-        copy_prob = self.src_ptr_net(query_embed, query_token_embed_mask, ptr_net_decoder_state)
+        rule_predict = softmax(T.dot(decoder_hidden_state_trans_rule, 
+                                     T.transpose(self.rule_embedding_W)) \
+                               + self.rule_embedding_b)
 
         # (batch_size, max_example_action_num)
         rule_tgt_prob = rule_predict[T.shape_padright(T.arange(batch_size)),
                                      T.shape_padleft(T.arange(max_example_action_num)),
                                      tgt_action_seq[:, :, 0]]
 
+        # (batch_size, max_example_action_num, target_vocab_size)
+        vocab_predict = softmax(T.dot(decoder_hidden_state_trans_token, 
+                                      T.transpose(self.vocab_embedding_W)) \
+                                + self.vocab_embedding_b)
+
         # (batch_size, max_example_action_num)
         vocab_tgt_prob = vocab_predict[T.shape_padright(T.arange(batch_size)),
                                        T.shape_padleft(T.arange(max_example_action_num)),
                                        tgt_action_seq[:, :, 1]]
+
+        # (batch_size, max_example_action_num, max_query_length)
+        copy_prob = self.src_ptr_net(query_embed, 
+                                     query_token_embed_mask, 
+                                     ptr_net_decoder_state)
 
         # (batch_size, max_example_action_num)
         copy_tgt_prob = copy_prob[T.shape_padright(T.arange(batch_size)),
                                   T.shape_padleft(T.arange(max_example_action_num)),
                                   tgt_action_seq[:, :, 2]]
 
+        # (batch_size, max_example_action_num, 2)
+        terminal_gen_action_prob = self.terminal_gen_softmax(H)
 
         # (batch_size, max_example_action_num)
         tgt_prob = tgt_action_seq_type[:, :, 0] * rule_tgt_prob + \
@@ -193,7 +192,7 @@ class Model:
                    tgt_action_seq_type[:, :, 2] * terminal_gen_action_prob[:, :, 1] * copy_tgt_prob
 
         likelihood = T.log(tgt_prob + 1.e-7 * (1 - tgt_action_seq_mask))
-        loss = - (likelihood * tgt_action_seq_mask).sum(axis=-1) # / tgt_action_seq_mask.sum(axis=-1)
+        loss = - (likelihood * tgt_action_seq_mask).sum(axis=-1)
         loss = T.mean(loss)
 
         # let's build the function!
@@ -208,70 +207,56 @@ class Model:
                                           #  copy_prob, terminal_gen_action_prob],
                                           updates=updates)
 
-        # if WORD_DROPOUT > 0:
-        #     self.build_decoder(query_tokens, query_token_embed_intact, query_token_embed_mask)
-        # else:
-        #     self.build_decoder(query_tokens, query_token_embed, query_token_embed_mask)
+        self.build_decoder(query_tokens, 
+                           query_token_embed, 
+                           query_token_embed_mask)
 
-        self.build_decoder(query_tokens, query_token_embed, query_token_embed_mask)
-
-    def build_decoder(self, query_tokens, query_token_embed, query_token_embed_mask):
-        logging.info('building decoder ...')
-
-        # (batch_size, decoder_state_dim)
-        decoder_prev_state = ndim_tensor(2, name='decoder_prev_state')
-
-        # (batch_size, decoder_state_dim)
-        decoder_prev_cell = ndim_tensor(2, name='decoder_prev_cell')
+    def build_decoder(self, 
+                      query_tokens, query_token_embed, query_token_embed_mask):
+        # Re-setup the encoder
+        query_embed = self.query_encoder_lstm(query_token_embed, 
+                                              mask=query_token_embed_mask,
+                                              dropout=config.dropout, train=False)
 
         # (batch_size, n_timestep, decoder_state_dim)
         hist_h = ndim_tensor(3, name='hist_h')
 
-        # (batch_size, decoder_state_dim)
-        prev_action_embed = ndim_tensor(2, name='prev_action_embed')
-
-        # (batch_size)
-        node_id = T.ivector(name='node_id')
-
-        # (batch_size, node_embed_dim)
-        node_embed = self.node_embedding[node_id]
-
-        # (batch_size)
-        par_rule_id = T.ivector(name='par_rule_id')
-
-        # (batch_size, decoder_state_dim)
-        par_rule_embed = T.switch(par_rule_id[:, None] < 0,
-                                  T.alloc(0., 1, config.rule_embed_dim),
-                                  self.rule_embedding_W[par_rule_id])
-
         # ([time_step])
         time_steps = T.ivector(name='time_steps')
 
-        # (batch_size)
-        parent_t = T.ivector(name='parent_t')
-
-        # (batch_size, 1)
-        parent_t_reshaped = T.shape_padright(parent_t)
-
-        query_embed = self.query_encoder_lstm(query_token_embed, mask=query_token_embed_mask,
-                                              dropout=config.dropout, train=False)
-
-        # (batch_size, 1, decoder_state_dim)
-        prev_action_embed_reshaped = prev_action_embed.dimshuffle((0, 'x', 1))
-
-        # (batch_size, 1, node_embed_dim)
+        # (batch_size) -> (batch_size, 1, node_embed_dim)
+        node_id = T.ivector(name='node_id')
+        node_embed = self.node_embedding[node_id]
         node_embed_reshaped = node_embed.dimshuffle((0, 'x', 1))
-
-        # (batch_size, 1, node_embed_dim)
-        par_rule_embed_reshaped = par_rule_embed.dimshuffle((0, 'x', 1))
 
         if not config.frontier_node_type_feed:
             node_embed_reshaped *= 0.
 
+        # (batch_size) -> (batch_size, 1, node_embed_dim)
+        par_rule_id = T.ivector(name='par_rule_id')
+        par_rule_embed = T.switch(par_rule_id[:, None] < 0,
+                                  T.alloc(0., 1, config.rule_embed_dim),
+                                  self.rule_embedding_W[par_rule_id])
+        par_rule_embed_reshaped = par_rule_embed.dimshuffle((0, 'x', 1))
+
         if not config.parent_action_feed:
             par_rule_embed_reshaped *= 0.
 
-        decoder_input = T.concatenate([prev_action_embed_reshaped, node_embed_reshaped, par_rule_embed_reshaped], axis=-1)
+        # (batch_size) -> (batch_size, 1)
+        parent_t = T.ivector(name='parent_t')
+        parent_t_reshaped = T.shape_padright(parent_t)
+
+        # (batch_size, decoder_state_dim)
+        decoder_prev_state = ndim_tensor(2, name='decoder_prev_state')
+        decoder_prev_cell = ndim_tensor(2, name='decoder_prev_cell')
+        prev_action_embed = ndim_tensor(2, name='prev_action_embed')
+
+        # (batch_size, 1, decoder_state_dim)
+        prev_action_embed_reshaped = prev_action_embed.dimshuffle((0, 'x', 1))
+
+        decoder_input = T.concatenate([prev_action_embed_reshaped,
+                                       node_embed_reshaped, 
+                                       par_rule_embed_reshaped], axis=-1)
 
         # (batch_size, 1, decoder_state_dim)
         # (batch_size, 1, decoder_state_dim)
@@ -591,7 +576,6 @@ class Model:
         return OrderedDict([(p_name, p.get_value(borrow=False)) for (p_name, p) in list(self.params_dict.items())])
 
     def save(self, model_file, **kwargs):
-        logging.info('save model to [%s]', model_file)
 
         weights_dict = self.pull_params()
         for k, v in list(kwargs.items()):
@@ -600,7 +584,6 @@ class Model:
         np.savez(model_file, **weights_dict)
 
     def load(self, model_file):
-        logging.info('load model from [%s]', model_file)
         weights_dict = np.load(model_file)
 
         # assert len(weights_dict.files) == len(self.params_dict)
@@ -609,7 +592,6 @@ class Model:
             if p_name not in weights_dict:
                 raise RuntimeError('parameter [%s] not in saved weights file', p_name)
             else:
-                logging.info('loading parameter [%s]', p_name)
                 assert np.array_equal(p.shape.eval(), weights_dict[p_name].shape), \
                     'shape mis-match for [%s]!, %s != %s' % (p_name, p.shape.eval(), weights_dict[p_name].shape)
 

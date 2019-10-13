@@ -1,54 +1,27 @@
 #!usr/bin/env/python
 import argparse
+import configparser
 import math
 import random
 import numpy as np
+import os
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 
-from models.generator import Generator
+# from models.generator import Generator
 from models.discriminator import Discriminator
-from models.oracle import Oracle
+# from models.oracle import Oracle
 from models.rollout import Rollout
 
 from data_utils import GeneratorDataset, DiscriminatorDataset
 
-
-SEED = 88
-BATCH_SIZE = 64
-TOTAL_EPOCHS = 200 
-GENERATED_NUM = 10000
-VOCAB_SIZE = 5000
-SEQUENCE_LEN = 20
-
-REAL_FILE = 'data/real.data'
-FAKE_FILE = 'data/fake.data'
-EVAL_FILE = 'data/eval.data'
-
-# generator params
-PRE_G_EPOCHS = 120
-G_EMB_SIZE = 32
-G_HIDDEN_SIZE = 32
-G_LR = 1e-3
-
-# discriminator params
-D_EMB_SIZE = 32
-D_NUM_CLASSES = 2
-D_FILTER_SIZES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20]
-D_NUM_FILTERS = [100, 200, 200, 200, 200, 100, 100, 100, 100, 100, 160, 160]
-DROPOUT = 0.75
-D_LR = 1e-3
-D_L2_REG = 0.0
-
-# rollout params
-ROLLOUT_UPDATE_RATE = 0.8
-ROLLOUT_NUM = 16
-
-G_STEPS = 1
-D_STEPS = 5
-K_STEPS = 3
+from model import Model
+from nn.utils.io_utils import deserialize_from_file, serialize_to_file
+from learner import Learner
+from components import Hyp
+from dataset import DataEntry, DataSet, Vocab, Action
 
 
 def generate_samples(net, batch_size, generated_num, output_file):
@@ -63,24 +36,68 @@ def generate_samples(net, batch_size, generated_num, output_file):
             f.write('{}\n'.format(string))
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--cuda', default=False, action='store_true', help='Enable CUDA')
-    args = parser.parse_args()
-    use_cuda = True if args.cuda and torch.cuda.is_available() else False
+def run(args):
+    # Set up model and training parameters based on config file and runtime
+    # arguments
+    SEED = int(args['SEED'])
+    BATCH_SIZE = int(args['BATCH_SIZE'])
+    TOTAL_EPOCHS = int(args['TOTAL_EPOCHS']) 
+    GENERATED_NUM = int(args['GENERATED_NUM'])
+    VOCAB_SIZE = int(args['VOCAB_SIZE'])
+    SEQUENCE_LEN = int(args['SEQUENCE_LEN'])
+
+    # generator params
+    PRE_G_EPOCHS = int(args['PRE_G_EPOCHS'])
+    G_EMB_SIZE = int(args['G_EMB_SIZE'])
+    G_HIDDEN_SIZE = int(args['G_HIDDEN_SIZE'])
+    G_LR = float(args['G_LR'])
+
+    # discriminator params
+    D_EMB_SIZE = int(args['D_EMB_SIZE'])
+    D_NUM_CLASSES = int(args['D_NUM_CLASSES'])
+    D_FILTER_SIZES = eval(args['D_FILTER_SIZES'])
+    D_NUM_FILTERS = eval(args['D_NUM_FILTERS'])
+    DROPOUT = float(args['DROPOUT'])
+    D_LR = float(args['D_LR'])
+    D_L2_REG = float(args['D_L2_REG'])
+    D_WGAN = eval(args['D_WGAN'])
+
+    # rollout params
+    ROLLOUT_UPDATE_RATE = float(args['ROLLOUT_UPDATE_RATE'])
+    ROLLOUT_NUM = int(args['ROLLOUT_NUM'])
+
+    G_STEPS = int(args['G_STEPS'])
+    D_STEPS = int(args['D_STEPS'])
+    K_STEPS = int(args['K_STEPS'])
+    
+    use_cuda = eval(args['cuda'])
+
+    if not torch.cuda.is_available():
+        use_cuda = False
 
     random.seed(SEED)
     np.random.seed(SEED)
 
-    netG = Generator(VOCAB_SIZE, G_EMB_SIZE, G_HIDDEN_SIZE, G_LR, use_cuda)
+    # Set this up so Generator gets NL2Code inputs
+    # netG = Generator(VOCAB_SIZE, G_EMB_SIZE, G_HIDDEN_SIZE, G_LR, use_cuda)
+    model = Model()
+    model.build()
+
+    # Set this up so the Discriminator gets Tree.LSTM inputs
     netD = Discriminator(VOCAB_SIZE, D_EMB_SIZE, D_NUM_CLASSES, D_FILTER_SIZES, D_NUM_FILTERS, DROPOUT, D_LR, D_L2_REG, use_cuda)
+    # Does this need to change?
     oracle = Oracle(VOCAB_SIZE, G_EMB_SIZE, G_HIDDEN_SIZE, use_cuda)
 
     # generating synthetic data
     print('Generating data...')
+
+    # Generate starting samples
     generate_samples(oracle, BATCH_SIZE, GENERATED_NUM, REAL_FILE)
 
-    # pretrain generator
+    # 
+    # PRETRAIN GENERATOR
+    # 
+
     gen_set = GeneratorDataset(REAL_FILE)
     genloader = DataLoader(dataset=gen_set, 
                            batch_size=BATCH_SIZE, 
@@ -144,7 +161,27 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
-                
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cuda', default=False, action='store_true', 
+                        help='Enable GPU training.')
+    parser.add_argument('-c', '--config', required=False, 
+                        help='Config file with updated parameters for generator;'
+                             'defaults to "config.cfg" in this directory '
+                             'otherwise.')
+    args = vars(parser.parse_args())
 
+    cfg = configparser.ConfigParser()
+    cfgDIR = os.path.dirname(os.path.realpath(__file__))
 
+    if args['config'] is not None:
+        cfg.read(args['config'])
+    else:
+        cfg.read(os.path.join(cfgDIR, 'config.cfg'))
+
+    cfg_dict = cfg['ARGS']
+
+    for carg in cfg_dict:
+        if carg in args:
+            cfg_dict[carg] = str(args.get(carg))
+
+    run(cfg_dict)

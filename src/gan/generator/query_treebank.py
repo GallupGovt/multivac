@@ -2,9 +2,8 @@
 import argparse
 import re
 
-from NL2code.lang.eng.grammar import EnglishGrammar
-from NL2code.astnode import *
-
+from multivac.src.gan.generator.astnode import *
+from multivac.src.gan.generator.lang.eng.grammar import EnglishGrammar
 from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
 
@@ -68,21 +67,21 @@ def get_eng_tree(text, depth=0, debug=False):
         print(("Malformatted parse string: '{}'".format(text)))
         raise ValueError
 
-    next_idx = tree_str.index(" ") + 1
+    next_idx = tree_str.index(" ")
 
-    tree = ASTNode(tree_str[:next_idx - 1])
+    tree = ASTNode(tree_str[:next_idx])
     if debug: print(("\t" * depth + "Type: '{}'".format(tree.type)))
 
     if "(" in tree_str:
         while "(" in tree_str:
             tree_str = tree_str[tree_str.index("("):]
-            next_idx = find_match_paren(tree_str) + 2
-            tree.children.append(get_eng_tree(tree_str[:next_idx - 1], 
+            next_idx = find_match_paren(tree_str) + 1
+            tree.children.append(get_eng_tree(tree_str[:next_idx], 
                                               depth+1, 
                                               debug))
-            tree_str = tree_str[next_idx:]
+            tree_str = tree_str[next_idx + 1:]
     else:
-        tree.value = tree_str[next_idx:]
+        tree.value = tree_str[next_idx + 1:]
         if debug: print(("\t" * depth + "Value: " + tree.value))
 
     return tree
@@ -104,18 +103,21 @@ def get_grammar(parse_trees, verbose=False):
 
     return grammar
 
+def parse_raw(parser, query):
+    query = stanford_parse(parser, query)
+    return get_eng_tree(query.parse_string)
 
-def run(args_dict):
-    verbose = args_dict['verbose']
+
+def extract_grammar(source_file, output=None, clean=False, verbose=False):
     parse_trees = list()
     rules = set()
 
     parser = StanfordParser(annots = "tokenize pos lemma ner parse")
 
-    with open(args_dict['queries'], 'r') as f:
+    with open(source_file, 'r') as f:
         queries = f.readlines()
 
-    if args_dict['clean']:
+    if clean:
         queries = clean_queries(queries, verbose)
 
     if verbose:
@@ -149,8 +151,8 @@ def run(args_dict):
     if verbose:
         print("Grammar induced successfully.")
 
-    if args_dict['output'] is not None:
-        with open(args_dict['output'], 'w') as f:
+    if output is not None:
+        with open(output, 'w') as f:
             for rule in rules:
                 rule_kids = [str(x) for x in rule.children]
                 out_str = str(rule.parent) + ' -> ' + ', '.join(rule_kids)
@@ -166,10 +168,14 @@ if __name__ == '__main__':
                         help='Path to queries.')
     parser.add_argument('-o', '--output',
                         help='Filename for output.')
-    parser.add_argument('-c', '--clean', action='store_true',
+    parser.add_argument('-c', '--clean', action='store_true', default=False,
                         help='Pre-clean queries before populating.')
-    parser.add_argument('-v', '--verbose', action='store_true',
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='Print verbose output on progress.')
 
     args_dict = vars(parser.parse_args())
-    run(args_dict)
+
+    extract_grammar(args_dict['queries'],
+                    args_dict['output'], 
+                    args_dict['clean'], 
+                    args_dict['verbose'])
