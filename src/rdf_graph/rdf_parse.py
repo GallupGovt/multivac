@@ -157,16 +157,18 @@ class stanford_parse(object):
         if how == 'asis':
             result = self.rdfs
         elif how == 'list':
-            result = self.rdfs.copy()
+            result = self.rdfs.copy().values()
             
             if not use_tokens:
                 for rdf in result:
                     for part in ['subject', 'relation', 'object']:
-                        result[rdf][part] = [self.tokens[int(t)].text 
+                        rdf[part] = ' '.join([self.tokens[int(t)].text 
                                           for t 
-                                          in result[rdf][part]]
+                                          in rdf[part]])
+                        # result[rdf] = [x for x in result[rdf].values()]
 
-            result = [x for x in result.values()]
+            result = [list(x.values()) for x in result]
+            result = [x for sl in result for x in sl]
         else:
             result = []
             longest = 0
@@ -335,14 +337,14 @@ class stanford_parse(object):
         return ' '.join([t.text for t in self.tokens])
 
 
-def process_texts(parser, texts, verbose=False, how='longest'):
+def process_texts(parser, texts, verbose=False, form='longest'):
     # Perform basic parsing and extraction on an iterable of sentences
     sentences = [stanford_parse(parser, text) for text in texts]
     processed = []
 
     for sentence in sentences:
         if len(sentence.rdfs) > 0:
-            processed.append(sentence.get_rdfs(use_tokens=False, how=how))
+            processed.append(sentence.get_rdfs(use_tokens=False, how=form))
         else:
             processed.append([])
 
@@ -350,13 +352,29 @@ def process_texts(parser, texts, verbose=False, how='longest'):
 
 def run(args_dict):
     parser = StanfordParser()
-    texts = pd.read_csv(args_dict['text_file'])
-    contents = process_queries(parser, 
-                               queries['text'], 
-                               args_dict['verbose'],
-                               args_dict['how'])
-    texts['Annotations'] = pd.Series(contents)
-    texts.to_csv(args_dict['out_file'], index=False)
+
+    if args_dict['text_file'].upper().endswith(".CSV"):
+        texts = pd.read_csv(args_dict['text_file'])
+        texts = texts['text']
+    else:
+        with open(args_dict['text_file'], "r") as f:
+            texts = pd.Series(f.readlines())
+
+    contents = process_texts(parser, 
+                             texts, 
+                             args_dict['verbose'],
+                             args_dict['form'])
+
+    if args_dict['out_file'].upper().endswith(".CSV"):
+        result = pd.concat([texts, pd.Series(contents)], axis=1)
+        result.columns = ['text', 'annotations']
+        result.to_csv(args_dict['out_file'], index=False)
+    else:
+        with open(args_dict['out_file'], "w") as f:
+            try:
+                f.write('\n'.join([','.join(x) for x in contents]))
+            except:
+                print(contents[0])
 
 
 if __name__ == '__main__':
@@ -366,7 +384,7 @@ if __name__ == '__main__':
                         help='Path to sentences to parse.')
     parser.add_argument('-o', '--out_file',
                         help='Filename for output.')
-    parser.add_argument('-h', '--how', choices=['asis',
+    parser.add_argument('-f', '--form', choices=['asis', 'list',
                         'longest', 'all'],
                         help='Method for returning RDF components of queries.')
     parser.add_argument('-v', '--verbose', action='store_true',
