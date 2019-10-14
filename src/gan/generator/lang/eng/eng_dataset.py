@@ -1,97 +1,29 @@
 # -*- coding: UTF-8 -*-
-from __future__ import division
-import ast
-import astor
-import logging
+
+import argparse
 from itertools import chain
 import nltk
-import re
+import os
 
-from nn.utils.io_utils import serialize_to_file, deserialize_from_file
-from nn.utils.generic_utils import init_logging
-
-from multivac.src.gan.generator.query_treebank import extract_grammar
-
-from dataset import gen_vocab, DataSet, DataEntry, Action, APPLY_RULE, GEN_TOKEN, COPY_TOKEN, GEN_COPY_TOKEN, Vocab
-from lang.py.parse import parse, parse_tree_to_python_ast, canonicalize_code, get_grammar, parse_raw, \
-    de_canonicalize_code, tokenize_code, tokenize_code_adv, de_canonicalize_code_for_seq2seq
-from lang.py.unaryclosure import get_top_unary_closures, apply_unary_closures
-
-
-# def rule_vs_node_stat():
-#     line_num = 0
-#     parse_trees = []
-#     code_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/card_datasets/hearthstone/all_hs.out' 
-#     # '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.code'
-#     node_nums = rule_nums = 0.
-#     for line in open(code_file):
-#         code = line.replace('§', '\n').strip()
-#         parse_tree = parse(code)
-#         node_nums += len(list(parse_tree.nodes))
-#         rules, _ = parse_tree.get_productions()
-#         rule_nums += len(rules)
-#         parse_trees.append(parse_tree)
-
-#         line_num += 1
-
-#     print 'avg. nums of nodes: %f' % (node_nums / line_num)
-#     print 'avg. nums of rules: %f' % (rule_nums / line_num)
+from multivac.src.gan.generator.dataset import \
+    gen_vocab, DataSet, DataEntry, Action, Vocab, \
+    APPLY_RULE, GEN_TOKEN, COPY_TOKEN, GEN_COPY_TOKEN
+from multivac.src.gan.generator.lang.eng.unaryclosure import \
+    apply_unary_closures, get_top_unary_closures
+from multivac.src.gan.generator.nn.utils.io_utils import \
+    serialize_to_file, deserialize_from_file
+from multivac.src.gan.generator.query_treebank import parse_raw, get_grammar
+from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
 
-# def process_heart_stone_dataset():
-#     data_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/card_datasets/hearthstone/all_hs.out'
-#     parse_trees = []
-#     rule_num = 0.
-#     example_num = 0
-#     for line in open(data_file):
-#         code = line.replace('§', '\n').strip()
-#         parse_tree = parse(code)
-#         # sanity check
-#         pred_ast = parse_tree_to_python_ast(parse_tree)
-#         pred_code = astor.to_source(pred_ast)
-#         ref_ast = ast.parse(code)
-#         ref_code = astor.to_source(ref_ast)
-
-#         if pred_code != ref_code:
-#             raise RuntimeError('code mismatch!')
-
-#         rules, _ = parse_tree.get_productions(include_value_node=False)
-#         rule_num += len(rules)
-#         example_num += 1
-
-#         parse_trees.append(parse_tree)
-
-#     grammar = get_grammar(parse_trees)
-
-#     with open('hs.grammar.txt', 'w') as f:
-#         for rule in grammar:
-#             str = rule.__repr__()
-#             f.write(str + '\n')
-
-#     with open('hs.parse_trees.txt', 'w') as f:
-#         for tree in parse_trees:
-#             f.write(tree.__repr__() + '\n')
-
-
-#     print 'avg. nums of rules: %f' % (rule_num / example_num)
-
-
-def canonicalize_hs_example(query, code):
-    query = re.sub(r'<.*?>', '', query)
+def canonicalize_example(query, text, parser):
+    '''
+    If we want to do any cleaning on the text, here's where to do it.
+    '''
     query_tokens = nltk.word_tokenize(query)
+    parse_tree = parse_raw(parser, text)
 
-    code = code.replace('§', '\n').strip()
-
-    # sanity check
-    parse_tree = parse_raw(code)
-    gold_ast_tree = ast.parse(code).body[0]
-    gold_source = astor.to_source(gold_ast_tree)
-    ast_tree = parse_tree_to_python_ast(parse_tree)
-    pred_source = astor.to_source(ast_tree)
-
-    assert gold_source == pred_source, 'sanity check fails: gold=[%s], actual=[%s]' % (gold_source, pred_source)
-
-    return query_tokens, code, parse_tree
+    return query_tokens, text, parse_tree
 
 
 def preprocess_eng_dataset(annot_file, text_file, write_out=False):
@@ -99,18 +31,19 @@ def preprocess_eng_dataset(annot_file, text_file, write_out=False):
         f = open('eng_dataset.examples.txt', 'w')
 
     examples = []
+    parser = StanfordParser(annots = "tokenize pos lemma ner parse")
 
     for idx, (annot, text) in enumerate(zip(open(annot_file), open(text_file))):
         annot = annot.strip()
         text = text.strip()
 
-        tokens, clean_text, parse_tree = canonicalize_hs_example(annot, text)
+        tokens, clean_text, parse_tree = canonicalize_example(annot, text, parser)
         example = {'id': idx, 
                    'query_tokens': tokens, 
-                   'code': clean_text, 
+                   'text': clean_text, 
                    'parse_tree': parse_tree,
                    'str_map': None, 
-                   'raw_code': text}
+                   'raw_text': text}
         examples.append(example)
 
         if write_out:
@@ -135,7 +68,7 @@ def parse_eng_dataset(annot_file, text_file,
     parse_trees = [e['parse_tree'] for e in data]
 
     # apply unary closures
-    # THESE RUN CHECKS, NOT CHANGE THE DATA
+    # THESE RUN CHECKS, THEY DO NOT CHANGE THE DATA
     unary_closures = get_top_unary_closures(parse_trees, k=20)
 
     for parse_tree in parse_trees:
@@ -187,7 +120,7 @@ def parse_eng_dataset(annot_file, text_file,
     for entry in data:
         idx = entry['id']
         query_tokens = entry['query_tokens']
-        code = entry['code']
+        text = entry['text']
         parse_tree = entry['parse_tree']
 
         rule_list, rule_parents = parse_tree.get_productions(include_value_node=True)
@@ -234,12 +167,19 @@ def parse_eng_dataset(annot_file, text_file,
 
                     # cannot copy, only generation
                     # could be unk!
-                    if tok_src_idx < 0 or tok_src_idx >= MAX_QUERY_LENGTH:
-                        action = Action(GEN_TOKEN, d)
-                        if terminal_token not in terminal_vocab:
-                            if terminal_token not in query_tokens:
-                                # print terminal_token
-                                can_fully_reconstructed = False
+                    # import pdb; pdb.set_trace()
+                    QUERY_TOO_LONG = False
+
+                    if MAX_QUERY_LENGTH is not None:
+                        if tok_src_idx >= MAX_QUERY_LENGTH:
+                            QUERY_TOO_LONG = True
+                    
+                    if tok_src_idx < 0 or QUERY_TOO_LONG:
+                            action = Action(GEN_TOKEN, d)
+                            if terminal_token not in terminal_vocab:
+                                if terminal_token not in query_tokens:
+                                    # print terminal_token
+                                    can_fully_reconstructed = False
                     else:  # copy
                         if term_tok_id != terminal_vocab.unk:
                             d['source_idx'] = tok_src_idx
@@ -258,8 +198,8 @@ def parse_eng_dataset(annot_file, text_file,
             examples_with_empty_actions_num += 1
             continue
 
-        example = DataEntry(idx, query_tokens, parse_tree, code, actions, 
-                            {'str_map': None, 'raw_code': entry['raw_code']})
+        example = DataEntry(idx, query_tokens, parse_tree, text, actions, 
+                            {'str_map': None, 'raw_text': entry['raw_text']})
 
         if can_fully_reconstructed:
             can_fully_reconstructed_examples_num += 1
@@ -275,14 +215,19 @@ def parse_eng_dataset(annot_file, text_file,
         all_examples.append(example)
 
     # print statistics
-    # max_query_len = max(len(e.query) for e in all_examples)
+
+    if MAX_QUERY_LENGTH is not None:
+        max_query_len = MAX_QUERY_LENGTH
+    else:
+        max_query_len = max(len(e.query_tokens) for e in all_examples)
+
     max_actions_len = max(len(e.actions) for e in all_examples)
 
-    train_data.init_data_matrices(max_query_length=MAX_QUERY_LENGTH, 
+    train_data.init_data_matrices(max_query_length=max_query_len, 
                                   max_example_action_num=max_actions_len)
-    dev_data.init_data_matrices(max_query_length=MAX_QUERY_LENGTH, 
+    dev_data.init_data_matrices(max_query_length=max_query_len, 
                                 max_example_action_num=max_actions_len)
-    test_data.init_data_matrices(max_query_length=MAX_QUERY_LENGTH, 
+    test_data.init_data_matrices(max_query_length=max_query_len, 
                                  max_example_action_num=max_actions_len)
 
     fp = os.getcwd() + os.path.sep 
@@ -294,46 +239,21 @@ def parse_eng_dataset(annot_file, text_file,
     return train_data, dev_data, test_data
 
 
-def dump_data_for_evaluation(data_type='django', data_file='', max_query_length=70):
-    train_data, dev_data, test_data = deserialize_from_file(data_file)
-    prefix = '/Users/yinpengcheng/Projects/dl4mt-tutorial/codegen_data/'
-    for dataset, output in [(train_data, prefix + '%s.train' % data_type),
-                            (dev_data, prefix + '%s.dev' % data_type),
-                            (test_data, prefix + '%s.test' % data_type)]:
-        f_source = open(output + '.desc', 'w')
-        f_target = open(output + '.code', 'w')
-
-        for e in dataset.examples:
-            query_tokens = e.query[:max_query_length]
-            code = e.code
-            if data_type == 'django':
-                target_code = de_canonicalize_code_for_seq2seq(code, e.meta_data['raw_code'])
-            else:
-                target_code = code
-
-            # tokenize code
-            target_code = target_code.strip()
-            tokenized_target = tokenize_code_adv(target_code, breakCamelStr=False if data_type=='django' else True)
-            tokenized_target = [tk.replace('\n', '#NEWLINE#') for tk in tokenized_target]
-            tokenized_target = [tk for tk in tokenized_target if tk is not None]
-
-            while tokenized_target[-1] == '#INDENT#':
-                tokenized_target = tokenized_target[:-1]
-
-            f_source.write(' '.join(query_tokens) + '\n')
-            f_target.write(' '.join(tokenized_target) + '\n')
-
-        f_source.close()
-        f_target.close()
-
-
 if __name__ == '__main__':
-    init_logging('py.log')
-    # rule_vs_node_stat()
-    # process_heart_stone_dataset()
-    parse_hs_dataset()
-    # dump_data_for_evaluation(data_file='data/django.cleaned.dataset.freq5.par_info.refact.space_only.bin')
-    # dump_data_for_evaluation(data_type='hs', data_file='data/hs.freq3.pre_suf.unary_closure.bin')
-    # code_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.code'
-    # py_grammar, _ = extract_grammar(code_file)
-    # serialize_to_file(py_grammar, 'py_grammar.bin')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-a', '--annots', required=True, 
+                        help='File to pull source annotations from.')
+    parser.add_argument('-t', '--texts', required=True, 
+                        help='File to pull target texts from.')
+    parser.add_argument('-l', '--max_query_length', required=False, 
+                        help='Maximum length of query to parse. If not set, no'
+                             ' maximum.')
+    parser.add_argument('-f', '--min_freq', required=False, default='1',
+                        help='Minimum word frequency for inclusion in '
+                             'generated vocabulary; default is 1.')
+    args = vars(parser.parse_args())
+
+    parse_eng_dataset(args['annots'], args['texts'], 
+                      MAX_QUERY_LENGTH=args['max_query_length'], 
+                      WORD_FREQ_CUT_OFF=int(args['min_freq']))
+

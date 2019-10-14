@@ -76,9 +76,7 @@ def get_eng_tree(text, depth=0, debug=False):
         while "(" in tree_str:
             tree_str = tree_str[tree_str.index("("):]
             next_idx = find_match_paren(tree_str) + 1
-            tree.children.append(get_eng_tree(tree_str[:next_idx], 
-                                              depth+1, 
-                                              debug))
+            tree.add_child(get_eng_tree(tree_str[:next_idx], depth+1, debug))
             tree_str = tree_str[next_idx + 1:]
     else:
         tree.value = tree_str[next_idx + 1:]

@@ -14,7 +14,6 @@ import nn.optimizers as optimizers
 
 import config
 from lang.grammar import Grammar
-from parse import *
 from astnode import *
 
 
@@ -23,13 +22,9 @@ class PointerNet(Layer):
         super(PointerNet, self).__init__()
 
         self.dense1_input = Dense(config.encoder_hidden_dim, config.ptrnet_hidden_dim, activation='linear', name='Dense1_input')
-
         self.dense1_h = Dense(config.decoder_hidden_dim + config.encoder_hidden_dim, config.ptrnet_hidden_dim, activation='linear', name='Dense1_h')
-
         self.dense2 = Dense(config.ptrnet_hidden_dim, 1, activation='linear', name='Dense2')
-
         self.params += self.dense1_input.params + self.dense1_h.params + self.dense2.params
-
         self.set_name(name)
 
     def __call__(self, query_embed, query_token_embed_mask, decoder_states):

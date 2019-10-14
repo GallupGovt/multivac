@@ -1,7 +1,6 @@
 # -*- coding: UTF-8 -*-
 
-from astnode import ASTNode
-from lang.py.grammar import type_str_to_type
+from multivac.src.gan.generator.astnode import ASTNode
 from multivac.src.gan.generator.query_treebank import parse_raw as parse
 from collections import Counter
 import re
@@ -56,14 +55,14 @@ def get_unary_links():
 
     ranked_links = sorted(unary_links_counter, key=unary_links_counter.get, reverse=True)
     for link in ranked_links:
-        print str(link) + ' ||| ' + str(unary_links_counter[link])
+        print(str(link) + ' ||| ' + str(unary_links_counter[link]))
 
     unary_links = ranked_links[:20]
     unary_closures = []
     for link in unary_links:
         unary_closures.append(unary_link_to_closure(link))
 
-    unary_closures = zip(unary_links, unary_closures)
+    unary_closures = list(zip(unary_links, unary_closures))
 
     node_nums = rule_nums = 0.
     for parse_tree in parse_trees:
@@ -79,9 +78,9 @@ def get_unary_links():
         rule_nums += len(rules)
         node_nums += len(list(parse_tree.nodes))
 
-    print '**** after applying unary closures ****'
-    print 'avg. nums of nodes: %f' % (node_nums / len(parse_trees))
-    print 'avg. nums of rules: %f' % (rule_nums / len(parse_trees))
+    print('**** after applying unary closures ****')
+    print('avg. nums of nodes: %f' % (node_nums / len(parse_trees)))
+    print('avg. nums of rules: %f' % (rule_nums / len(parse_trees)))
 
 
 
@@ -94,20 +93,20 @@ def get_top_unary_closures(parse_trees, k=20, freq=50):
 
     ranked_links = sorted(unary_links_counter, key=unary_links_counter.get, reverse=True)
     if k:
-        print 'rank cut off: %d' % k
+        print('rank cut off: %d' % k)
         unary_links = ranked_links[:k]
     else:
-        print 'freq cut off: %d' % freq
+        print('freq cut off: %d' % freq)
         unary_links = sorted([l for l in unary_links_counter if unary_links_counter[l] >= freq], key=unary_links_counter.get, reverse=True)
 
     unary_closures = []
     for link in unary_links:
         unary_closures.append(unary_link_to_closure(link))
 
-    unary_closures = zip(unary_links, unary_closures)
+    unary_closures = list(zip(unary_links, unary_closures))
 
     for link, closure in unary_closures:
-        print 'link: %s ||| closure: %s ||| freq: %d' % (link, closure, unary_links_counter[link])
+        print('link: %s ||| closure: %s ||| freq: %d' % (link, closure, unary_links_counter[link]))
 
     return unary_closures
 

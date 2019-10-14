@@ -10,11 +10,11 @@ import re
 import astor
 # from itertools import chain
 
-from nn.utils.generic_utils import init_logging
-from nn.utils.io_utils import serialize_to_file, deserialize_from_file
+from multivac.src.gan.generator.nn.utils.generic_utils import init_logging
+from multivac.src.gan.generator.nn.utils.io_utils import serialize_to_file, deserialize_from_file
 
 # import config
-from lang.py.unaryclosure import get_top_unary_closures, apply_unary_closures
+from multivac.src.gan.generator.lang.eng.unaryclosure import get_top_unary_closures, apply_unary_closures
 
 # define actions
 APPLY_RULE = 0
@@ -204,7 +204,7 @@ class DataSet:
         order = ['query_tokens', 'tgt_action_seq', 'tgt_action_seq_type',
                  'tgt_node_seq', 'tgt_par_rule_seq', 'tgt_par_t_seq']
 
-        max_src_seq_len = max(len(self.examples[i].query) for i in ids)
+        max_src_seq_len = max(len(self.examples[i].query_tokens) for i in ids)
         max_tgt_seq_len = max(len(self.examples[i].actions) for i in ids)
 
         logging.debug('max. src sequence length: %d', max_src_seq_len)
@@ -225,9 +225,6 @@ class DataSet:
         annot_vocab = self.annot_vocab
         terminal_vocab = self.terminal_vocab
 
-        # np.max([len(e.query) for e in self.examples])
-        # np.max([len(e.rules) for e in self.examples])
-
         query_tokens = self.data_matrix['query_tokens'] = np.zeros((self.count, max_query_length), dtype='int32')
         tgt_node_seq = self.data_matrix['tgt_node_seq'] = np.zeros((self.count, max_example_action_num), dtype='int32')
         tgt_par_rule_seq = self.data_matrix['tgt_par_rule_seq'] = np.zeros((self.count, max_example_action_num), dtype='int32')
@@ -236,7 +233,7 @@ class DataSet:
         tgt_action_seq_type = self.data_matrix['tgt_action_seq_type'] = np.zeros((self.count, max_example_action_num, 3), dtype='int32')
 
         for eid, example in enumerate(self.examples):
-            exg_query_tokens = example.query[:max_query_length]
+            exg_query_tokens = example.query_tokens[:max_query_length]
             exg_action_seq = example.actions[:max_example_action_num]
 
             for tid, token in enumerate(exg_query_tokens):

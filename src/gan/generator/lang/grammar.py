@@ -98,8 +98,6 @@ class Grammar(object):
             KeyError('key=%s' % key_node)
 
     def get_node_type_id(self, node):
-        from NL2code.astnode import ASTNode
-
         if isinstance(node, ASTNode):
             type_repr = typename(node.type)
             return self.node_type_to_id[type_repr]
