@@ -35,7 +35,7 @@ class GRU(Layer):
                  activation='tanh', inner_activation='sigmoid',
                  return_sequences=False, name='GRU'):
 
-        super(GRU, self).__init__()
+        super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.return_sequences = return_sequences
@@ -146,7 +146,7 @@ class GRU_4BiRNN(Layer):
                  activation='tanh', inner_activation='sigmoid',
                  return_sequences=False, name=None):
 
-        super(GRU_4BiRNN, self).__init__()
+        super().__init__()
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.return_sequences = return_sequences
@@ -248,7 +248,7 @@ class LSTM(Layer):
                  init='glorot_uniform', inner_init='orthogonal', forget_bias_init='one',
                  activation='tanh', inner_activation='sigmoid', return_sequences=False, name='LSTM'):
 
-        super(LSTM, self).__init__()
+        super().__init__()
 
         self.output_dim = output_dim
         self.init = initializations.get(init)
@@ -356,22 +356,22 @@ class LSTM(Layer):
 
 
 class BiLSTM(Layer):
-    def __init__(self, input_dim, output_dim,
-                 init='glorot_uniform', inner_init='orthogonal', forget_bias_init='one',
-                 activation='tanh', inner_activation='sigmoid', return_sequences=False, name='BiLSTM'):
-        super(BiLSTM, self).__init__()
+    def __init__(self, input_dim, output_dim, init='glorot_uniform', 
+                 inner_init='orthogonal', forget_bias_init='one', 
+                 activation='tanh', inner_activation='sigmoid', 
+                 return_sequences=False, name='BiLSTM'):
+        super().__init__()
 
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.return_sequences = return_sequences
 
-        params = dict(locals())
-        del params['self']
-
-        params['name'] = 'foward_lstm'
-        self.forward_lstm = LSTM(**params)
-        params['name'] = 'backward_lstm'
-        self.backward_lstm = LSTM(**params)
+        self.forward_lstm = LSTM(input_dim, output_dim, init, inner_init, 
+                                 forget_bias_init, activation, inner_activation, 
+                                 return_sequences, name='foward_lstm')
+        self.backward_lstm = LSTM(input_dim, output_dim, init, inner_init, 
+                                  forget_bias_init, activation, inner_activation, 
+                                  return_sequences, name='backward_lstm')
 
         self.params = self.forward_lstm.params + self.backward_lstm.params
 
@@ -403,7 +403,7 @@ class CondAttLSTM(Layer):
                  init='glorot_uniform', inner_init='orthogonal', forget_bias_init='one',
                  activation='tanh', inner_activation='sigmoid', name='CondAttLSTM'):
 
-        super(CondAttLSTM, self).__init__()
+        super().__init__()
 
         self.output_dim = output_dim
         self.init = initializations.get(init)
@@ -586,7 +586,7 @@ class GRUDecoder(Layer):
                  activation='tanh', inner_activation='sigmoid',
                  name='GRUDecoder'):
 
-        super(GRUDecoder, self).__init__()
+        super().__init__()
         self.input_dim = input_dim
         self.context_dim = context_dim
         self.hidden_dim = hidden_dim

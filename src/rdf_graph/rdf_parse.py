@@ -4,7 +4,6 @@ from corenlp import CoreNLPClient
 import pandas as pd
 import re
 
-
 def tokenize_text(text, parser=None):
     if parser is None:
         parser = StanfordParser()
@@ -51,7 +50,6 @@ def clean_queries(queries, verbose=False):
         print(("{} cleaned queries remaining.".format(len(queries))))
 
     return clean
-
 
 class StanfordParser(object):
     def __init__(self, nlp=None, annots=None, props=None):
@@ -236,8 +234,9 @@ class stanford_parse(object):
                                           for t 
                                           in rdf[part]])
                         # result[rdf] = [x for x in result[rdf].values()]
+
             result = [list(x.values()) for x in result]
-            # result = [x for sl in result for x in sl]
+            result = [x for sl in result for x in sl]
         else:
             result = []
             longest = 0

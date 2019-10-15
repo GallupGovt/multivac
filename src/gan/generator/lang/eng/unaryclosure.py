@@ -39,8 +39,6 @@ def extract_unary_closure(parse_tree):
 
 
 def get_unary_links():
-    # data_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/card_datasets/hearthstone/all_hs.out'
-    data_file = '/Users/yinpengcheng/Research/SemanticParsing/CodeGeneration/en-django/all.code'
     parse_trees = []
     unary_links_counter = Counter()
 
@@ -83,36 +81,46 @@ def get_unary_links():
     print('avg. nums of rules: %f' % (rule_nums / len(parse_trees)))
 
 
-
 def get_top_unary_closures(parse_trees, k=20, freq=50):
     unary_links_counter = Counter()
+
     for parse_tree in parse_trees:
         example_unary_links = extract_unary_closure(parse_tree)
+
         for link in example_unary_links:
             unary_links_counter[link] += 1
 
-    ranked_links = sorted(unary_links_counter, key=unary_links_counter.get, reverse=True)
+    ranked_links = sorted(unary_links_counter, 
+                          key=unary_links_counter.get, 
+                          reverse=True)
+
     if k:
         print('rank cut off: %d' % k)
         unary_links = ranked_links[:k]
     else:
         print('freq cut off: %d' % freq)
-        unary_links = sorted([l for l in unary_links_counter if unary_links_counter[l] >= freq], key=unary_links_counter.get, reverse=True)
+        links = [l for l in unary_links_counter if unary_links_counter[l] >= freq]
+        unary_links = sorted(links, key=unary_links_counter.get, reverse=True)
 
     unary_closures = []
+
     for link in unary_links:
         unary_closures.append(unary_link_to_closure(link))
 
     unary_closures = list(zip(unary_links, unary_closures))
 
-    for link, closure in unary_closures:
-        print('link: %s ||| closure: %s ||| freq: %d' % (link, closure, unary_links_counter[link]))
+    for l, closure in unary_closures:
+        print('link: %s ||| closure: %s ||| freq: %d' % (link, 
+                                                         closure, 
+                                                         unary_links_counter[l]))
 
     return unary_closures
 
 
 def apply_unary_closures(parse_tree, unary_closures):
-    unary_closures = sorted(unary_closures, key=lambda x: x[0].size, reverse=True)
+    unary_closures = sorted(unary_closures, 
+                            key=lambda x: x[0].size, 
+                            reverse=True)
     original_parse_tree = parse_tree.copy()
 
     # apply all unary closures
@@ -121,11 +129,12 @@ def apply_unary_closures(parse_tree, unary_closures):
 
     new_tree_copy = parse_tree.copy()
     compressed_ast_to_normal(new_tree_copy)
+
     assert original_parse_tree == new_tree_copy
 
-
-rule_regex = re.compile(r'(?P<parent>.*?) -> \((?P<child>.*?)(\{(?P<clabel>.*?)\})?\)')
 def compressed_ast_to_normal(parse_tree):
+    rule_regex = re.compile(r'(?P<parent>.*?) -> \((?P<child>.*?)(\{(?P<clabel>.*?)\})?\)')
+
     if parse_tree.label and '@' in parse_tree.label and '$' in parse_tree.label:
         label = parse_tree.label
         label = label.replace('$', ' ')
@@ -133,6 +142,7 @@ def compressed_ast_to_normal(parse_tree):
 
         intermediate_nodes = []
         first_node = last_node = None
+
         for rule_repr in rule_reprs:
             m = rule_regex.match(rule_repr)
             p = m.group('parent')
@@ -140,8 +150,10 @@ def compressed_ast_to_normal(parse_tree):
             cl = m.group('clabel')
 
             node = ASTNode(c, label=cl)
+
             if last_node:
                 last_node.add_child(node)
+
             if not first_node:
                 first_node = node
 
@@ -149,6 +161,7 @@ def compressed_ast_to_normal(parse_tree):
             intermediate_nodes.append(node)
 
         last_node.value = parse_tree.value
+
         for child in parse_tree.children:
             last_node.add_child(child)
             compressed_ast_to_normal(child)
@@ -163,13 +176,6 @@ def compressed_ast_to_normal(parse_tree):
         new_child_trees = []
         for child in parse_tree.children[:]:
             compressed_ast_to_normal(child)
-        #     new_child_trees.append(new_child_tree)
-        # del parse_tree.children[:]
-        # for child_tree in new_child_trees:
-        #     parse_tree.add_child(child_tree)
-        #
-        # return parse_tree
-
 
 def match_sub_tree(parse_tree, cur_match_node, is_root=False):
     cur_level_match = False
@@ -229,30 +235,4 @@ def unary_link_to_closure(unary_link):
     return closure
 
 if __name__ == '__main__':
-#     code = """
-# class Demonwrath(SpellCard):
-#     def __init__(self):
-#         super().__init__("Demonwrath", 3, CHARACTER_CLASS.WARLOCK, CARD_RARITY.RARE)
-#
-#     def use(self, player, game):
-#         super().use(player, game)
-#         targets = copy.copy(game.other_player.minions)
-#         targets.extend(game.current_player.minions)
-#         for minion in targets:
-#             if minion.card.minion_type is not MINION_TYPE.DEMON:
-#                 minion.damage(player.effective_spell_damage(2), self)
-#     """
-#     parse_tree = parse(code)
-#     original_parse_tree = parse_tree.copy()
-#     unary_links = extract_unary_closure(parse_tree)
-#
-#     for link in unary_links:
-#         closure = unary_link_to_closure(link)
-#         print closure, link
-#         apply_unary_closure(parse_tree, closure, link)
-#
-#     compressed_ast_to_normal(parse_tree)
-#     print parse_tree
-#     print original_parse_tree
-#     print parse_tree == original_parse_tree
     get_unary_links()

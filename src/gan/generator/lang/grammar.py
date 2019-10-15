@@ -3,44 +3,6 @@ from collections import OrderedDict, defaultdict
 from multivac.src.gan.generator.astnode import ASTNode
 from multivac.src.gan.generator.lang.util import typename
 
-TERMINAL_TYPES = {
-    'CC',    # Coordinating conjunction
-    'CD',    # Cardinal number
-    'DT',    # Determiner
-    'EX',    # Existential there
-    'FW',    # Foreign word
-    'IN',    # Preposition or subordinating conjunction
-    'JJ',    # Adjective
-    'JJR',   # Adjective, comparative
-    'JJS',   # Adjective, superlative
-    'LS',    # List item marker
-    'MD',    # Modal
-    'NN',    # Noun, singular or mass
-    'NNS',   # Noun, plural
-    'NNP',   # Proper noun, singular
-    'NNPS',  # Proper noun, plural
-    'PDT',   # Predeterminer
-    'POS',   # Possessive ending
-    'PRP',   # Personal pronoun
-    'PRP$',  # Possessive pronoun (prolog version PRP-S)
-    'RB',    # Adverb
-    'RBR',   # Adverb, comparative
-    'RBS',   # Adverb, superlative
-    'RP',    # Particle
-    'SYM',   # Symbol
-    'TO',    # to
-    'UH',    # Interjection
-    'VB',    # Verb, base form
-    'VBD',   # Verb, past tense
-    'VBG',   # Verb, gerund or present participle
-    'VBN',   # Verb, past participle
-    'VBP',   # Verb, non-3rd person singular present
-    'VBZ',   # Verb, 3rd person singular present
-    'WDT',   # Wh-determiner
-    'WP',    # Wh-pronoun
-    'WP$',   # Possessive wh-pronoun (prolog version WP-S)
-    'WRB'    # Wh-adverb
-}
 
 class Grammar(object):
     def __init__(self, rules):
@@ -68,12 +30,17 @@ class Grammar(object):
                 rhs_nodes.add(child.as_type_node)
 
         root_node = lhs_nodes - rhs_nodes
-        assert len(root_node) == 1
+
+        try:
+            assert len(root_node) == 1
+        except AssertionError:
+            print(root_node)
+            raise AssertionError
+            
         self.root_node = next(iter(root_node))
 
         self.terminal_nodes = rhs_nodes - lhs_nodes
         self.terminal_types = set([n.type for n in self.terminal_nodes])
-        self.terminal_types.update(TERMINAL_TYPES)
 
         self.node_type_to_id = OrderedDict()
         for i, type in enumerate(node_types, start=0):

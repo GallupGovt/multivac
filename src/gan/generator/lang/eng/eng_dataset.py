@@ -38,6 +38,10 @@ def preprocess_eng_dataset(annot_file, text_file, write_out=False):
         text = text.strip()
 
         tokens, clean_text, parse_tree = canonicalize_example(annot, text, parser)
+
+        if parse_tree is None:
+            continue
+
         example = {'id': idx, 
                    'query_tokens': tokens, 
                    'text': clean_text, 
@@ -53,8 +57,6 @@ def preprocess_eng_dataset(annot_file, text_file, write_out=False):
             f.write('\n')
             f.write(clean_text + '\n')
             f.write('*' * 50 + '\n')
-
-        idx += 1
 
     if write_out:
         f.close()
@@ -205,9 +207,10 @@ def parse_eng_dataset(annot_file, text_file,
             can_fully_reconstructed_examples_num += 1
 
         # train, valid, test splits
-        if 0 <= idx < 533:
+
+        if idx % 3 == 0:
             train_data.add(example)
-        elif idx < 599:
+        elif idx % 3 == 1:
             dev_data.add(example)
         else:
             test_data.add(example)

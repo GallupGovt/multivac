@@ -4,27 +4,39 @@ import numpy as np
 import logging
 import copy
 
+import nn.activations as activations
+import nn.initializations as initializations
+import nn.optimizers as optimizers
+
+from multivac.src.gan.generator.astnode import *
+from multivac.src.gan.generator.lang.grammar import Grammar
+
 from nn.layers.embeddings import Embedding
 from nn.layers.core import Dense, Layer
 from nn.layers.recurrent import BiLSTM, LSTM, CondAttLSTM
-from nn.utils.theano_utils import ndim_itensor, tensor_right_shift, ndim_tensor, alloc_zeros_matrix, shared_zeros
-import nn.initializations as initializations
-import nn.activations as activations
-import nn.optimizers as optimizers
-
-import config
-from lang.grammar import Grammar
-from astnode import *
+from nn.utils.theano_utils import ndim_itensor, tensor_right_shift, \
+                                  ndim_tensor, alloc_zeros_matrix, shared_zeros
 
 
 class PointerNet(Layer):
-    def __init__(self, name='PointerNet'):
-        super(PointerNet, self).__init__()
+    def __init__(self, config, name='PointerNet'):
+        super().__init__()
 
-        self.dense1_input = Dense(config.encoder_hidden_dim, config.ptrnet_hidden_dim, activation='linear', name='Dense1_input')
-        self.dense1_h = Dense(config.decoder_hidden_dim + config.encoder_hidden_dim, config.ptrnet_hidden_dim, activation='linear', name='Dense1_h')
-        self.dense2 = Dense(config.ptrnet_hidden_dim, 1, activation='linear', name='Dense2')
-        self.params += self.dense1_input.params + self.dense1_h.params + self.dense2.params
+        self.dense1_input = Dense(config['encoder_hidden_dim'], 
+                                  config['ptrnet_hidden_dim'], 
+                                  activation='linear', 
+                                  name='Dense1_input')
+        self.dense1_h = Dense(  config['decoder_hidden_dim'] \
+                              + config['encoder_hidden_dim'], 
+                              config['ptrnet_hidden_dim'], 
+                              activation='linear', 
+                              name='Dense1_h')
+        self.dense2 = Dense(config['ptrnet_hidden_dim'], 1, 
+                            activation='linear', 
+                            name='Dense2')
+        self.params += self.dense1_input.params \
+                     + self.dense1_h.params \
+                     + self.dense2.params
         self.set_name(name)
 
     def __call__(self, query_embed, query_token_embed_mask, decoder_states):
@@ -82,25 +94,12 @@ class Hyp:
         elif self.grammar.is_terminal(node):
             return False
 
-        # elif node.type == 'epsilon':
-        #     return False
-        # elif is_terminal_ast_type(node.type):
-        #     return False
-
-        # if node.type == 'root':
-        #     return True
-        # elif inspect.isclass(node.type) and issubclass(node.type, ast.AST) and not is_terminal_ast_type(node.type):
-        #     return True
-        # elif node.holds_value and not node.label.endswith('<eos>'):
-        #     return True
-
         return True
 
     def apply_rule(self, rule, nt=None):
         if nt is None:
             nt = self.frontier_nt()
 
-        # assert rule.parent.type == nt.type
         if rule.parent.type != nt.type:
             self.has_grammar_error = True
 
@@ -111,11 +110,9 @@ class Hyp:
         nt.applied_rule = rule
 
         for child_node in rule.children:
-            child = DecodeTree(child_node.type, child_node.label, child_node.value)
-            # if is_builtin_type(rule.parent.type):
-            #     child.label = None
-            #     child.holds_value = True
-
+            child = DecodeTree(child_node.type, 
+                               child_node.label, 
+                               child_node.value)
             nt.add_child(child)
 
     def append_token(self, token, nt=None):
@@ -163,10 +160,6 @@ class Hyp:
         """
         nt = self.frontier_nt()
 
-        # if nt is a non-finishing leaf
-        # if nt.holds_value:
-        #     return nt.t
-
         if nt.parent:
             return nt.parent.t
         else:
@@ -191,46 +184,53 @@ class CondAttLSTM(Layer):
     """
     Conditional LSTM with Attention
     """
-    def __init__(self, input_dim, output_dim,
-                 context_dim, att_hidden_dim,
-                 init='glorot_uniform', inner_init='orthogonal', forget_bias_init='one',
-                 activation='tanh', inner_activation='sigmoid', name='CondAttLSTM'):
+    def __init__(self, input_dim, output_dim, context_dim, att_hidden_dim,
+                 parent_hidden_state_feed, tree_attention,
+                 init='glorot_uniform', inner_init='orthogonal', 
+                 forget_bias_init='one', activation='tanh', 
+                 inner_activation='sigmoid', 
+                 name='CondAttLSTM'):
 
-        super(CondAttLSTM, self).__init__()
+        super().__init__()
 
+        self.parent_hidden_state_feed = parent_hidden_state_feed
+        self.tree_attention = tree_attention
+
+        self.att_hidden_dim = att_hidden_dim
+        self.context_dim = context_dim
+        self.input_dim = input_dim
         self.output_dim = output_dim
+
         self.init = initializations.get(init)
         self.inner_init = initializations.get(inner_init)
         self.forget_bias_init = initializations.get(forget_bias_init)
         self.activation = activations.get(activation)
         self.inner_activation = activations.get(inner_activation)
-        self.context_dim = context_dim
-        self.input_dim = input_dim
 
         # regular LSTM layer
 
-        self.W_i = self.init((input_dim, self.output_dim))
+        self.W_i = self.init((self.input_dim, self.output_dim))
         self.U_i = self.inner_init((self.output_dim, self.output_dim))
         self.C_i = self.inner_init((self.context_dim, self.output_dim))
         self.H_i = self.inner_init((self.output_dim, self.output_dim))
         self.P_i = self.inner_init((self.output_dim, self.output_dim))
         self.b_i = shared_zeros((self.output_dim))
 
-        self.W_f = self.init((input_dim, self.output_dim))
+        self.W_f = self.init((self.input_dim, self.output_dim))
         self.U_f = self.inner_init((self.output_dim, self.output_dim))
         self.C_f = self.inner_init((self.context_dim, self.output_dim))
         self.H_f = self.inner_init((self.output_dim, self.output_dim))
         self.P_f = self.inner_init((self.output_dim, self.output_dim))
         self.b_f = self.forget_bias_init((self.output_dim))
 
-        self.W_c = self.init((input_dim, self.output_dim))
+        self.W_c = self.init((self.input_dim, self.output_dim))
         self.U_c = self.inner_init((self.output_dim, self.output_dim))
         self.C_c = self.inner_init((self.context_dim, self.output_dim))
         self.H_c = self.inner_init((self.output_dim, self.output_dim))
         self.P_c = self.inner_init((self.output_dim, self.output_dim))
         self.b_c = shared_zeros((self.output_dim))
 
-        self.W_o = self.init((input_dim, self.output_dim))
+        self.W_o = self.init((self.input_dim, self.output_dim))
         self.U_o = self.inner_init((self.output_dim, self.output_dim))
         self.C_o = self.inner_init((self.context_dim, self.output_dim))
         self.H_o = self.inner_init((self.output_dim, self.output_dim))
@@ -245,11 +245,11 @@ class CondAttLSTM(Layer):
         ]
 
         # attention layer
-        self.att_ctx_W1 = self.init((context_dim, att_hidden_dim))
-        self.att_h_W1 = self.init((output_dim, att_hidden_dim))
-        self.att_b1 = shared_zeros((att_hidden_dim))
+        self.att_ctx_W1 = self.init((self.context_dim, self.att_hidden_dim))
+        self.att_h_W1 = self.init((self.output_dim, self.att_hidden_dim))
+        self.att_b1 = shared_zeros((self.att_hidden_dim))
 
-        self.att_W2 = self.init((att_hidden_dim, 1))
+        self.att_W2 = self.init((self.att_hidden_dim, 1))
         self.att_b2 = shared_zeros((1))
 
         self.params += [
@@ -258,11 +258,11 @@ class CondAttLSTM(Layer):
         ]
 
         # attention over history
-        self.hatt_h_W1 = self.init((output_dim, att_hidden_dim))
-        self.hatt_hist_W1 = self.init((output_dim, att_hidden_dim))
-        self.hatt_b1 = shared_zeros((att_hidden_dim))
+        self.hatt_h_W1 = self.init((self.output_dim, self.att_hidden_dim))
+        self.hatt_hist_W1 = self.init((self.output_dim, self.att_hidden_dim))
+        self.hatt_b1 = shared_zeros((self.att_hidden_dim))
 
-        self.hatt_W2 = self.init((att_hidden_dim, 1))
+        self.hatt_W2 = self.init((self.att_hidden_dim, 1))
         self.hatt_b2 = shared_zeros((1))
 
         self.params += [
@@ -342,7 +342,7 @@ class CondAttLSTM(Layer):
 
         ##### feed in parent hidden state #####
 
-        if not config.parent_hidden_state_feed:
+        if not self.parent_hidden_state_feed:
             t = 0
 
         par_h = T.switch(t,
@@ -350,7 +350,7 @@ class CondAttLSTM(Layer):
                          T.zeros_like(h_tm1))
 
         ##### feed in parent hidden state #####
-        if config.tree_attention:
+        if self.tree_attention:
             i_t = self.inner_activation(
                 xi_t + T.dot(h_tm1 * b_u[0], u_i) + T.dot(ctx_vec, c_i) + T.dot(par_h, p_i) + T.dot(h_ctx_vec, h_i))
             f_t = self.inner_activation(

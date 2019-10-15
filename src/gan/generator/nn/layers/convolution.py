@@ -13,7 +13,7 @@ class Convolution2d(Layer):
 
     def __init__(self, max_sent_len, word_embed_dim, filter_num, filter_window_size,
                  border_mode='valid', activation='relu', name='Convolution2d'):
-        super(Convolution2d, self).__init__()
+        super().__init__()
 
         self.init = initializations.get('uniform')
         self.activation = activations.get(activation)
