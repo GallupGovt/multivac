@@ -1,30 +1,34 @@
 
 import argparse
 import ast
-import config
+# import config
 import configparser
 import cProfile
 import os
 import logging
 import numpy as np
 import traceback
-from vprof import profiler
+# from vprof import profiler
 
 from astnode import ASTNode
 from components import Hyp
 from dataset import DataEntry, DataSet, Vocab, Action
-from decoder import decode_python_dataset
+from decoder import decode_english_dataset
 from evaluation import *
 from learner import Learner
-from model import Model
-from nn.utils.generic_utils import init_logging
-from nn.utils.io_utils import deserialize_from_file, serialize_to_file
+from model import Generator
+from multivac.src.gan.generator.nn.utils.io_utils import deserialize_from_file, serialize_to_file
 
 def run(args_dict):
+    verbose = args_dict['verbose']
+
     if not os.path.exists(args_dict['output_dir']):
         os.makedirs(args_dict['output_dir'])
 
-    np.random.seed(args_dict['random_seed'])
+    np.random.seed(int(args_dict['random_seed']))
+
+    if verbose:
+        print('Extracting dataset from ' + args_dict['data'])
 
     train_data, dev_data, test_data = deserialize_from_file(args_dict['data'])
 
@@ -37,25 +41,26 @@ def run(args_dict):
     if not args_dict['node_num']:
         args_dict['node_num'] = len(train_data.grammar.node_type_to_id)
 
-    # 
-    # This may signal some weirdness with this "config" module...
-    # 
-    config_module = sys.modules['config']
-    for name, value in list(vars(args_dict).items()):
-        setattr(config_module, name, value)
-
     if args_dict['operation'] in ['train', 'decode', 'interactive']:
-        model = Model()
+        if verbose:
+            print("Initiating generator model...")
+        model = Generator(args_dict)
         model.build()
+
+        if verbose:
+            print("Done.")
 
         if args_dict['model']:
             model.load(args_dict['model'])
 
     if args_dict['operation'] == 'train':
-        # train_data = train_data.get_dataset_by_ids(range(2000), 'train_sample')
-        # dev_data = dev_data.get_dataset_by_ids(range(10), 'dev_sample')
-        learner = Learner(model, train_data, dev_data)
+        if verbose:
+            print("Training!")
+        learner = Learner(args_dict, model, train_data, dev_data)
         learner.train()
+
+        if verbose:
+            print('Done.')
 
     if args_dict['operation'] == 'decode':
         # ==========================
@@ -75,7 +80,7 @@ def run(args_dict):
             decode_results = decode_and_evaluate_ifttt_by_split(model, test_data)
         else:
             dataset = eval(args_dict['type'])
-            decode_results = decode_python_dataset(model, dataset)
+            decode_results = decode_english_dataset(model, dataset)
 
         serialize_to_file(decode_results, args_dict['saveto'])
 
@@ -173,21 +178,47 @@ if __name__ == '__main__':
                         help='Config file with updated parameters for generator;'
                              'defaults to "config.cfg" in this directory '
                              'otherwise.')
+    parser.add_argument('-d', '--data', required=True, 
+                        help='Dataset file with for training the Generator.')
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help='Print verbose reporting to standard out.')
 
-    args = parser.parse_args()
+    all_args = parser.parse_known_args()
+    args = vars(all_args[0])
+
+    i = 0
+
+    while i < len(all_args[1]):
+        if all_args[1][i].startswith('--'):
+            args[all_args[1][i][2:]] = all_args[1][i+1]
+            i += 2
+        else:
+            i += 1
 
     cfg = configparser.ConfigParser()
     cfgDIR = os.path.dirname(os.path.realpath(__file__))
 
-    if args_dict['config'] is not None:
-        cfg.read(args_dict['config'])
+    if args['config'] is not None:
+        cfg.read(args['config'])
     else:
         cfg.read(os.path.join(cfgDIR, 'config.cfg'))
 
-    cfg_dict = cfg['ARGS']
+    cfg_dict = cfg._sections['ARGS']
+    cfg_dict.update(args)
 
     for carg in cfg_dict:
-        if carg in args:
-            cfg_dict[carg] = args.get(carg)
+        # Cast all arguments to proper types
+        if cfg_dict[carg] == 'None':
+            cfg_dict[carg] = None
+            continue
+
+        try:
+            cfg_dict[carg] = int(cfg_dict[carg])
+        except:
+            try:
+                cfg_dict[carg] = float(cfg_dict[carg])
+            except:
+                if cfg_dict[carg] in ['True','False']:
+                    cfg_dict[carg] = eval(cfg_dict[carg])
 
     run(cfg_dict)

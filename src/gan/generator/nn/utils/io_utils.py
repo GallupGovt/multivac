@@ -74,13 +74,12 @@ def load_array(name):
 
 
 def serialize_to_file(obj, path, protocol=pickle.HIGHEST_PROTOCOL):
-    f = open(path, 'wb')
-    pickle.dump(obj, f, protocol=protocol)
-    f.close()
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f, protocol=protocol)
 
 
 def deserialize_from_file(path):
-    f = open(path, 'rb')
-    obj = pickle.load(f)
-    f.close()
+    with open(path, 'rb') as f:
+        obj = pickle.load(f)
+    
     return obj

@@ -1,25 +1,41 @@
-import traceback
-import config
 
+import re
+import traceback
+
+from lang.eng.unaryclosure import compressed_ast_to_normal
+from lang.eng.grammar import BRACKET_TYPES
 from model import *
 
-def decode_python_dataset(model, dataset, verbose=True):
-    from lang.py.parse import decode_tree_to_python_ast
+def decode_tree_to_string(decode_tree):
+    compressed_ast_to_normal(decode_tree)
+    decode_tree = decode_tree.children[0]
+    result = [x.value for x in decode_tree.get_leaves()]
+
+    return re.sub("<eos>", "", ' '.join(result)).strip()
+
+def decode_english_dataset(model, dataset, cfg):
+    verbose = cfg['verbose']
+
     if verbose:
-        logging.info('decoding [%s] set, num. examples: %d', dataset.name, dataset.count)
+        print('decoding [{}] set, num. examples: {}'.format(dataset.name, 
+                                                            dataset.count))
 
     decode_results = []
     cum_num = 0
+
     for example in dataset.examples:
-        cand_list = model.decode(example, dataset.grammar, dataset.terminal_vocab,
-                                 beam_size=config.beam_size, max_time_step=config.decode_max_time_step)
+        cand_list = model.decode(example, 
+                                 dataset.grammar, 
+                                 dataset.terminal_vocab,
+                                 beam_size=cfg['beam_size'], 
+                                 max_time_step=cfg['decode_max_time_step'])
 
         exg_decode_results = []
+
         for cid, cand in enumerate(cand_list[:10]):
             try:
-                ast_tree = decode_tree_to_python_ast(cand.tree)
-                code = astor.to_source(ast_tree)
-                exg_decode_results.append((cid, cand, ast_tree, code))
+                text = decode_tree_to_string(cand.tree)
+                exg_decode_results.append((cid, cand, text))
             except:
                 if verbose:
                     print("Exception in converting tree to code:")
@@ -36,7 +52,6 @@ def decode_python_dataset(model, dataset, verbose=True):
 
     return decode_results
 
-    # serialize_to_file(decode_results, '%s.decode_results.profile' % dataset.name)
 
 def decode_ifttt_dataset(model, dataset, verbose=True):
     if verbose:

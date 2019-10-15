@@ -2,7 +2,7 @@ from collections import namedtuple
 from collections import Iterable, OrderedDict, defaultdict
 from io import StringIO
 
-from .lang.util import typename
+from multivac.src.gan.generator.lang.util import typename
 
 class ASTNode(object):
     def __init__(self, node_type, label=None, value=None, children=None):
@@ -254,7 +254,7 @@ class ASTNode(object):
 
 class DecodeTree(ASTNode):
     def __init__(self, node_type, label=None, value=None, children=None, t=-1):
-        super(DecodeTree, self).__init__(node_type, label, value, children)
+        super().__init__(node_type, label, value, children)
 
         # record the time step when this subtree is created from a rule application
         self.t = t
@@ -275,7 +275,7 @@ class DecodeTree(ASTNode):
 
 class Rule(ASTNode):
     def __init__(self, *args, **kwargs):
-        super(Rule, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         assert self.value is None and self.label is None, 'Rule LHS cannot have values or labels'
 

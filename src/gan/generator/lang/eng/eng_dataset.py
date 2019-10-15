@@ -205,9 +205,10 @@ def parse_eng_dataset(annot_file, text_file,
             can_fully_reconstructed_examples_num += 1
 
         # train, valid, test splits
-        if 0 <= idx < 533:
+
+        if idx % 3 == 0:
             train_data.add(example)
-        elif idx < 599:
+        elif idx % 3 == 1:
             dev_data.add(example)
         else:
             test_data.add(example)

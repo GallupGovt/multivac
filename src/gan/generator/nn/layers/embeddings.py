@@ -29,7 +29,7 @@ class Embedding(Layer):
     '''
     def __init__(self, input_dim, output_dim, init='uniform', name=None):
 
-        super(Embedding, self).__init__()
+        super().__init__()
         self.init = initializations.get(init)
         self.input_dim = input_dim
         self.output_dim = output_dim
@@ -74,7 +74,7 @@ class HybridEmbedding(Layer):
     '''
     def __init__(self, embed_size, unfixed_embed_size, embed_dim, init='uniform', name='HybridEmbedding'):
 
-        super(HybridEmbedding, self).__init__()
+        super().__init__()
         self.init = initializations.get(init)
 
         self.unfixed_embed_size = unfixed_embed_size

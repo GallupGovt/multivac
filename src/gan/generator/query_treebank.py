@@ -9,11 +9,8 @@ from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
 def check_parse(query):
     parseable = True
-    toks = [x.pos_.upper() for x in query.tokens]
 
-    if 'AUX' in toks:
-        pass
-    elif 'VERB' in toks:
+    if any([x.pos_.upper().startswith('VB') for x in query.tokens]):
         pass
     else:
         parseable = False
@@ -21,21 +18,41 @@ def check_parse(query):
     return parseable
 
 def clean_queries(queries, verbose=False):
-    clean_queries = list()
+    clean = list()
 
     if verbose:
         print(("Performing basic clean on {} queries.".format(len(queries))))
 
-    for text in queries:
-        text = re.sub(r"^\W+|[^\w{W}(?<!?)]+$", "", text)
+    for query in queries:
+        # strip whitespace, and quotes
+        # Remove any sentence fragments preceding question
+        # Remove non-alphabetic characters at the start of the string
+        query = query.strip()
+        query = query.strip("\"")
+        query = re.sub(r"“|”", "\"", query)
+        query = re.sub(r"‘|’", "\'", query)
+        query = re.sub(r"`", "\'", query)
+        query = query[query.index(re.split(r"\"", query)[-1]):]
+        query = query[query.index(re.split(r"NumericCitation", query, re.IGNORECASE)[-1]):]
+        query = query[query.index(re.split(r"[\.\!\?]\s+", query)[-1]):]
+        query = re.sub(r"^(?!\()[^a-zA-Z]+","", query)
+        query = re.sub(r"^(\(.*\))?\W+","", query)
+        query = re.sub(r"(\s+)([\)\]\}\.\,\?\!])", r"\2", query)
+        query = re.sub(r"([\(\[\{])(\s+)", r"\1", query)
 
-        if "citation" not in text.lower():
-            clean_queries.append(text)
+        if len(query) > 0:
+            tok_chk = [len(x) for x in query.split()]
+
+            if sum(tok_chk)/len(tok_chk) < 2:
+                continue
+
+            query = query[0].upper() + query[1:]
+            clean.append(query)
 
     if verbose:
         print(("{} cleaned queries remaining.".format(len(queries))))
 
-    return clean_queries
+    return clean
 
 def find_match_paren(s):
     count = 0
@@ -54,9 +71,9 @@ def get_eng_tree(text, depth=0, debug=False):
         an ASTNode tree from it. 
 
         Example input:
-        '(SBARQ (WHADVP (WRB Why)) (SQ (VBP do) (NP (NNS birds)) (ADVP (RB 
-        suddenly)) (VP (VB appear) (SBAR (WHADVP (WRB whenever)) (S (NP (PRP 
-        you)) (VP (VBP are) (ADJP (JJ near))))))) (. ?))'
+        '(ROOT (SBARQ (WHADVP (WRB Why)) (SQ (VBP do) (NP (NNS birds)) (ADVP 
+        (RB suddenly)) (VP (VB appear) (SBAR (WHADVP (WRB whenever)) (S (NP 
+        (PRP you)) (VP (VBP are) (ADJP (JJ near))))))) (. ?)))'
     '''
 
     if debug: print(("\t" * depth + "String: '{}'".format(text)))
@@ -121,17 +138,23 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False):
     if verbose:
         print("Performing constituency parsing of queries")
 
-    for query in queries:
-        query = stanford_parse(parser, query)
+    for i, q in enumerate(queries):
+        if len(q) > 0:
+            try:
+                query = stanford_parse(parser, q)
+            except:
+                print('Could not parse query {}: "{}"'.format(i, q))
+                continue
 
-        if not check_parse(query):
-            continue
+        if check_parse(query):
+            try:
+                parse_trees.append(get_eng_tree(query.parse_string))
+            except:
+                print(("Could not interpret query parse {}: '{}'".format(i, query)))
+                continue
 
-        try:
-            parse_trees.append(get_eng_tree(query.parse_string))
-        except:
-            print(("Could not parse query: '{}'".format(query)))
-            continue
+        if i % 100 == 0:
+            print("{} queries processed.".format(i))
 
     if verbose:
         print(("{} queries successfully parsed.".format(len(parse_trees))))

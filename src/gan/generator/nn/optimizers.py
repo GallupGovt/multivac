@@ -55,7 +55,7 @@ class Optimizer(object):
 class SGD(Optimizer):
 
     def __init__(self, lr=0.01, momentum=0., decay=0., nesterov=False, *args, **kwargs):
-        super(SGD, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(locals())
         self.iterations = shared_scalar(0)
         self.lr = shared_scalar(lr)
@@ -89,7 +89,7 @@ class SGD(Optimizer):
 
 class RMSprop(Optimizer):
     def __init__(self, lr=0.001, rho=0.9, epsilon=1e-6, *args, **kwargs):
-        super(RMSprop, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(locals())
         self.lr = shared_scalar(lr)
         self.rho = shared_scalar(rho)
@@ -116,7 +116,7 @@ class RMSprop(Optimizer):
 
 class Adagrad(Optimizer):
     def __init__(self, lr=0.01, epsilon=1e-6, *args, **kwargs):
-        super(Adagrad, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(locals())
         self.lr = shared_scalar(lr)
 
@@ -143,7 +143,7 @@ class Adadelta(Optimizer):
         Reference: http://arxiv.org/abs/1212.5701
     '''
     def __init__(self, lr=1.0, rho=0.95, epsilon=1e-6, *args, **kwargs):
-        super(Adadelta, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(locals())
         self.lr = shared_scalar(lr)
 
@@ -181,7 +181,7 @@ class Adadelta_GaussianNoise(Optimizer):
         Reference: http://arxiv.org/abs/1212.5701
     '''
     def __init__(self, lr=1.0, rho=0.95, epsilon=1e-6, *args, **kwargs):
-        super(Adadelta_GaussianNoise, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(locals())
         self.lr = shared_scalar(lr)
         self.rng = MRG_RandomStreams(use_cuda=config.get('run.use_cuda')) #RandomStreams() #(use_cuda=False)
@@ -227,7 +227,7 @@ class Adam(Optimizer):
         Default parameters follow those provided in the original paper.
     '''
     def __init__(self, lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=1e-8, *args, **kwargs):
-        super(Adam, self).__init__(**kwargs)
+        super().__init__(**kwargs)
         self.__dict__.update(locals())
         self.iterations = shared_scalar(0)
         self.lr = shared_scalar(lr)

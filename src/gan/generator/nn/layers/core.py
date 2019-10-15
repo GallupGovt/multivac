@@ -82,7 +82,7 @@ class MaskedLayer(Layer):
 class Dense(Layer):
     def __init__(self, input_dim, output_dim, init='glorot_uniform', activation='tanh', name='Dense'):
 
-        super(Dense, self).__init__()
+        super().__init__()
         self.init = initializations.get(init)
         self.activation = activations.get(activation)
         self.input_dim = input_dim
@@ -108,7 +108,7 @@ class Dense(Layer):
 
 class Dropout(Layer):
     def __init__(self, p, srng, name='dropout'):
-        super(Dropout, self).__init__()
+        super().__init__()
 
         assert 0. < p < 1.
 
@@ -131,7 +131,7 @@ class Dropout(Layer):
 
 class WordDropout(Layer):
     def __init__(self, p, srng, name='WordDropout'):
-        super(WordDropout, self).__init__()
+        super().__init__()
 
         self.p = p
         self.srng = srng
