@@ -4,6 +4,45 @@ from corenlp import CoreNLPClient
 import pandas as pd
 import re
 
+
+def clean_queries(queries, verbose=False):
+    clean = list()
+
+    if verbose:
+        print(("Performing basic clean on {} queries.".format(len(queries))))
+
+    for query in queries:
+        # strip whitespace, and quotes
+        # Remove any sentence fragments preceding question
+        # Remove non-alphabetic characters at the start of the string
+        query = query.strip()
+        query = re.sub(r"“|”", "\"", query)
+        query = re.sub(r"‘|’", "\'", query)
+        query = re.sub(r"`", "\'", query)
+        query = query.strip("\"")
+        query = query.strip("\'")
+        query = query[query.index(re.split(r"\"", query)[-1]):]
+        query = query[query.index(re.split(r"NumericCitation", query, re.IGNORECASE)[-1]):]
+        query = query[query.index(re.split(r"[\.\!\?]\s+", query)[-1]):]
+        query = re.sub(r"^(?!\()[^a-zA-Z]+","", query)
+        query = re.sub(r"^(\(.*\))?\W+","", query)
+        query = re.sub(r"(\s+)([\)\]\}\.\,\?\!])", r"\2", query)
+        query = re.sub(r"([\(\[\{])(\s+)", r"\1", query)
+
+        if len(query) > 0:
+            tok_chk = [len(x) for x in query.split()]
+
+            if sum(tok_chk)/len(tok_chk) < 2:
+                continue
+
+            query = query[0].upper() + query[1:]
+            clean.append(query)
+
+    if verbose:
+        print(("{} cleaned queries remaining.".format(len(queries))))
+
+    return clean
+
 class StanfordParser(object):
     def __init__(self, nlp=None, annots=None, props=None):
         if annots is None:
@@ -337,8 +376,9 @@ class stanford_parse(object):
         return ' '.join([t.text for t in self.tokens])
 
 
-def process_texts(parser, texts, verbose=False, form='longest'):
+def process_texts(parser, texts, clean=False, verbose=False, form='longest'):
     # Perform basic parsing and extraction on an iterable of sentences
+    texts = clean_queries(texts, verbose)
     sentences = [stanford_parse(parser, text) for text in texts]
     processed = []
 
@@ -348,7 +388,7 @@ def process_texts(parser, texts, verbose=False, form='longest'):
         else:
             processed.append([])
 
-    return processed
+    return processed, texts
 
 def run(args_dict):
     parser = StanfordParser()
@@ -360,21 +400,28 @@ def run(args_dict):
         with open(args_dict['text_file'], "r") as f:
             texts = pd.Series(f.readlines())
 
-    contents = process_texts(parser, 
-                             texts, 
-                             args_dict['verbose'],
-                             args_dict['form'])
-
-    if args_dict['out_file'].upper().endswith(".CSV"):
-        result = pd.concat([texts, pd.Series(contents)], axis=1)
-        result.columns = ['text', 'annotations']
-        result.to_csv(args_dict['out_file'], index=False)
+    if args_dict['just_clean']:
+        texts = clean_queries(texts, args_dict['verbose'])
     else:
-        with open(args_dict['out_file'], "w") as f:
-            try:
-                f.write('\n'.join([','.join(x) for x in contents]))
-            except:
-                print(contents[0])
+        contents, texts = process_texts(parser, 
+                                        texts, 
+                                        args_dict['clean'],
+                                        args_dict['verbose'],
+                                        args_dict['form'])
+
+        if args_dict['out_file'].upper().endswith(".CSV"):
+            result = pd.concat([texts, pd.Series(contents)], axis=1)
+            result.columns = ['text', 'annotations']
+            result.to_csv(args_dict['out_file'], index=False)
+        else:
+            with open(args_dict['out_file'], "w") as f:
+                try:
+                    f.write('\n'.join([','.join(x) for x in contents]))
+                except:
+                    print(contents[0])
+
+    with open(args_dict['text_file']+"_cleaned.txt", "w") as f:
+        f.write('\n'.join(texts))
 
 
 if __name__ == '__main__':
@@ -387,8 +434,12 @@ if __name__ == '__main__':
     parser.add_argument('-f', '--form', choices=['asis', 'list',
                         'longest', 'all'],
                         help='Method for returning RDF components of queries.')
+    parser.add_argument('-c', '--clean', action='store_true',
+                        help='Clean queries before processing.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print verbose output on progress.')
+    parser.add_argument('--just_clean', action='store_true',
+                        help='Just clean and return the texts.')
 
     args_dict = vars(parser.parse_args())
     run(args_dict)
