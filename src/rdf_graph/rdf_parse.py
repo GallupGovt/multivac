@@ -4,6 +4,14 @@ from corenlp import CoreNLPClient
 import pandas as pd
 import re
 
+def tokenize_text(text, parser=None):
+    if parser is None:
+        parser = StanfordParser()
+
+    p = stanford_parse(parser, text)
+
+    return [x.text for x in p.tokens]
+
 class StanfordParser(object):
     def __init__(self, nlp=None, annots=None, props=None):
         if annots is None:
@@ -354,7 +362,7 @@ def run(args_dict):
     contents = process_queries(parser, 
                                queries['text'], 
                                args_dict['verbose'],
-                               args_dict['how'])
+                               args_dict['form'])
     texts['Annotations'] = pd.Series(contents)
     texts.to_csv(args_dict['out_file'], index=False)
 
@@ -366,7 +374,7 @@ if __name__ == '__main__':
                         help='Path to sentences to parse.')
     parser.add_argument('-o', '--out_file',
                         help='Filename for output.')
-    parser.add_argument('-h', '--how', choices=['asis',
+    parser.add_argument('-f', '--form', choices=['asis', 'list',
                         'longest', 'all'],
                         help='Method for returning RDF components of queries.')
     parser.add_argument('-v', '--verbose', action='store_true',

@@ -102,16 +102,18 @@ def evaluate_decode_results(dataset, decode_results, cfg):
         if len(decode_cands) == 0:
             continue
 
-        decode_cand = decode_cands[0]
+        text = ''
+        i = 0
 
-        cid, cand, text = decode_cand
+        while i < len(decode_cands) and len(text) == 0:
+            cid, cand, text = decode_cands[i]
+            i += 1
 
-        try:
-            predict_tokens = tokenize_text(text)
-        except:
-            import pdb; pdb.set_trace()
-            print('error in tokenizing [{}]'.format(text))
+        if text == '':
+            predict_tokens = []
             continue
+        else:
+            predict_tokens = tokenize_text(text)
 
         if refer_tokens == predict_tokens:
             cum_acc += 1
@@ -141,7 +143,7 @@ def evaluate_decode_results(dataset, decode_results, cfg):
 
         # we apply Ling Wang's trick when evaluating BLEU scores
         refer_tokens_for_bleu = tokenize_text(ref_text_for_bleu)
-        pred_tokens_for_bleu = tokenize_text(pred_text_for_bleu)
+        pred_tokens_for_bleu = predict_tokens
 
         shorter = len(pred_tokens_for_bleu) < len(refer_tokens_for_bleu)
 

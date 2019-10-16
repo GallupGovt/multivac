@@ -41,7 +41,6 @@ class Grammar(object):
 
         self.terminal_nodes = rhs_nodes - lhs_nodes
         self.terminal_types = set([n.type for n in self.terminal_nodes])
-        self.terminal_types.update(TERMINAL_TYPES)
 
         self.node_type_to_id = OrderedDict()
         for i, type in enumerate(node_types, start=0):

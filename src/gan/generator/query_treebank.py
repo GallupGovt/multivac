@@ -28,10 +28,11 @@ def clean_queries(queries, verbose=False):
         # Remove any sentence fragments preceding question
         # Remove non-alphabetic characters at the start of the string
         query = query.strip()
-        query = query.strip("\"")
         query = re.sub(r"“|”", "\"", query)
         query = re.sub(r"‘|’", "\'", query)
         query = re.sub(r"`", "\'", query)
+        query = query.strip("\"")
+        query = query.strip("\'")
         query = query[query.index(re.split(r"\"", query)[-1]):]
         query = query[query.index(re.split(r"NumericCitation", query, re.IGNORECASE)[-1]):]
         query = query[query.index(re.split(r"[\.\!\?]\s+", query)[-1]):]
@@ -119,8 +120,19 @@ def get_grammar(parse_trees, verbose=False):
     return grammar
 
 def parse_raw(parser, query):
-    query = stanford_parse(parser, query)
-    return get_eng_tree(query.parse_string)
+    try:
+        query = stanford_parse(parser, query)
+    except:
+        print('Could not parse query: {}'.format(query))
+        return None
+
+    try:
+        result = get_eng_tree(query.parse_string)
+    except: 
+        print("Could not interpret query parse: {}".format(query.parse_string))
+        return None
+
+    return result
 
 
 def extract_grammar(source_file, output=None, clean=False, verbose=False):
