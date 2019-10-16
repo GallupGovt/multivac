@@ -4,7 +4,7 @@ import argparse
 
 from datetime import datetime
 
-from rdf_graph import RDFGraph
+from src.rdf_graph.rdf_graph import RDFGraph
 
 
 def run(args_dict):
@@ -21,7 +21,7 @@ def run(args_dict):
 
     print('\nExtracting relation triples from abstracts')
     knowledge_graph.extract_raw_tuples()
-  
+
     # pre-process extracted tuples
     print('\nPreprocessing raw relation triples')
     knowledge_graph.preprocess_raw_tuples()
