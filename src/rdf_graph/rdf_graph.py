@@ -4,17 +4,18 @@ import numpy as np
 import os
 import re
 import string
+import pickle
+
 # import xmltodict
 
 # from collections import Counter
 from corenlp import CoreNLPClient
+from datetime import datetime
 from nltk import pos_tag, word_tokenize, sent_tokenize
 from nltk.stem import WordNetLemmatizer
-from rdf_parse import StanfordParser, stanford_parse
+from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
-from sklearn.feature_extraction.text import TfidfVectorizer
-from textdistance import cosine
 
 nlp = CoreNLPClient()
 parser = StanfordParser(nlp)
@@ -72,19 +73,21 @@ class RDFGraph:
         del(self.all_texts)
         self.all_texts = []
 
-    def cluster_entities(self, link_method='average'):
-        entity_list = np.array([entity[0] for entity in self.unique_entities])
-        # Create distance matrix (vector) using cosine similarity 
+    def cluster_entities(self, embeddings_path, link_method='average'):
+        embeddings_dict = self.load_embeddings(embeddings_path,
+                                               self.unique_entities)
+        # Create distance matrix (vector) using cosine similarity
         # between all entity strings
-        dist_vec = pdist(entity_list.reshape(-1, 1), 
-                         lambda u, v: cosine.normalized_distance(u[0], v[0]))
+        embeddings_array = np.array([embedding for embedding in embeddings_dict.values()])
+        dist_vec = pdist(embeddings_array, 'cosine')
 
         # Cluster distance matrix to find co-referring entities
         Z = fastcluster.linkage(dist_vec, method=link_method)
         cluster_labels = fcluster(Z, t=self.clust_dist_thres,
                                   criterion='distance')
         cluster_members_all = []
-        
+
+        entity_list = np.array([entity for entity in embeddings_dict.keys()])
         for clus_label in np.unique(cluster_labels):
             clus_indx = cluster_labels == clus_label
             cluster_members = list(entity_list[clus_indx])
@@ -95,37 +98,6 @@ class RDFGraph:
                   'cluster_rep': self.get_cluster_representatives(cluster_members_all)}
 
         self.entity_cluster_results = output
-
-    @staticmethod
-    def compute_tuple_tfidf_scores(texts, tuples):
-        vectorizer = TfidfVectorizer()
-
-        tfidf_matrix = vectorizer.fit_transform(texts)
-        token_2_indx = {token: np.int(num_indx) for num_indx, token
-                        in enumerate(vectorizer.get_feature_names())}
-        tfidf_tuple_scores = []
-
-        for indx, text_tuples in enumerate(tuples):
-            if text_tuples is not None:
-                text_tuples_flat = [tuple_x for sent in text_tuples
-                                        for tuple_x in sent]
-                tfidf_vector = tfidf_matrix[indx, :]
-                
-                for tuple_x in text_tuples_flat:
-                    subj_indx = [token_2_indx[token.lower()]
-                                 for token in tuple_x[0].split(' ')
-                                 if token.lower() in token_2_indx.keys()]
-                    subj_score = np.mean(tfidf_vector[:, subj_indx])
-                    obj_indx = [token_2_indx[token.lower()]
-                                for token in tuple_x[2].split(' ')
-                                if token.lower() in token_2_indx.keys()]
-                    obj_score = np.mean(tfidf_vector[:, obj_indx])
-                    tfidf_score = np.mean(np.array([subj_score, obj_score]))
-                    tfidf_tuple_scores.append([tuple_x, tfidf_score])
-
-        tfidf_tuple_scores_sorted = sorted(tfidf_tuple_scores,
-                                           key=lambda x: x[1], reverse=True)
-        return tfidf_tuple_scores_sorted
 
     def extract_raw_tuples(self):
         if len(self.all_texts) == 0:
@@ -181,7 +153,6 @@ class RDFGraph:
             # relation lists. If not, will result in key error and we will move
             # on to next tuple
             try:
-                # import ipdb; ipdb.set_trace()
                 print(tuple_x)
                 tuple_filt = [entity_dict[tuple_x[0]],
                               relation_dict[tuple_x[1]],
@@ -261,7 +232,27 @@ class RDFGraph:
                               for x 
                               in self.all_texts}
 
-    def output_to_openke(self, timestamp):
+    @staticmethod
+    def load_embeddings(embeddings_path, entity_list):
+        embeddings = pickle.load(open(embeddings_path, 'rb'))
+        embeddings_dict = {token: vector for token, vector in
+                           zip(embeddings['vocab'], embeddings['embeddings'])}
+        # Compute avg embeddings for each entity
+        entity_embeddings = {}
+        for entity in entity_list:
+            entity_split = entity.split()
+            entity_split_embeddings = [embeddings_dict[token] for token in entity_split if token in embeddings_dict]
+            if len(entity_split_embeddings) == 1:
+                entity_embeddings.update({
+                    entity: np.squeeze(np.array(entity_split_embeddings))
+                })
+            elif len(entity_split_embeddings) > 1:
+                entity_embeddings.update({
+                    entity: np.mean(np.array(entity_split_embeddings), axis=0)
+                })
+        return entity_embeddings
+
+    def output_to_openke(self, timestamp=datetime.now()):
         relation_list = [relation[0] for relation in self.unique_relations]
         final_tuples = self.filter_tuples(self.tuples_preprocessed,
                                           self.entity_cluster_results['cluster_rep'],
@@ -308,27 +299,24 @@ class RDFGraph:
                 f.write(line)
 
     def preprocess_raw_tuples(self):
-        # Remove nones from 'all_tuples' and 'text' dicts
-        self.all_tuples = {num: tuples for num, tuples in self.all_tuples.items()
-                           if tuples is not None}
-        self.text = {num: text for num, text in self.text.items()
-                     if text is not None}
+        # Temp - Remove tuples missing subject, predicate or object
+        tuples = [self.all_tuples[key] for key in self.all_tuples.keys()]
+        tuples_cleared = [tuple_x
+                          for art in tuples
+                          for sent in art
+                          for tuple_x in sent
+                          if all([token != '' for token in tuple_x])]
+        self.all_tuples = tuples_cleared
 
         # Initialize NLTK Lemmatizer
         lemmatizer = WordNetLemmatizer()
         # 1. Get tf-idf scores for each tuple
-        self.tuple_tfidf_scores = self.compute_tuple_tfidf_scores(self.text.values(),
-                                                                  self.all_tuples.values())
         preprocessed_tuples = []
 
-        for num_tuple, tuple_x in enumerate(self.tuple_tfidf_scores):
+        for num_tuple, tuple_x in enumerate(self.all_tuples):
             tuple_x_clean = []
 
-            # Only pull the top # tuples as set by 'tfidf'
-            if num_tuple >= self.top_tfidf:
-                break
-
-            for num, element in enumerate(tuple_x[0]):
+            for num, element in enumerate(tuple_x):
                 # ensure the tuple_x is not empty
                 if element is None:
                     continue
