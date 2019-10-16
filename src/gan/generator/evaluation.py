@@ -5,7 +5,7 @@ import logging
 import os
 import traceback
 
-from multivac.src.rdf_graph.rdf_parse import tokenize_text
+from multivac.src.rdf_graph.rdf_parse import tokenize_text, StanfordParser
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu, SmoothingFunction
 
 from model import *
@@ -59,6 +59,8 @@ def evaluate_decode_results(dataset, decode_results, cfg):
     verbose = cfg['verbose']
     assert dataset.count == len(decode_results)
 
+    parser = StanfordParser()
+
     f = f_decode = None
 
     if verbose:
@@ -95,7 +97,7 @@ def evaluate_decode_results(dataset, decode_results, cfg):
         example = dataset.examples[eid]
         ref_text = example.text
         refer_source = ref_text
-        refer_tokens = tokenize_text(ref_text)
+        refer_tokens = tokenize_text(ref_text, parser)
         cur_example_correct = False
 
         decode_cands = decode_results[eid]
@@ -113,7 +115,7 @@ def evaluate_decode_results(dataset, decode_results, cfg):
             predict_tokens = []
             continue
         else:
-            predict_tokens = tokenize_text(text)
+            predict_tokens = tokenize_text(text, parser)
 
         if refer_tokens == predict_tokens:
             cum_acc += 1
@@ -142,7 +144,7 @@ def evaluate_decode_results(dataset, decode_results, cfg):
         #     pred_code_for_bleu = text
 
         # we apply Ling Wang's trick when evaluating BLEU scores
-        refer_tokens_for_bleu = tokenize_text(ref_text_for_bleu)
+        refer_tokens_for_bleu = tokenize_text(ref_text_for_bleu, parser)
         pred_tokens_for_bleu = predict_tokens
 
         shorter = len(pred_tokens_for_bleu) < len(refer_tokens_for_bleu)
@@ -193,7 +195,7 @@ def evaluate_decode_results(dataset, decode_results, cfg):
             cid, cand, text = decode_cand
 
             try:
-                predict_tokens = tokenize_text(text)
+                predict_tokens = tokenize_text(text, parser)
 
                 if predict_tokens == refer_tokens:
                     cur_oracle_acc = 1
@@ -209,7 +211,7 @@ def evaluate_decode_results(dataset, decode_results, cfg):
                 #     pred_code_for_bleu = code
 
                 # we apply Ling Wang's trick when evaluating BLEU scores
-                pred_tokens_for_bleu = tokenize_text(pred_text_for_bleu)
+                pred_tokens_for_bleu = tokenize_text(pred_text_for_bleu, parser)
 
                 ngram_weights = [0.25] * min(4, len(refer_tokens_for_bleu))
                 bleu_score = sentence_bleu([refer_tokens_for_bleu], 
