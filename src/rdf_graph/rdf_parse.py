@@ -4,6 +4,14 @@ from corenlp import CoreNLPClient
 import pandas as pd
 import re
 
+def tokenize_text(text, parser=None):
+    if parser is None:
+        parser = StanfordParser()
+
+    p = stanford_parse(parser, text)
+
+    return [x.text for x in p.tokens]
+
 
 def clean_queries(queries, verbose=False):
     clean = list()
