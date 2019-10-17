@@ -3,9 +3,9 @@ import argparse
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='PyTorch TreeLSTM for Sentence Similarity on Dependency Trees')
+        description='Discriminator for QueryGAN')
     # data arguments
-    parser.add_argument('--data', default='data/sick/',
+    parser.add_argument('--data', default='data/multivac/',
                         help='path to dataset')
     parser.add_argument('--glove', default='data/glove/',
                         help='directory with GLOVE embeddings')
@@ -20,8 +20,6 @@ def parse_args():
                         help='Size of TreeLSTM cell state')
     parser.add_argument('--hidden_dim', default=50, type=int,
                         help='Size of classifier MLP')
-    parser.add_argument('--num_classes', default=5, type=int,
-                        help='Number of classes in dataset')
     parser.add_argument('--freeze_embed', action='store_true',
                         help='Freeze word embeddings')
     # training arguments
