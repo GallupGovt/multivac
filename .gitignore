@@ -30,3 +30,17 @@ __pycache__/
 
 # system files
 .DS_Store
+
+# logs
+*.log
+
+# flat-files
+*.json
+*.xml
+*.csv
+
+
+# envs
+venv/
+env/
+virtualenv/
