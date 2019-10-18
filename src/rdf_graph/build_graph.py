@@ -29,7 +29,7 @@ def run(args_dict):
     # cluster all entities using fast
     # agglomerative clustering and cosine distance of averaged word embeddings
     print('\nClustering entities from relation triples')
-    knowledge_graph.cluster_entities()
+    knowledge_graph.cluster_entities('data/DA_glove_embeddings_300.pickle')
     print('\n{} entity clusters were found'
           .format(len(knowledge_graph.entity_cluster_results['cluster_members'])))
 
