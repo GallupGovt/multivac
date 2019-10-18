@@ -253,10 +253,9 @@ class RDFGraph:
         return entity_embeddings
 
     def output_to_openke(self, timestamp=datetime.now()):
-        relation_list = [relation[0] for relation in self.unique_relations]
         final_tuples = self.filter_tuples(self.tuples_preprocessed,
                                           self.entity_cluster_results['cluster_rep'],
-                                          relation_list)
+                                          self.unique_relations)
         self.final_tuples = final_tuples
         relation_temp = list(set([tuple_x[1] for tuple_x in
                                   self.final_tuples]))
