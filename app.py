@@ -6,12 +6,7 @@ from flask import (
 	url_for
 )
 
-# import the multivac query utility
-# this is an exampe substitute for the query utility
-def dummy_utility(args_dict):
-	hash1 = hash(args_dict['arg1'])
-	hash2 = hash(args_dict['arg2'])
-	return f'OUTPUT: res1: {hash1}, res2: {hash2}'
+from src.rdf_graph import map_queries
 
 
 app = Flask(__name__)
@@ -20,29 +15,32 @@ app.debug = True
 
 @app.route('/')
 def query():
-    return render_template('query.html')
+
+    return render_template(
+    	'query.html'
+    )
 
 
 @app.route('/results')
 def results():
 
 	if request.method == 'GET':
-		# populate inputs based on utility run args_dict
-		inp1 = request.values.get('input-1')
-		inp2 = request.values.get('input-2')
 
-		# this is a dummy example using dummy_utility
-		example_args_dict = {
-			'arg1': inp1,
-			'arg2': inp2
+		args_dict = {
+			'docker_folder_structure': [x for x in os.walk(os.getcwd())],
+			'dir': request.values.get('dir-input'),
+			'model': request.values.get('model-type-input'),
+			'out': request.values.get('out-input'),
+			'run': request.values.get('run-input'),
+			'threshold': request.values.get('threshold-input'),
+			'verbose': request.values.get('verbosity-input'),
+			'num_top_rel': request.values.get('num-top-input'),
+			'search': request.values.get('search-input'),
 		}
-		example_results = dummy_utility(example_args_dict)
 
-		return render_template(
-			'result.html',
-			query=example_args_dict,
-			results=example_results
-		)
+		# results = map_queries.run(args_dict)
+
+		return args_dict
 
 	else:
 		return redirect(url_for('query'))

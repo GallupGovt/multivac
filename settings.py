@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-from multivac.src import utilities
+from src import utilities
 
 
 cfg = configparser.ConfigParser()
