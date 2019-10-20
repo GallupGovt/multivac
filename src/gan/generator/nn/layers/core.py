@@ -4,9 +4,9 @@ import theano
 import theano.tensor as T
 import numpy as np
 
-from nn.utils.theano_utils import *
-import nn.initializations as initializations
-import nn.activations as activations
+from multivac.src.gan.generator.nn.utils.theano_utils import *
+import multivac.src.gan.generator.nn.initializations as initializations
+import multivac.src.gan.generator.nn.activations as activations
 
 from theano.tensor.shared_randomstreams import RandomStreams
 from theano.sandbox.rng_mrg import MRG_RandomStreams

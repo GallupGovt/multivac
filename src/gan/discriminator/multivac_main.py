@@ -117,11 +117,9 @@ def main():
     logger.debug('==> Size of test data    : %d ' % len(test_dataset))
 
     # initialize model, criterion/loss_function, optimizer
-    model = QueryGAN_Discriminator(vocab.size(),
-                                   args.input_dim,
-                                   args.mem_dim,
-                                   args.sparse,
-                                   args.freeze_embed)
+    dargs = vars(args)
+    dargs['vocab_size'] = vocab.size()
+    model = QueryGAN_Discriminator(dargs)
     criterion = nn.MSELoss()
 
     # for words common to dataset vocab and GLOVE, use GLOVE vectors
@@ -144,8 +142,7 @@ def main():
 
         # zero out the embeddings for padding and other special words 
         # if they are absent in vocab
-        for idx, item in enumerate([Constants.PAD_WORD, Constants.UNK_WORD,
-                                    Constants.BOS_WORD, Constants.EOS_WORD]):
+        for idx, item in enumerate(['<blank>', '<unk>', '<bos>', '<eos>']):
             emb[idx].zero_()
 
         for word in vocab.labelToIdx.keys():

@@ -1,18 +1,21 @@
 
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import argparse
 import glob
 import json
-# import matplotlib.pyplot as plt
-# import networkx as nx
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 import os
-import pandas as pd
 import re
 import tensorflow as tf
+
+import pandas as pd
 import sys
 
 from datetime import datetime
-from multivac.settings import models_dir
+#from multivac.settings import models_dir
 from numpy import array
 from OpenKE import config, models
 from rdf_parse import StanfordParser, stanford_parse
@@ -342,6 +345,9 @@ def run(args_dict):
         if not files:
             raise Exception('No models to predict on; generate one first.')
         else:
+            if verbose:
+                print("Loading files...")
+
             times = list(set([file.split('.')[2] for file in files]))
             ifile = max([datetime.strptime(x, '%d%b%Y-%H:%M:%S') for
                         x in times]).strftime('%d%b%Y-%H:%M:%S')
@@ -350,9 +356,14 @@ def run(args_dict):
             args_dict.update({'timestamp': ifile})
 
     # initialize settings
+    if verbose:
+        print("Initializing OpenKE system...")
+                
     con.init()
 
     # set knowledge embedding model
+    if verbose:
+        print("Setting model...")
     kem = set_model_choice(args_dict['model'])
     con.set_model(kem)
 
@@ -361,6 +372,9 @@ def run(args_dict):
         # model training
         con.run()
     else:
+        if verbose:
+            print("Beginning predictions...")
+
         # predict objects
         if not args_dict['search']:
             raise Exception('You need to provide a search term.')
@@ -370,7 +384,7 @@ def run(args_dict):
             glove = loadGloveModel(args_dict['glove'], verbose)
 
             # identify files for use
-            files = glob.glob(os.path.join(con.get_in_path(),'*.txt'))
+            files = glob.glob(os.path.join(con.in_path,'*.txt'))
             rel_file = max([file for file in files if re.search('relation', file)],
                            key=os.path.getctime)
             ent_file = max([file for file in files if re.search('entity', file)],
@@ -400,7 +414,7 @@ def run(args_dict):
                 predicted_object(con, 
                                  args_dict['search'], 
                                  num_top_rel, 
-                                 threshold)
+                                 threshold=threshold)
 
 
 

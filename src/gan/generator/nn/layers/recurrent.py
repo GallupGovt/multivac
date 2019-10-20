@@ -5,7 +5,7 @@ import theano
 import theano.tensor as T
 import numpy as np
 
-from .core import *
+from multivac.src.gan.generator.nn.layers.core import *
 
 
 class GRU(Layer):

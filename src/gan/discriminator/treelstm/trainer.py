@@ -34,7 +34,7 @@ class Trainer(object):
             total_loss += loss.item()
             loss.backward()
 
-            if idx % self.args.batchsize == 0 and idx > 0:
+            if idx % self.args['batchsize'] == 0 and idx > 0:
                 self.optimizer.step()
                 self.optimizer.zero_grad()
 

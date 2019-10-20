@@ -1,15 +1,14 @@
-from nn.utils.config_factory import config
-from nn.utils.generic_utils import *
+from multivac.src.gan.generator.nn.utils.config_factory import config
+from multivac.src.gan.generator.nn.utils.generic_utils import *
 
 import logging
 import numpy as np
 import sys, os
 import time
 
-import decoder
-import evaluation
-from dataset import *
-# import config
+from . import decoder
+from . import evaluation
+from .dataset import *
 
 
 class Learner(object):
@@ -25,6 +24,91 @@ class Learner(object):
             if val_data:
                 print('validation set [{}] ({} examples)'.format(val_data.name, 
                                                                  val_data.count))
+
+    def pretrain(self):
+        dataset = self.train_data
+        nb_train_sample = dataset.count
+        index_array = np.arange(nb_train_sample)
+
+        nb_epoch = self.cfg['pre_g_epochs']
+        batch_size = self.cfg['batch_size']
+
+        if self.cfg['verbose']:
+            print('begin pretraining')
+
+        for epoch in range(nb_epoch):
+            np.random.shuffle(index_array)
+            batches = make_batches(nb_train_sample, batch_size)
+
+            # epoch begin
+            sys.stdout.write('Epoch %d' % epoch)
+            begin_time = time.time()
+            cum_nb_examples = 0
+            loss = 0.0
+
+            for batch_index, (batch_start, batch_end) in enumerate(batches):
+                batch_ids = index_array[batch_start:batch_end]
+                examples = dataset.get_examples(batch_ids)
+                cur_batch_size = len(examples)
+
+                inputs = dataset.get_prob_func_inputs(batch_ids)
+
+                if not self.cfg['enable_copy']:
+                    tgt_action_seq = inputs[1]
+                    tgt_action_seq_type = inputs[2]
+
+                    for i in range(cur_batch_size):
+                        for t in range(tgt_action_seq[i].shape[0]):
+                            if tgt_action_seq_type[i, t, 2] == 1:
+                                # can only be copied
+                                if tgt_action_seq_type[i, t, 1] == 0:
+                                    tgt_action_seq_type[i, t, 1] = 1
+                                    tgt_action_seq[i, t, 1] = 1  # index of <unk>
+
+                                tgt_action_seq_type[i, t, 2] = 0
+
+                train_func_outputs = self.model.train_func(*inputs)
+                batch_loss = train_func_outputs[0]
+
+                if self.cfg['verbose']:
+                    print('prob_func finished computing')
+
+                cum_nb_examples += cur_batch_size
+                loss += batch_loss * batch_size
+
+                if self.cfg['verbose']:
+                    print('Batch {}, avg. loss = {}'.format(batch_index, batch_loss, 4))
+
+                if batch_index == 4:
+                    elapsed = time.time() - begin_time
+                    eta = nb_train_sample / (cum_nb_examples / elapsed)
+                    print((', eta %ds' % (eta)))
+                    sys.stdout.flush()
+
+            print('[Epoch {}] pretrain cumulative loss = {}, (took {}s)'.format(
+                epoch, loss / cum_nb_examples, time.time() - begin_time)
+            )
+
+    def pgtrain(self, batch_size, sequence_len, rollout, netD):
+        samples = self.sample(batch_size, seq_len)
+        zeros = torch.zeros(batch_size, 1, dtype=torch.int64)
+
+        if self.use_cuda:
+            zeros = zeros.cuda()
+
+        inputs = torch.cat([zeros, samples.data], dim=1)[:, :-1].contiguous()
+        targets = samples.data.contiguous().view(-1)
+
+        # calculate reward
+        rewards = np.array(rollout.get_reward(samples, netD))
+                    
+        prob = F.log_softmax(self(inputs), dim=1)
+        loss = self.adv_criterion(prob, targets, rewards)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
 
     def train(self):
         dataset = self.train_data
@@ -155,10 +239,9 @@ class Learner(object):
                     self.model.save(os.path.join(self.cfg['output_dir'], 
                                                  'model.iter%d' % cum_updates))
 
-            if self.cfg['verbose']:
-                print('[Epoch {}] cumulative loss = {}, (took {}s)'.format(epoch,
-                                                                           loss / cum_nb_examples,
-                                                                           time.time() - begin_time))
+            print('[Epoch {}] cumulative loss = {}, (took {}s)'.format(epoch,
+                                                                       loss / cum_nb_examples,
+                                                                       time.time() - begin_time))
 
             if early_stop:
                 break

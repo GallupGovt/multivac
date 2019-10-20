@@ -5,27 +5,31 @@ import numpy as np
 
 from collections import OrderedDict
 import copy
-# import heapq
 import sys
 
-from nn.layers.embeddings import Embedding
-from nn.layers.core import Dense, Dropout, WordDropout
-from nn.layers.recurrent import BiLSTM, LSTM
-import nn.optimizers as optimizers
-import nn.initializations as initializations
-from nn.activations import softmax
-from nn.utils.theano_utils import *
+from multivac.src.gan.discriminator.treelstm import Constants
+
+from multivac.src.gan.generator.nn.layers.embeddings import Embedding
+from multivac.src.gan.generator.nn.layers.core import Dense, Dropout, WordDropout
+from multivac.src.gan.generator.nn.layers.recurrent import BiLSTM, LSTM
+import multivac.src.gan.generator.nn.optimizers as optimizers
+import multivac.src.gan.generator.nn.initializations as initializations
+from multivac.src.gan.generator.nn.activations import softmax
+from multivac.src.gan.generator.nn.utils.theano_utils import *
 
 from multivac.src.gan.generator.lang.grammar import Grammar
 from multivac.src.gan.generator.astnode import ASTNode, Rule, DecodeTree
-from components import Hyp, PointerNet, CondAttLSTM
+from multivac.src.gan.generator.dataset import DataEntry
+from multivac.src.rdf_graph.rdf_parse import tokenize_text
+from multivac.src.gan.generator.components import Hyp, PointerNet, CondAttLSTM
 
 sys.setrecursionlimit(50000)
 
 class Generator():
     '''Generator'''
-    def __init__(self, config):
+    def __init__(self, config, oracle=False):
         self.cfg = config
+        self.oracle = oracle
 
         if self.cfg['verbose']:
             print("Query embedding...")
@@ -206,6 +210,7 @@ class Generator():
         # ctx_vectors: (batch_size, max_example_action_num, encoder_hidden_dim)
         if self.cfg['verbose']:
             print("\tDecoder processing...")
+
         H, _, C = self.decoder_lstm(decoder_input,
                                     context=query_embed,
                                     context_mask=query_token_embed_mask,
@@ -266,28 +271,40 @@ class Generator():
                    tgt_action_seq_type[:, :, 1] * terminal_gen_action_prob[:, :, 0] * vocab_tgt_prob + \
                    tgt_action_seq_type[:, :, 2] * terminal_gen_action_prob[:, :, 1] * copy_tgt_prob
 
-        # Defining MLE loss - I think.
+        # Defining NLLoss - I think.
         likelihood = T.log(tgt_prob + 1.e-7 * (1 - tgt_action_seq_mask))
-        loss = - (likelihood * tgt_action_seq_mask).sum(axis=-1)
-        loss = T.mean(loss)
+        nlloss = - (likelihood * tgt_action_seq_mask).sum(axis=-1)
+        nlloss = T.mean(nlloss)
+
+        # one_hot = np.zeros(tgt_prob.shape)
+        # one_hot.scatter_(1, target.data.view(-1, 1), 1)
+        # loss = torch.masked_select(pred, one_hot) * reward.contiguous().view(-1)
+        # loss = -torch.sum(loss)
+
+        # adv_loss = self.adversarial_loss(likelihood)
 
         # let's build the function!
 
         if self.cfg['verbose']:
-            print("\tBuilding theano.train function...")
+            print("\tBuilding theano.processing function...")
         train_inputs = [query_tokens, tgt_action_seq, tgt_action_seq_type,
                         tgt_node_seq, tgt_par_rule_seq, tgt_par_t_seq]
         optimizer = optimizers.get(self.cfg['optimizer'])
         optimizer.clip_grad = self.cfg['clip_grad']
-        updates, grads = optimizer.get_updates(self.params, loss)
-        self.train_func = theano.function(train_inputs, [loss], updates=updates)
+        updates, grads = optimizer.get_updates(self.params, nlloss)
+        self.train_func = theano.function(train_inputs, [nlloss], updates=updates)
+
+        # if self.cfg['verbose']:
+        #     print("\tBuilding theano.train function...")
+        # self.train_func = theano.function(self.proc_fun(train_inputs), [nlloss], updates=updates)
+        # self.pgtrain_func = theano.function(train_inputs, [adv_loss], updates=updates)
 
         self.build_decoder(query_tokens, 
                            query_token_embed, 
                            query_token_embed_mask)
 
     def build_decoder(self, 
-                      query_tokens, query_token_embed, query_token_embed_mask):
+                      query_tokens, query_token_embed, query_token_embed_mask, reward=1):
         if self.cfg['verbose']:
             print("Build decoder system...")
         # Re-setup the encoder
@@ -436,6 +453,7 @@ class Generator():
             else: token_set.add(tid)
 
         for t in range(max_time_step):
+            #print("{}\n".format(t) + '\n'.join([x.__repr__() for x in hyp_samples]))
             hyp_num = len(hyp_samples)
             decoder_prev_state = np.array([hyp.state for hyp in hyp_samples]).astype('float32')
             decoder_prev_cell = np.array([hyp.cell for hyp in hyp_samples]).astype('float32')
@@ -577,7 +595,7 @@ class Generator():
                     new_hyp.cell = copy.copy(decoder_next_cell[hyp_id])
                     new_hyp.action_embed = rule_embedding[rule_id]
                 else:
-                    tid = (cand_id - rule_apply_cand_num) % word_prob.shape[1]
+                    tid = int((cand_id - rule_apply_cand_num) % word_prob.shape[1])
                     word_gen_hyp_id = (cand_id - rule_apply_cand_num) / word_prob.shape[1]
                     word_gen_hyp_id = int(word_gen_hyp_id)
                     hyp_id = word_gen_hyp_ids[word_gen_hyp_id]
@@ -585,7 +603,7 @@ class Generator():
                     if tid == unk:
                         token = unk_words[word_gen_hyp_id]
                     else:
-                        token = terminal_vocab.id_token_map[tid]
+                        token = terminal_vocab[tid]
 
                     frontier_nt = hyp_frontier_nts[hyp_id]
                     hyp = hyp_samples[hyp_id]
@@ -594,8 +612,8 @@ class Generator():
                     new_hyp = Hyp(hyp)
                     new_hyp.append_token(token)
 
-                    if self.cfg['verbose']:
-                        cand_copy_prob = cand_copy_probs[word_gen_hyp_id]
+                    # if self.cfg['verbose']:
+                    #     cand_copy_prob = cand_copy_probs[word_gen_hyp_id]
 
                         # if cand_copy_prob > 0.5:
                         #     print(str(new_hyp.frontier_nt()) + ''
@@ -635,6 +653,37 @@ class Generator():
         completed_hyps = sorted(completed_hyps, key=lambda x: x.score, reverse=True)
 
         return completed_hyps
+
+    def sample(self, parser, seed_seq, grammar, vocab):
+        example = DataEntry(raw_id=None, 
+                            query_tokens=tokenize_text(seed_seq, parser), 
+                            parse_tree=None, 
+                            text=seed_seq, 
+                            actions=None, 
+                            meta_data=None)
+        example._data = [np.array([vocab.convertToIdx(example.query_tokens)], 
+                                  dtype='int32')]
+
+        cand_list = self.decode(example, 
+                                grammar, 
+                                vocab,
+                                beam_size=self.cfg['beam_size'], 
+                                max_time_step=self.cfg['decode_max_time_step'])
+
+        cand = cand_list[0]
+        text = decode_tree_to_string(cand.tree)
+        parse = parser.get_parse(text)['sentences'][0]
+        tokens = [x['word'] for x in parse['tokens']]
+
+        deps = sorted(parse['basicDependencies'], 
+                      key=lambda x: x['dependent'])
+        parents = [x['governor'] for x in deps]
+
+        return tokens, parents
+
+    @staticmethod
+    def get_parents(parser, text):
+        parse = parser.get_parse(text)['sentences'][0]
 
     @property
     def params_name_to_id(self):

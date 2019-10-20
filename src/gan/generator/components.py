@@ -4,17 +4,17 @@ import numpy as np
 import logging
 import copy
 
-import nn.activations as activations
-import nn.initializations as initializations
-import nn.optimizers as optimizers
+import multivac.src.gan.generator.nn.activations as activations
+import multivac.src.gan.generator.nn.initializations as initializations
+import multivac.src.gan.generator.nn.optimizers as optimizers
 
 from multivac.src.gan.generator.astnode import *
 from multivac.src.gan.generator.lang.grammar import Grammar
 
-from nn.layers.embeddings import Embedding
-from nn.layers.core import Dense, Layer
-from nn.layers.recurrent import BiLSTM, LSTM, CondAttLSTM
-from nn.utils.theano_utils import ndim_itensor, tensor_right_shift, \
+from multivac.src.gan.generator.nn.layers.embeddings import Embedding
+from multivac.src.gan.generator.nn.layers.core import Dense, Layer
+from multivac.src.gan.generator.nn.layers.recurrent import BiLSTM, LSTM, CondAttLSTM
+from multivac.src.gan.generator.nn.utils.theano_utils import ndim_itensor, tensor_right_shift, \
                                   ndim_tensor, alloc_zeros_matrix, shared_zeros
 
 
@@ -88,7 +88,7 @@ class Hyp:
     def can_expand(self, node):
         if self.grammar.is_value_node(node):
             # if the node is finished
-            if node.value is not None and node.value.endswith('<eos>'):
+            if node.value is not None:# and node.value.endswith('<eos>'):
                 return False
             return True
         elif self.grammar.is_terminal(node):
@@ -164,21 +164,6 @@ class Hyp:
             return nt.parent.t
         else:
             return 0
-
-    # def get_action_parent_tree(self):
-    #     """
-    #     get the parent tree
-    #     """
-    #     nt = self.frontier_nt()
-    #
-    #     # if nt is a non-finishing leaf
-    #     if nt.holds_value:
-    #         return nt
-    #
-    #     if nt.parent:
-    #         return nt.parent
-    #     else:
-    #         return None
 
 class CondAttLSTM(Layer):
     """

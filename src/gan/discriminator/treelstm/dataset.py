@@ -86,7 +86,7 @@ class SICKDataset(data.Dataset):
         return labels
 
 
-# Dataset class for SICK dataset
+# Dataset class for MULTIVAC dataset
 class MULTIVACDataset(data.Dataset):
     def __init__(self, path, vocab):
         super().__init__()

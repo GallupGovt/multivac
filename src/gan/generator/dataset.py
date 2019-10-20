@@ -156,7 +156,7 @@ class DataEntry:
         return self._data
 
     def copy(self):
-        e = DataEntry(self.raw_id, self.query_tokens, self.parse_tree, self.code, self.actions, self.meta_data)
+        e = DataEntry(self.raw_id, self.query_tokens, self.parse_tree, self.text, self.actions, self.meta_data)
 
         return e
 
