@@ -4,6 +4,8 @@ import theano.tensor as T
 import numpy as np
 from six.moves import range
 
+from multivac.src.gan.generator.nn.utils.generic_utils import get_from_module
+
 if theano.config.floatX == 'float64':
     epsilon = 1.0e-9
 else:
@@ -59,6 +61,5 @@ mae = MAE = mean_absolute_error
 mape = MAPE = mean_absolute_percentage_error
 msle = MSLE = mean_squared_logarithmic_error
 
-from .utils.generic_utils import get_from_module
 def get(identifier):
     return get_from_module(identifier, globals(), 'objective')

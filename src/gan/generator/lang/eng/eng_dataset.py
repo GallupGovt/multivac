@@ -66,6 +66,9 @@ def preprocess_eng_dataset(annot_file, text_file, write_out=False):
 
 def parse_eng_dataset(annot_file, text_file, 
                       MAX_QUERY_LENGTH=70, WORD_FREQ_CUT_OFF=1):
+
+    DIR = os.path.dirname(annot_file)
+
     data = preprocess_eng_dataset(annot_file, text_file)
     parse_trees = [e['parse_tree'] for e in data]
 
@@ -82,6 +85,8 @@ def parse_eng_dataset(annot_file, text_file,
     with open('eng.grammar.unary_closure.txt', 'w') as f:
         for rule in grammar:
             f.write(rule.__repr__() + '\n')
+
+    serialize_to_file(grammar, os.path.join(DIR, "eng.grammar.pkl"))
 
     annot_tokens = list(chain(*[e['query_tokens'] for e in data]))
     annot_vocab = gen_vocab(annot_tokens, 
@@ -233,9 +238,9 @@ def parse_eng_dataset(annot_file, text_file,
     test_data.init_data_matrices(max_query_length=max_query_len, 
                                  max_example_action_num=max_actions_len)
 
-    fp = os.getcwd() + os.path.sep 
-    fp += "eng.freq{}.max_actions{}".format(WORD_FREQ_CUT_OFF, max_actions_len)
-    fp += ".pre_suf.unary_closure.bin"
+    fp = "eng.freq{}.max_actions{}.pre_suf.unary_closure.bin".format(WORD_FREQ_CUT_OFF, 
+                                                                     max_actions_len)
+    fp = os.path.join(DIR, fp)
 
     serialize_to_file((train_data, dev_data, test_data), fp)
 

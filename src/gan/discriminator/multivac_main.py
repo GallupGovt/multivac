@@ -117,11 +117,9 @@ def main():
     logger.debug('==> Size of test data    : %d ' % len(test_dataset))
 
     # initialize model, criterion/loss_function, optimizer
-    model = QueryGAN_Discriminator(vocab.size(),
-                                   args.input_dim,
-                                   args.mem_dim,
-                                   args.sparse,
-                                   args.freeze_embed)
+    dargs = vars(args)
+    dargs['vocab_size'] = vocab.size()
+    model = QueryGAN_Discriminator(dargs)
     criterion = nn.MSELoss()
 
     # for words common to dataset vocab and GLOVE, use GLOVE vectors

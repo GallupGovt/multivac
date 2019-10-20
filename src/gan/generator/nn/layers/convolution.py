@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
-from .core import Layer
-from nn.utils.theano_utils import *
-import nn.initializations as initializations
-import nn.activations as activations
+from multivac.src.gan.generator.nn.layers.core import Layer
+from multivac.src.gan.generator.nn.utils.theano_utils import *
+import multivac.src.gan.generator.nn.initializations as initializations
+import multivac.src.gan.generator.nn.activations as activations
 from theano.tensor.nnet import conv
 from theano.tensor.signal import pool
 

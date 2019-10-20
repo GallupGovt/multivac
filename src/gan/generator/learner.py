@@ -1,14 +1,14 @@
-from nn.utils.config_factory import config
-from nn.utils.generic_utils import *
+from multivac.src.gan.generator.nn.utils.config_factory import config
+from multivac.src.gan.generator.nn.utils.generic_utils import *
 
 import logging
 import numpy as np
 import sys, os
 import time
 
-import decoder
-import evaluation
-from dataset import *
+from . import decoder
+from . import evaluation
+from .dataset import *
 # import config
 
 

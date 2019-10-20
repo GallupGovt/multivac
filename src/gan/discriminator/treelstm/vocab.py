@@ -13,6 +13,43 @@ class Vocab(object):
         if filename is not None:
             self.loadFile(filename)
 
+        self.add('<pad>')
+        self.add('<unk>')
+        self.add('<eos>')
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return self.getLabel(item)
+        else:
+            return self.getIndex(item)
+
+    def __contains__(self, item):
+        if isinstance(item, int):
+            return item in self.idxToLabel
+        else:
+            return item in self.labelToIdx
+
+    @property
+    def size(self):
+        return len(self.idxToLabel)
+
+    def __setitem__(self, key, value):
+        self.labelToIdx[key] = value
+
+    def __len__(self):
+        return len(self.labelToIdx)
+
+    def __iter__(self):
+        return iter(list(self.labelToIdx.keys()))
+
+    @property
+    def unk(self):
+        return self.labelToIdx['<unk>']
+
+    @property
+    def eos(self):
+        return self.labelToIdx['<eos>']
+
     def size(self):
         return len(self.idxToLabel)
 
@@ -26,15 +63,16 @@ class Vocab(object):
 
     def getIndex(self, key, default=None):
         key = key.lower() if self.lower else key
-        try:
+
+        if key in self.labelToIdx:
             return self.labelToIdx[key]
-        except KeyError:
+        else:
             return default
 
     def getLabel(self, idx, default=None):
-        try:
+        if idx in self.idxToLabel:
             return self.idxToLabel[idx]
-        except KeyError:
+        else:
             return default
 
     # Mark this `label` and `idx` as special
@@ -50,6 +88,7 @@ class Vocab(object):
     # Add `label` in the dictionary. Use `idx` as its index if given.
     def add(self, label):
         label = label.lower() if self.lower else label
+
         if label in self.labelToIdx:
             idx = self.labelToIdx[label]
         else:
@@ -60,7 +99,10 @@ class Vocab(object):
 
     # Convert `labels` to indices. Use `unkWord` if not found.
     # Optionally insert `bosWord` at the beginning and `eosWord` at the .
-    def convertToIdx(self, labels, unkWord, bosWord=None, eosWord=None):
+    def convertToIdx(self, labels, unkWord=None, bosWord=None, eosWord=None):
+        if unkWord is None:
+            unkWord = self.unk
+
         vec = []
 
         if bosWord is not None:
@@ -75,7 +117,7 @@ class Vocab(object):
         return vec
 
     # Convert `idx` to labels. If index `stop` is reached, convert it and return.
-    def convertToLabels(self, idx, stop):
+    def convertToLabels(self, idx, stop=None):
         labels = []
 
         for i in idx:

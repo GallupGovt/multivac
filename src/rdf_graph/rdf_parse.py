@@ -6,11 +6,14 @@ import re
 
 def tokenize_text(text, parser=None):
     if parser is None:
-        parser = StanfordParser()
+        parser = StanfordParser(annots="tokenize")
 
-    p = stanford_parse(parser, text)
+    p = parser.get_parse(text)
 
-    return [x.text for x in p.tokens]
+    if 'sentences' in p.keys():
+        p = p['sentences'][0]
+
+    return [x['word'] for x in p['tokens']]
 
 
 def clean_queries(queries, verbose=False):
@@ -73,7 +76,7 @@ class StanfordParser(object):
 
     def get_deps(self, sentence, deptype='basicDependencies', ret='asis'):
         if isinstance(sentence, str):
-            sentence = self.get_parse(sentence, deptype)
+            sentence = self.get_parse(sentence)['sentences'][0]
 
         deps = sentence[deptype]
 

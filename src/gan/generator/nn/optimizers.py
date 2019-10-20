@@ -2,13 +2,13 @@
 import theano
 import theano.tensor as T
 
-from .utils.theano_utils import shared_zeros, shared_scalar, floatX
-from .utils.generic_utils import get_from_module
+from multivac.src.gan.generator.nn.utils.theano_utils import shared_zeros, shared_scalar, floatX
+from multivac.src.gan.generator.nn.utils.generic_utils import get_from_module
 from six.moves import zip
 from theano.sandbox.rng_mrg import MRG_RandomStreams
 from theano.tensor.shared_randomstreams import RandomStreams
 import math
-from nn.utils.config_factory import config
+from multivac.src.gan.generator.nn.utils.config_factory import config
 
 
 def clip_norm(g, c, n):

@@ -1,3 +1,6 @@
+
+from multivac.src.gan.generator.nn.utils.generic_utils import get_from_module
+
 import theano.tensor as T
 
 
@@ -37,7 +40,5 @@ def linear(x):
     '''
     return x
 
-
-from .utils.generic_utils import get_from_module
 def get(identifier):
     return get_from_module(identifier, globals(), 'activation function')

@@ -370,7 +370,7 @@ def run(args_dict):
             glove = loadGloveModel(args_dict['glove'], verbose)
 
             # identify files for use
-            files = glob.glob(os.path.join(con.get_in_path(),'*.txt'))
+            files = glob.glob(os.path.join(con.in_path,'*.txt'))
             rel_file = max([file for file in files if re.search('relation', file)],
                            key=os.path.getctime)
             ent_file = max([file for file in files if re.search('entity', file)],
@@ -400,7 +400,7 @@ def run(args_dict):
                 predicted_object(con, 
                                  args_dict['search'], 
                                  num_top_rel, 
-                                 threshold)
+                                 threshold=threshold)
 
 
 

@@ -75,15 +75,6 @@ def run(args_dict):
         # dataset = test_data # test_data.get_dataset_by_ids([1,2,3,4,5,6,7,8,9,10], name='sample')
         # cProfile.run('decode_dataset(model, dataset)', sort=2)
 
-        # from evaluation import decode_and_evaluate_ifttt
-        if args_dict['data_type'] == 'ifttt':
-            decode_results = decode_and_evaluate_ifttt_by_split(model, test_data)
-        else:
-            dataset = eval(args_dict['type'])
-            decode_results = decode_english_dataset(model, dataset)
-
-        serialize_to_file(decode_results, args_dict['saveto'])
-
     if args_dict['operation'] == 'evaluate':
         dataset = eval(args_dict['type'])
         if config.mode == 'self':
