@@ -88,7 +88,7 @@ class Hyp:
     def can_expand(self, node):
         if self.grammar.is_value_node(node):
             # if the node is finished
-            if node.value is not None and node.value.endswith('<eos>'):
+            if node.value is not None:# and node.value.endswith('<eos>'):
                 return False
             return True
         elif self.grammar.is_terminal(node):

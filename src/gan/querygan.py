@@ -1,5 +1,6 @@
 #!usr/bin/env/python
 import argparse
+from collections import namedtuple
 import configparser
 import copy
 import math
@@ -25,7 +26,7 @@ from multivac.src.rdf_graph.rdf_parse import StanfordParser
 from generator.learner import Learner
 from generator.components import Hyp
 from generator.dataset import DataEntry, DataSet, Vocab, Action
-
+from generator.decoder import decode_tree_to_string
 
 def generate_samples(net, grammar, vocab, seq_len, 
                      generated_num, dst_dir, oracle=False):
@@ -34,10 +35,30 @@ def generate_samples(net, grammar, vocab, seq_len,
     net.oracle = oracle
 
     for i in tqdm(range(generated_num), desc='Generating Samples... '):
-        seed_seq = ' '.join(vocab.convertToLabels(random.sample(range(vocab.size()), seq_len), 
-                                                  stop=None))
-        sample = net.sample(parser, seed_seq, grammar, vocab)
-        samples.append(sample)
+        query = vocab.convertToLabels(random.sample(range(vocab.size()), 
+                                      seq_len))
+        seed_seq = ' '.join(query)
+        query_tokens_data = [query_to_data(seed_seq, vocab)]
+        example = namedtuple('example', 
+                             ['query_tokens', 'data'])(query_tokens=query, 
+                                                       data=query_tokens_data)
+        sample = net.decode(example, 
+                            grammar, 
+                            vocab,
+                            beam_size=net.cfg['beam_size'], 
+                            max_time_step=net.cfg['decode_max_time_step'])[0]
+        text = decode_tree_to_string(sample.tree)
+
+        samples.append(text)
+
+    sample_parses = parser.get_parse('\n'.join(samples))
+
+    for i, parse in enumerate(samples):
+        tokens = [x['word'] for x in parse['tokens']]
+        deps = sorted(parse['basicDependencies'], 
+                      key=lambda x: x['dependent'])
+        parents = [x['governor'] for x in deps]
+        samples[i] = (tokens, parents)
 
     with open(os.path.join(dst_dir, 'samp.toks'), 'w') as tokfile, \
             open(os.path.join(dst_dir, 'samp.parents'), 'w') as parfile, \
@@ -47,6 +68,21 @@ def generate_samples(net, grammar, vocab, seq_len,
             parfile.write(' '.join([str(x) for x in parents]) + '\n')
             tokfile.write(' '.join(tokens) + '\n')
             catfile.write('1' + '\n')
+
+def query_to_data(query, annot_vocab):
+    if isinstance(query, str):
+        query_tokens = query.split(' ')
+    else:
+        query_tokens = query
+
+    data = np.zeros((1, len(query_tokens)), dtype='int32')
+
+    for tid, token in enumerate(query_tokens):
+        token_id = annot_vocab[token]
+
+        data[0, tid] = token_id
+
+    return data
 
 def run(cfg_dict):
     # Set up model and training parameters based on config file and runtime
@@ -88,7 +124,7 @@ def run(cfg_dict):
 
     grammar = deserialize_from_file(gargs['grammar'])
     glove_vocab, glove_emb = utils.load_word_vectors(
-        os.path.join(gan_args['glove'], 'glove.840B.300d'))
+        os.path.join(gan_args['glove_dir'], gan_args['glove_file']))
 
     gargs['rule_num'] = len(grammar.rules)
     gargs['node_num'] = len(grammar.node_type_to_id)

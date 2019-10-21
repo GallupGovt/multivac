@@ -441,7 +441,7 @@ class Generator():
             else: token_set.add(tid)
 
         for t in range(max_time_step):
-            print(t)
+            print("{}\n".format(t) + '\n'.join([x.__repr__() for x in hyp_samples]))
             hyp_num = len(hyp_samples)
             decoder_prev_state = np.array([hyp.state for hyp in hyp_samples]).astype('float32')
             decoder_prev_cell = np.array([hyp.cell for hyp in hyp_samples]).astype('float32')
@@ -561,6 +561,7 @@ class Generator():
                 cand_scores = np.array(rule_apply_cand_scores)
 
             top_cand_ids = (-cand_scores).argsort()[:beam_size - completed_hyp_num]
+            #import pdb; pdb.set_trace()
 
             # expand_cand_num = 0
             for cand_id in top_cand_ids:
@@ -639,12 +640,20 @@ class Generator():
             hyp_samples = new_hyp_samples
 
         completed_hyps = sorted(completed_hyps, key=lambda x: x.score, reverse=True)
+        print('Completed hyps:')
+        print(completed_hyps)
 
         return completed_hyps
 
     def sample(self, parser, seed_seq, grammar, vocab):
-        example = DataEntry(raw_id=None, query_tokens=tokenize_text(seed_seq, parser), parse_tree=None, text=seed_seq, actions=None, meta_data=None)
-        example._data = [np.array([vocab.convertToIdx(example.query_tokens)], dtype='int32')]
+        example = DataEntry(raw_id=None, 
+                            query_tokens=tokenize_text(seed_seq, parser), 
+                            parse_tree=None, 
+                            text=seed_seq, 
+                            actions=None, 
+                            meta_data=None)
+        example._data = [np.array([vocab.convertToIdx(example.query_tokens)], 
+                                  dtype='int32')]
 
         cand_list = self.decode(example, 
                                 grammar, 
