@@ -5,6 +5,7 @@ import os
 import re
 import string
 import pickle
+import multiprocessing as mp
 
 # import xmltodict
 
@@ -13,7 +14,7 @@ from corenlp import CoreNLPClient
 from datetime import datetime
 from nltk import pos_tag, word_tokenize, sent_tokenize
 from nltk.stem import WordNetLemmatizer
-from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+from rdf_parse import StanfordParser, stanford_parse
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 
@@ -99,35 +100,40 @@ class RDFGraph:
 
         self.entity_cluster_results = output
 
-    def extract_raw_tuples(self):
+    def extract_raw_tuples(self, parallel=False, n_cores=12):
         if len(self.all_texts) == 0:
             self.load_texts()
 
-        parser = StanfordParser()
-        i = 0
-
         # Loop through articles or article batches:
-        for Id, text in self.all_texts.items():
-            print(i)
-            # Start information extraction
+        # for Id, text in self.all_texts.items():
+        if parallel:
+            pool = mp.Pool(n_cores)
+            all_tuples = pool.map(self.extract_article_tuples, self.all_texts.values())
+        else:
+            all_tuples = list(map(self.extract_article_tuples, self.all_texts.values()))
 
-            tuples = []
+        self.all_tuples = {Id: art_tuples for Id, art_tuples in
+                           zip(self.all_texts.keys(), all_tuples)}
+
+    @staticmethod
+    def extract_article_tuples(text):
+        parser = StanfordParser()
+        tuples = []
+        try:
             sentences = sent_tokenize(text['text'])
+        except TypeError:
+            return None
 
-            for sentence in sentences:
-                try:
-                    sentence = stanford_parse(parser, sentence)
-                except:
-                    print(sentence)
-                    continue
-                rdfs = [(' '.join(rel['subject']),
-                         ' '.join(rel['relation']),
-                         ' '.join(rel['object'])) for rel in
-                         sentence.get_rdfs(use_tokens=False, how='list')]
-                tuples.append(rdfs)
+        for sentence in sentences:
+            try:
+                sentence = stanford_parse(parser, sentence)
+            except:
+                print(sentence)
+                continue
 
-            self.all_tuples.update({Id: tuples})
-            i += 1
+            rdfs = sentence.get_rdfs(use_tokens=False, how='list')
+            tuples.append(rdfs)
+        return tuples
 
     @staticmethod
     def filter_tuples(tuples, entities, relations):
