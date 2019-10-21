@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- HTML metdata -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <title>MULTIVAC | Gallup DSS</title>
+    <!-- Bootstap CSS and Style imports -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <!-- For any page specific style customizations -->
+    {% block header %}{% endblock %}
+</head>
+
+<body>
+    <div style="padding: 20px 0 80px 0">
+        <div class="container-fluid" style="width: 95%">
+            <div class="row">
+                <div class="col-sm text-center">
+                    <h1>{% block title %}{% endblock %}</h1>
+                    <p>{% block description %}{% endblock %}</p>
+                </div>
+            </div>
+            <hr>
+            <div class="row">
+                <div class="col-sm">
+                    <h2 class="display-5">System Process</h2>
+                    {% block leftcontent %}{% endblock %}
+                </div>
+                <div class="col-sm">
+                    <h2 class="display-5">Code Review</h2>
+                    {% block rightcontent %}{% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap JavaScript imports -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

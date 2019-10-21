@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Gallup - MULTIVAC
+{% endblock %}
+
+{% block description %}
+A DARPA Automating Scientific Knowledge Extraction (ASKE) Artifical Intelligence Exploration (AIE) Program
+{% endblock %}
+
+{% block leftcontent %}
+<hr>
+<button class="btn btn-lg btn-success" style="width: 49%">Initialize System</button>
+<button class="btn btn-lg btn-secondary" style="width: 49%">Generate Query</button>
+<hr>
+<!-- this is for rdf_graph -->
+<h5>Map queries to knowledge graph</h5><br>
+<form method="GET" action="{{ url_for('results') }}">
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label for="dir-input">Path to index data directory</label>
+            <input type="text" class="form-control" id="dir-input" name="dir-input" value="sys/data/raw/" required>
+        </div>
+        <div class="col-md-6 mb-3">
+            <label for="filetime-input">Timestamp appended to file</label>
+            <input type="text" class="form-control" id="filetime-input" name="filetime-input" placeholder="Not required" disabled>
+        </div>
+    </div>
+    <div class="mb-3">
+        <div class="form-group">
+            <label for="model-type-input">Model selection for knowledge embedding</label>
+            <select class="form-control" id="model-type-input" name="model-type-input">
+                <option value="analogy">analogy</option>
+                <option value="complex">complex</option>
+                <option value="distmult">distmult</option>
+                <option value="hole">hole</option>
+                <option value="rescal">rescal</option>
+                <option value="transd">transd</option>
+                <option value="transe">transe</option>
+                <option value="transh">transh</option>
+                <option value="transr">transr</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <label for="out-input">Path to models output directory</label>
+            <input type="text" class="form-control" id="out-input" name="out-input" value="sys/data/processed/">
+        </div>
+        <div class="col-md-6 mb-3">
+            <label for="glove-dir-input">Path to GloVe embeddings model file</label>
+            <input type="text" class="form-control" id="glove-dir-input" name="glove-dir-input" placeholder="Not required" disabled>
+        </div>
+    </div>
+    <div class="mb-3">
+        <div class="form-group">
+            <label for="run-input">Identify choice of action, fitting a model or predicting from it</label>
+            <select class="form-control" id="run-input" name="run-input">
+                <option value="analogy">fit</option>
+                <option value="complex">model</option>
+            </select>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-4 mb-3">
+            <label for="threshold-input">Threshold</label>
+            <input type="number" class="form-control" id="threshold-input" name="threshold-input" value="10">
+        </div>
+        <div class="col-md-4 mb-3">
+        	<label>Verbosity</label><br>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="verbosity-input" id="verbose-yes" value="True">
+                <label class="form-check-label" for="verbose-yes">True</label>
+            </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="verbosity-input" id="verbose-no" value="False" checked>
+                <label class="form-check-label" for="verbose-no">False</label>
+            </div>
+        </div>
+        <div class="col-md-4 mb-3">
+            <label for="num-top-input">Number ot top matches</label>
+            <input type="number" class="form-control" id="num-top-input" name="num-top-input" value="0.1">
+        </div>
+    </div>
+    <div class="mb-3">
+        <label for="search-input">Searches to execute. Either a path to a CSV containing triples or a triple in the format:<br> <code>"subject terms ::: relation terms ::: object terms"</code></label>
+        <input type="text" class="form-control" id="search-input" name="search-input" placeholder="subject terms ::: relation terms ::: object terms">
+    </div>
+    <hr>
+    <button class="btn btn-primary btn-lg btn-block" type="submit">Go!</button>
+    <hr>
+</form>
+{% endblock %}
+
+{% block rightcontent %}
+<hr>
+<iframe height="800" style="width: 100%" src="http://0.0.0.0:8080/github/GallupGovt/multivac/blob/master/precooked_replication.ipynb"></iframe>
+{% endblock %}

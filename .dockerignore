@@ -1,0 +1,10 @@
+.DS_Store
+__pycache__
+.git
+.gitignore
+venv
+env
+
+docker-compose.yml
+Dockerfile
+.dockerignore

@@ -1,0 +1,28 @@
+version: '3'
+services:
+  multivac:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+    - "5000:5000"
+    depends_on:
+    - stanfordnlp
+    - grobid
+    links:
+    - jupyter
+    volumes:
+      - "./:/app"
+  stanfordnlp:
+    image: "graham3333/corenlp-complete"
+    ports:
+    - "9000:9000"
+  grobid:
+    image: "lfoppiano/grobid:0.5.5"
+    ports:
+    - "8070:8070"
+    - "8071:8071"
+  jupyter:
+    image: "jupyter/nbviewer"
+    ports:
+      - "8080:8080"
