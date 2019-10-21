@@ -1,3 +1,5 @@
+import os
+
 from flask import (
 	Flask,
 	request,
@@ -11,6 +13,7 @@ from src.rdf_graph import map_queries
 
 app = Flask(__name__)
 app.debug = True
+app.config['STATIC_FOLDER'] = f'{os.getcwd()}/sys'
 
 
 @app.route('/')
@@ -26,11 +29,21 @@ def results():
 
 	if request.method == 'GET':
 
+		in_dir = os.path.abspath(request.values.get('dir-input'))
+		out_dir = os.path.abspath(request.values.get('out-input'))
+
+		# make sure these folders exist
+		assert os.path.exists(out_dir)
+		assert os.path.exists(in_dir)
+
+		print(in_dir)
+		print(out_dir)
+
 		args_dict = {
 			'docker_folder_structure': [x for x in os.walk(os.getcwd())],
-			'dir': request.values.get('dir-input'),
+			'dir': in_dir,
 			'model': request.values.get('model-type-input'),
-			'out': request.values.get('out-input'),
+			'out': out_dir,
 			'run': request.values.get('run-input'),
 			'threshold': request.values.get('threshold-input'),
 			'verbose': request.values.get('verbosity-input'),
@@ -38,7 +51,7 @@ def results():
 			'search': request.values.get('search-input'),
 		}
 
-		# results = map_queries.run(args_dict)
+		results = map_queries.run(args_dict)
 
 		return args_dict
 
