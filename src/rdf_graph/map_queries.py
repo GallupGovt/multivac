@@ -12,10 +12,10 @@ import tensorflow as tf
 import sys
 
 from datetime import datetime
-from multivac.settings import models_dir
+from settings import models_dir
 from numpy import array
 from OpenKE import config, models
-from rdf_parse import StanfordParser, stanford_parse
+from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
 def get_best_score(x):
     if isinstance(x, tuple):
