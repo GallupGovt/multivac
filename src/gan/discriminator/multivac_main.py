@@ -142,8 +142,7 @@ def main():
 
         # zero out the embeddings for padding and other special words 
         # if they are absent in vocab
-        for idx, item in enumerate([Constants.PAD_WORD, Constants.UNK_WORD,
-                                    Constants.BOS_WORD, Constants.EOS_WORD]):
+        for idx, item in enumerate(['<blank>', '<unk>', '<bos>', '<eos>']):
             emb[idx].zero_()
 
         for word in vocab.labelToIdx.keys():

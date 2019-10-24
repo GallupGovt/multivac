@@ -13,7 +13,7 @@ from multivac.src.gan.generator.lang.eng.unaryclosure import \
 from multivac.src.gan.generator.nn.utils.io_utils import \
     serialize_to_file, deserialize_from_file
 from multivac.src.gan.generator.query_treebank import parse_raw, get_grammar
-from multivac.src.rdf_graph.rdf_parse import StanfordParser
+from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
 
 def canonicalize_example(query, text, parser):
@@ -25,6 +25,73 @@ def canonicalize_example(query, text, parser):
 
     return query_tokens, text, parse_tree
 
+def get_actions(parse_tree, query_tokens, grammar, terminal_vocab):
+    rule_list, rule_parents = parse_tree.get_productions(include_value_node=True)
+    actions = []
+    can_fully_reconstructed = True
+    rule_pos_map = dict()
+
+    for rule_count, rule in enumerate(rule_list):
+        if not grammar.is_value_node(rule.parent):
+            assert rule.value is None
+            parent_rule = rule_parents[(rule_count, rule)][0]
+            if parent_rule:
+                parent_t = rule_pos_map[parent_rule]
+            else:
+                parent_t = 0
+
+            rule_pos_map[rule] = len(actions)
+
+            d = {'rule': rule, 'parent_t': parent_t, 
+                 'parent_rule': parent_rule}
+            action = Action(APPLY_RULE, d)
+            actions.append(action)
+        else:
+            assert rule.is_leaf
+
+            parent_rule = rule_parents[(rule_count, rule)][0]
+            parent_t = rule_pos_map[parent_rule]
+
+            terminal_val = rule.value
+            terminal_str = str(terminal_val)
+            terminal_tokens = [t for t in terminal_str.split(' ') if len(t) > 0]
+
+            for terminal_token in terminal_tokens:
+                term_tok_id = terminal_vocab[terminal_token]
+                tok_src_idx = -1
+                try:
+                    tok_src_idx = query_tokens.index(terminal_token)
+                except ValueError:
+                    pass
+
+                d = {'literal': terminal_token, 'rule': rule, 
+                     'parent_rule': parent_rule, 'parent_t': parent_t}
+
+                # cannot copy, only generation
+                # could be unk!
+                # import pdb; pdb.set_trace()
+                
+                if tok_src_idx < 0:
+                        action = Action(GEN_TOKEN, d)
+                        if terminal_token not in terminal_vocab:
+                            if terminal_token not in query_tokens:
+                                # print terminal_token
+                                can_fully_reconstructed = False
+                else:  # copy
+                    if term_tok_id != terminal_vocab.unk:
+                        d['source_idx'] = tok_src_idx
+                        action = Action(GEN_COPY_TOKEN, d)
+                    else:
+                        d['source_idx'] = tok_src_idx
+                        action = Action(COPY_TOKEN, d)
+
+                actions.append(action)
+
+            d = {'literal': '<eos>', 'rule': rule, 
+                 'parent_rule': parent_rule, 'parent_t': parent_t}
+            actions.append(Action(GEN_TOKEN, d))
+
+    return actions
 
 def preprocess_eng_dataset(annot_file, text_file, write_out=False):
     if write_out:
@@ -130,76 +197,7 @@ def parse_eng_dataset(annot_file, text_file,
         text = entry['text']
         parse_tree = entry['parse_tree']
 
-        rule_list, rule_parents = parse_tree.get_productions(include_value_node=True)
-
-        actions = []
-        can_fully_reconstructed = True
-        rule_pos_map = dict()
-
-        for rule_count, rule in enumerate(rule_list):
-            if not grammar.is_value_node(rule.parent):
-                assert rule.value is None
-                parent_rule = rule_parents[(rule_count, rule)][0]
-                if parent_rule:
-                    parent_t = rule_pos_map[parent_rule]
-                else:
-                    parent_t = 0
-
-                rule_pos_map[rule] = len(actions)
-
-                d = {'rule': rule, 'parent_t': parent_t, 
-                     'parent_rule': parent_rule}
-                action = Action(APPLY_RULE, d)
-                actions.append(action)
-            else:
-                assert rule.is_leaf
-
-                parent_rule = rule_parents[(rule_count, rule)][0]
-                parent_t = rule_pos_map[parent_rule]
-
-                terminal_val = rule.value
-                terminal_str = str(terminal_val)
-                terminal_tokens = [t for t in terminal_str.split(' ') if len(t) > 0]
-
-                for terminal_token in terminal_tokens:
-                    term_tok_id = terminal_vocab[terminal_token]
-                    tok_src_idx = -1
-                    try:
-                        tok_src_idx = query_tokens.index(terminal_token)
-                    except ValueError:
-                        pass
-
-                    d = {'literal': terminal_token, 'rule': rule, 
-                         'parent_rule': parent_rule, 'parent_t': parent_t}
-
-                    # cannot copy, only generation
-                    # could be unk!
-                    # import pdb; pdb.set_trace()
-                    QUERY_TOO_LONG = False
-
-                    if MAX_QUERY_LENGTH is not None:
-                        if tok_src_idx >= MAX_QUERY_LENGTH:
-                            QUERY_TOO_LONG = True
-                    
-                    if tok_src_idx < 0 or QUERY_TOO_LONG:
-                            action = Action(GEN_TOKEN, d)
-                            if terminal_token not in terminal_vocab:
-                                if terminal_token not in query_tokens:
-                                    # print terminal_token
-                                    can_fully_reconstructed = False
-                    else:  # copy
-                        if term_tok_id != terminal_vocab.unk:
-                            d['source_idx'] = tok_src_idx
-                            action = Action(GEN_COPY_TOKEN, d)
-                        else:
-                            d['source_idx'] = tok_src_idx
-                            action = Action(COPY_TOKEN, d)
-
-                    actions.append(action)
-
-                d = {'literal': '<eos>', 'rule': rule, 
-                     'parent_rule': parent_rule, 'parent_t': parent_t}
-                actions.append(Action(GEN_TOKEN, d))
+        actions = get_actions(parse_tree, query_tokens, grammar, terminal_vocab)
 
         if len(actions) == 0:
             examples_with_empty_actions_num += 1
@@ -246,6 +244,98 @@ def parse_eng_dataset(annot_file, text_file,
 
     return train_data, dev_data, test_data
 
+def generate_dataset(annot_file, text_file, grammar, vocab):
+    data = preprocess_eng_dataset(annot_file, text_file)
+    parse_trees = [e['parse_tree'] for e in data]
+    annot_tokens = list(chain(*[e['query_tokens'] for e in data]))
+
+    # now generate the dataset!
+
+    data_set = DataSet(vocab, vocab, grammar, 'generated_samples')
+    max_actions_len = max_query_len = 0
+
+    for entry in data:
+        idx = entry['id']
+        query_tokens = entry['query_tokens']
+        text = entry['text']
+        parse_tree = entry['parse_tree']
+
+        rule_list, rule_parents = parse_tree.get_productions(include_value_node=True)
+
+        actions = []
+        rule_pos_map = dict()
+
+        for rule_count, rule in enumerate(rule_list):
+            if not grammar.is_value_node(rule.parent):
+                assert rule.value is None
+                parent_rule = rule_parents[(rule_count, rule)][0]
+
+                if parent_rule:
+                    parent_t = rule_pos_map[parent_rule]
+                else:
+                    parent_t = 0
+
+                rule_pos_map[rule] = len(actions)
+
+                d = {'rule': rule, 'parent_t': parent_t, 
+                     'parent_rule': parent_rule}
+                action = Action(APPLY_RULE, d)
+                actions.append(action)
+            else:
+                assert rule.is_leaf
+
+                parent_rule = rule_parents[(rule_count, rule)][0]
+                parent_t = rule_pos_map[parent_rule]
+
+                terminal_val = rule.value
+                terminal_str = str(terminal_val)
+                terminal_tokens = [t for t in terminal_str.split(' ') if len(t) > 0]
+
+                for terminal_token in terminal_tokens:
+                    term_tok_id = vocab[terminal_token]
+                    tok_src_idx = -1
+
+                    if terminal_token in query_tokens:
+                        tok_src_idx = query_tokens.index(terminal_token)
+
+                    d = {'literal': terminal_token, 'rule': rule, 
+                         'parent_rule': parent_rule, 'parent_t': parent_t}
+                    
+                    if tok_src_idx < 0:
+                        action = Action(GEN_TOKEN, d)
+                    else:  # copy
+                        if term_tok_id != vocab.unk:
+                            d['source_idx'] = tok_src_idx
+                            action = Action(GEN_COPY_TOKEN, d)
+                        else:
+                            d['source_idx'] = tok_src_idx
+                            action = Action(COPY_TOKEN, d)
+
+                    actions.append(action)
+
+                d = {'literal': '<eos>', 'rule': rule, 
+                     'parent_rule': parent_rule, 'parent_t': parent_t}
+                actions.append(Action(GEN_TOKEN, d))
+
+        if len(actions) == 0:
+            continue
+
+        example = DataEntry(idx, query_tokens, parse_tree, text, actions, 
+                            {'str_map': None, 'raw_text': entry['raw_text']})
+        data_set.add(example)
+
+        if len(example.query_tokens) > max_query_len:
+            max_query_len = len(example.query_tokens)
+
+        if len(example.actions) > max_actions_len:
+            max_actions_len = len(example.actions)
+
+    # print statistics
+
+    data_set.init_data_matrices(max_query_length=max_query_len, 
+                                max_example_action_num=max_actions_len)
+
+    return data_set
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -4,6 +4,9 @@ import numpy as np
 import torch
 import torch.utils.data as data
 
+from multivac.src.gan.generator.dataset import DataEntry, Vocab, DataSet
+from multivac.src.gan.generator.lang.eng.eng_dataset import generate_dataset
+
 
 def read_file(file):
     with open(file, 'r') as f:
@@ -17,12 +20,19 @@ def read_file(file):
     return data
 
 
-class GeneratorDataset(data.Dataset):
-    def __init__(self, data_file):
-        super(GeneratorDataset, self).__init__()
-        data = torch.LongTensor(np.asarray(read_file(data_file), dtype=np.int64))
-        self.X = torch.cat([torch.zeros(data.size(0), 1).long(), data], dim=1)
-        self.y = torch.cat([data, torch.zeros(data.size(0), 1).long()], dim=1)
+class GeneratorDataset(DataSet):
+    def __init__(self, annot_file, text_file, vocab, grammar):
+        super().__init__(vocab, vocab, grammar, name='generated_samples')
+
+        with open(data_file, "r") as f:
+            for i, line in enumerate(f.readlines()):
+                seed_seq, 
+
+                query_tokens_data = [query_to_data(seed_seq, vocab)]
+                example = namedtuple('example', 
+                                     ['query_tokens', 'data'])(query_tokens=query, 
+                                                               data=query_tokens_data)
+                example = DataEntry()
 
     def __len__(self):
         return self.X.size(0)

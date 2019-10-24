@@ -441,7 +441,7 @@ class Generator():
             else: token_set.add(tid)
 
         for t in range(max_time_step):
-            print("{}\n".format(t) + '\n'.join([x.__repr__() for x in hyp_samples]))
+            #print("{}\n".format(t) + '\n'.join([x.__repr__() for x in hyp_samples]))
             hyp_num = len(hyp_samples)
             decoder_prev_state = np.array([hyp.state for hyp in hyp_samples]).astype('float32')
             decoder_prev_cell = np.array([hyp.cell for hyp in hyp_samples]).astype('float32')
@@ -561,7 +561,6 @@ class Generator():
                 cand_scores = np.array(rule_apply_cand_scores)
 
             top_cand_ids = (-cand_scores).argsort()[:beam_size - completed_hyp_num]
-            #import pdb; pdb.set_trace()
 
             # expand_cand_num = 0
             for cand_id in top_cand_ids:
@@ -584,7 +583,7 @@ class Generator():
                     new_hyp.cell = copy.copy(decoder_next_cell[hyp_id])
                     new_hyp.action_embed = rule_embedding[rule_id]
                 else:
-                    tid = (cand_id - rule_apply_cand_num) % word_prob.shape[1]
+                    tid = int((cand_id - rule_apply_cand_num) % word_prob.shape[1])
                     word_gen_hyp_id = (cand_id - rule_apply_cand_num) / word_prob.shape[1]
                     word_gen_hyp_id = int(word_gen_hyp_id)
                     hyp_id = word_gen_hyp_ids[word_gen_hyp_id]
@@ -601,8 +600,8 @@ class Generator():
                     new_hyp = Hyp(hyp)
                     new_hyp.append_token(token)
 
-                    if self.cfg['verbose']:
-                        cand_copy_prob = cand_copy_probs[word_gen_hyp_id]
+                    # if self.cfg['verbose']:
+                    #     cand_copy_prob = cand_copy_probs[word_gen_hyp_id]
 
                         # if cand_copy_prob > 0.5:
                         #     print(str(new_hyp.frontier_nt()) + ''
@@ -640,8 +639,6 @@ class Generator():
             hyp_samples = new_hyp_samples
 
         completed_hyps = sorted(completed_hyps, key=lambda x: x.score, reverse=True)
-        print('Completed hyps:')
-        print(completed_hyps)
 
         return completed_hyps
 
