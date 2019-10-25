@@ -89,6 +89,27 @@ class Learner(object):
                 epoch, loss / cum_nb_examples, time.time() - begin_time)
             )
 
+    def pgtrain(self, batch_size, sequence_len, rollout, netD):
+        samples = self.sample(batch_size, seq_len)
+        zeros = torch.zeros(batch_size, 1, dtype=torch.int64)
+
+        if self.use_cuda:
+            zeros = zeros.cuda()
+
+        inputs = torch.cat([zeros, samples.data], dim=1)[:, :-1].contiguous()
+        targets = samples.data.contiguous().view(-1)
+
+        # calculate reward
+        rewards = np.array(rollout.get_reward(samples, netD))
+                    
+        prob = F.log_softmax(self(inputs), dim=1)
+        loss = self.adv_criterion(prob, targets, rewards)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+
     def train(self):
         dataset = self.train_data
         nb_train_sample = dataset.count

@@ -255,7 +255,7 @@ def run(cfg_dict):
 
     for epoch in range(total_epochs):
         for _ in range(g_steps):
-            netG.pgtrain(batch_size, sequence_len, rollout, netD)
+            learner.pgtrain(batch_size, sequence_len, rollout, netD)
 
         for d_step in range(d_steps):
             # train discriminator
@@ -269,7 +269,8 @@ def run(cfg_dict):
         
             for k_step in range(k_steps):
                 loss = netD.dtrain(dis_set)
-                print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))          
+                print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
+                
         rollout.update_params()
 
         generate_samples(netG, BATCH_SIZE, GENERATED_NUM, EVAL_FILE)

@@ -271,28 +271,40 @@ class Generator():
                    tgt_action_seq_type[:, :, 1] * terminal_gen_action_prob[:, :, 0] * vocab_tgt_prob + \
                    tgt_action_seq_type[:, :, 2] * terminal_gen_action_prob[:, :, 1] * copy_tgt_prob
 
-        # Defining MLE loss - I think.
+        # Defining NLLoss - I think.
         likelihood = T.log(tgt_prob + 1.e-7 * (1 - tgt_action_seq_mask))
-        loss = - (likelihood * tgt_action_seq_mask).sum(axis=-1)
-        loss = T.mean(loss)
+        nlloss = - (likelihood * tgt_action_seq_mask).sum(axis=-1)
+        nlloss = T.mean(nlloss)
+
+        # one_hot = np.zeros(tgt_prob.shape)
+        # one_hot.scatter_(1, target.data.view(-1, 1), 1)
+        # loss = torch.masked_select(pred, one_hot) * reward.contiguous().view(-1)
+        # loss = -torch.sum(loss)
+
+        # adv_loss = self.adversarial_loss(likelihood)
 
         # let's build the function!
 
         if self.cfg['verbose']:
-            print("\tBuilding theano.train function...")
+            print("\tBuilding theano.processing function...")
         train_inputs = [query_tokens, tgt_action_seq, tgt_action_seq_type,
                         tgt_node_seq, tgt_par_rule_seq, tgt_par_t_seq]
         optimizer = optimizers.get(self.cfg['optimizer'])
         optimizer.clip_grad = self.cfg['clip_grad']
-        updates, grads = optimizer.get_updates(self.params, loss)
-        self.train_func = theano.function(train_inputs, [loss], updates=updates)
+        updates, grads = optimizer.get_updates(self.params, nlloss)
+        self.train_func = theano.function(train_inputs, [nlloss], updates=updates)
+
+        # if self.cfg['verbose']:
+        #     print("\tBuilding theano.train function...")
+        # self.train_func = theano.function(self.proc_fun(train_inputs), [nlloss], updates=updates)
+        # self.pgtrain_func = theano.function(train_inputs, [adv_loss], updates=updates)
 
         self.build_decoder(query_tokens, 
                            query_token_embed, 
                            query_token_embed_mask)
 
     def build_decoder(self, 
-                      query_tokens, query_token_embed, query_token_embed_mask):
+                      query_tokens, query_token_embed, query_token_embed_mask, reward=1):
         if self.cfg['verbose']:
             print("Build decoder system...")
         # Re-setup the encoder
