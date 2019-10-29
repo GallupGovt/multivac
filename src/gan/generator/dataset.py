@@ -46,6 +46,7 @@ class Vocab(object):
         self.insert_token('<pad>')
         self.insert_token('<unk>')
         self.insert_token('<eos>')
+        self.id2word = {v: k for k, v in self.token_id_map.items()}
 
     @property
     def unk(self):
@@ -58,9 +59,8 @@ class Vocab(object):
     def __getitem__(self, item):
         if item in self.token_id_map:
             return self.token_id_map[item]
-
-        logging.debug('encounter one unknown word [%s]' % item)
-        return self.token_id_map['<unk>']
+        else:
+            return self.unk
 
     def __contains__(self, item):
         return item in self.token_id_map
@@ -71,6 +71,7 @@ class Vocab(object):
 
     def __setitem__(self, key, value):
         self.token_id_map[key] = value
+        self.id2word[value] = key
 
     def __len__(self):
         return len(self.token_id_map)
