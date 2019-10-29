@@ -18,14 +18,12 @@ from rdf_parse import StanfordParser, stanford_parse
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 
-nlp = CoreNLPClient()
-parser = StanfordParser(nlp)
-
 
 class RDFGraph:
     def __init__(self, top_tfidf=20000, top_n_rel=None,
                  top_n_ent=None, clust_dist_thres=0.2, coref_opt=False,
-                 openke_output_folder=os.curdir):
+                 openke_output_folder=os.curdir,
+                 verbose=False):
         '''Inputs:
         a) top_tfidf = number of top TF-IDF triples to use. To extract novel
                knowledge statements, we sort tuples by their mean TF-IDF scores and
@@ -55,6 +53,17 @@ class RDFGraph:
         self.coref_opt = coref_opt
         self.openke_output_folder = openke_output_folder
         self.source_path = None
+        self.verbose = verbose
+
+        annots =  "tokenize ssplit pos depparse natlog openie",
+        props  = {"timeout": 45000,
+                  "openie.triple.strict": "true"}
+
+        if coref_opt:
+            annots += "ner coref"
+            props["openie.openie.resolve_coref"] = "true"
+
+        self.parser = StanfordParser(annots=annots, props=props)
 
     @staticmethod
     def clean_out_html_tags(texts):
@@ -106,38 +115,57 @@ class RDFGraph:
             self.load_texts()
 
         # temp
-        self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)[501:1500]}
-        print(len(self.all_texts))
+        # self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)[:25]}
+
+        if self.verbose: print("{} documents to parse".format(len(self.all_texts)))
 
         # Loop through articles or article batches:
         # for Id, text in self.all_texts.items():
         if parallel:
+            if self.verbose: print("Processing in parallel.")
             pool = mp.Pool(n_cores)
             all_tuples = pool.map(self.extract_article_tuples, self.all_texts.values())
         else:
+            if self.verbose: print("Processing in serial.")
             all_tuples = list(map(self.extract_article_tuples, self.all_texts.values()))
 
         self.all_tuples = {Id: art_tuples for Id, art_tuples in
                            zip(self.all_texts.keys(), all_tuples)}
-        import pdb; pdb.set_trace()
+
+        if self.verbose: print("{} tuples extracted.".format(len(self.all_tuples)))
+
         pickle.dump(self.all_tuples, open('tuples_501_1500.pickle', 'wb'))
 
-    @staticmethod
-    def extract_article_tuples(text):
-        parser = StanfordParser(props={"openie.triple.strict": "true"})
+        if self.verbose: print("Dumped intermediate file to tuples_501_1500.pickle")
+
+    def extract_article_tuples(self, text):
+        if self.verbose: 
+            if 'meta' in text:
+                print("PARSING: " + text['meta']['title'])
+            else:
+                print("PARSING: " + text['metadata']['title'])
+            start = datetime.now()
+
         tuples = []
+
         try:
+            sentences = self.parser.get_parse(text['text'])['sentences']
+        except:
+            if self.verbose: print("Could not parse whole document; parsing by sentence.")
+
             sentences = sent_tokenize(text['text'])
-        except TypeError:
-            return None
 
         for sentence in sentences:
             try:
-                sentence = stanford_parse(parser, sentence)
+                s = stanford_parse(self.parser, sentence, noop=True)
             except:
-                print(sentence)
+                print("Parse error: " + sentence)
                 continue
-            tuples.append(sentence.rdfs)
+
+            tuples.append(s.rdfs)
+
+        if self.verbose:
+            print("ELAPSED: {}".format(datetime.now() - start))
         return tuples
 
     @staticmethod

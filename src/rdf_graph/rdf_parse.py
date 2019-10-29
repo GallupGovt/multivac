@@ -56,10 +56,10 @@ def clean_queries(queries, verbose=False):
 class StanfordParser(object):
     def __init__(self, nlp=None, annots=None, props=None):
         if annots is None:
-            annots = "tokenize pos lemma ner depparse openie"
+            annots = "tokenize pos lemma depparse"
 
         if nlp is None:       
-            self.nlp_client = CoreNLPClient(annotators=annots.split(),
+            self.nlp_client = CoreNLPClient(annotators=annots,
                                             output_format='json')
         else:
             self.nlp_client = nlp
@@ -135,7 +135,8 @@ class stanford_token(object):
 
 
 class stanford_parse(object):
-    def __init__(self, parser, sentence, deptype='basicDependencies'):
+    def __init__(self, parser, sentence, deptype='basicDependencies', 
+                 noop=False, make_tree=False):
 
         if isinstance(sentence, str):
             self.text = sentence
@@ -146,37 +147,59 @@ class stanford_parse(object):
         self.tokens = []
         self.root = 0
         self.rdfs = []
+        self.deps = []
 
-        # if 'parse' in self.parse:
-        #     self.parse_string = re.sub(r"\s+", " ", self.parse['parse'])
-        # else:
-        #     self.parse_string = ''
-        #
-        # self.deps = sorted(self.parse[deptype], key=lambda k: k['dependent'])
-        #
-        # for i, w in enumerate(self.parse['tokens']):
-        #     tok = stanford_token(text=w['originalText'],
-        #                          index=w['index'],
-        #                          lemma_=w['lemma'],
-        #                          pos_=w['pos'],
-        #                          ner=w['ner'],
-        #                          dep_=self.deps[i]['dep'].replace(":",""),
-        #                          head=self.deps[i]['governor']-1)
-        #     self.tokens.append(tok)
-        #     if tok.dep_ == 'ROOT':
-        #         self.root = len(self.tokens)-1
-        #
-        # self._tokens = {t.text: t.i for t in self.tokens}
-        #
-        # for tok in self.tokens:
-        #     self.tokens[tok.head].has_children = True
-        #
-        # self.dep_tree = parser.get_deps(self.parse, deptype, "tree")
-        #
-        # # self.parse_tree = get_eng_tree(self.parse_string)
-        self.store_rdfs()
+        if 'parse' in self.parse:
+            self.parse_string = re.sub(r"\s+", " ", self.parse['parse'])
+        else:
+            self.parse_string = ''
+        
+        if 'openie' in self.parse:
+            self.store_rdfs()
         # self.substitute_rdfs()
         # self.expand_rdfs()
+
+        if not noop:
+            if deptype in self.parse:
+                self.deps = sorted(self.parse[deptype], 
+                                   key=lambda k: k['dependent'])
+            
+            for i, w in enumerate(self.parse['tokens']):
+                for prop in ['lemma','ner','pos']:
+                    if prop not in w:
+                        w[prop] = None
+
+                if len(self.deps) == 0:
+                    dep = None
+                    governor = None
+                else:
+                    dep = self.deps[i]['dep'].replace(":","")
+                    governor = self.deps[i]['governor']-1
+
+                tok = stanford_token(text=w['originalText'],
+                                     index=w['index'],
+                                     lemma_=w['lemma'],
+                                     pos_=w['pos'],
+                                     ner=w['ner'],
+                                     dep_=dep,
+                                     head=governor)
+
+                self.tokens.append(tok)
+
+                if tok.dep_ == 'ROOT':
+                    self.root = len(self.tokens)-1
+            
+            self._tokens = {t.text: t.i for t in self.tokens}
+            
+            for tok in self.tokens:
+                self.tokens[tok.head].has_children = True
+            
+            if deptype in self.parse:
+                self.dep_tree = parser.get_deps(self.parse, deptype, "tree")
+            
+            if make_tree:
+                self.parse_tree = get_eng_tree(self.parse_string)
+
 
     def __repr__(self):
         return ' '.join(["{}".format(t) for t in self.tokens])
