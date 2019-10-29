@@ -80,6 +80,7 @@ class RDFGraph:
         # Create distance matrix (vector) using cosine similarity
         # between all entity strings
         embeddings_array = np.array([embedding for embedding in embeddings_dict.values()])
+
         dist_vec = pdist(embeddings_array, 'cosine')
 
         # Cluster distance matrix to find co-referring entities
@@ -100,9 +101,13 @@ class RDFGraph:
 
         self.entity_cluster_results = output
 
-    def extract_raw_tuples(self, parallel=False, n_cores=12):
+    def extract_raw_tuples(self, parallel=False, n_cores=5):
         if len(self.all_texts) == 0:
             self.load_texts()
+
+        # temp
+        self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)[501:1500]}
+        print(len(self.all_texts))
 
         # Loop through articles or article batches:
         # for Id, text in self.all_texts.items():
@@ -114,10 +119,12 @@ class RDFGraph:
 
         self.all_tuples = {Id: art_tuples for Id, art_tuples in
                            zip(self.all_texts.keys(), all_tuples)}
+        import pdb; pdb.set_trace()
+        pickle.dump(self.all_tuples, open('tuples_501_1500.pickle', 'wb'))
 
     @staticmethod
     def extract_article_tuples(text):
-        parser = StanfordParser()
+        parser = StanfordParser(props={"openie.triple.strict": "true"})
         tuples = []
         try:
             sentences = sent_tokenize(text['text'])
@@ -130,9 +137,7 @@ class RDFGraph:
             except:
                 print(sentence)
                 continue
-
-            rdfs = sentence.get_rdfs(use_tokens=False, how='list')
-            tuples.append(rdfs)
+            tuples.append(sentence.rdfs)
         return tuples
 
     @staticmethod
