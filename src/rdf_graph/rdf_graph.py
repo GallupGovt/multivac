@@ -9,7 +9,7 @@ import multiprocessing as mp
 
 # import xmltodict
 
-# from collections import Counter
+from collections import Counter
 from corenlp import CoreNLPClient
 from datetime import datetime
 from nltk import pos_tag, word_tokenize, sent_tokenize
@@ -20,8 +20,8 @@ from scipy.cluster.hierarchy import fcluster
 
 
 class RDFGraph:
-    def __init__(self, top_tfidf=20000, top_n_rel=None,
-                 top_n_ent=None, clust_dist_thres=0.2, coref_opt=False,
+    def __init__(self, top_tfidf=20000, top_n_rel=50,
+                 top_n_ent=50000, clust_dist_thres=0.2, coref_opt=False,
                  openke_output_folder=os.curdir,
                  verbose=False):
         '''Inputs:
@@ -115,7 +115,7 @@ class RDFGraph:
             self.load_texts()
 
         # temp
-        # self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)[:25]}
+        self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)}
 
         if self.verbose: print("{} documents to parse".format(len(self.all_texts)))
 
@@ -134,9 +134,9 @@ class RDFGraph:
 
         if self.verbose: print("{} tuples extracted.".format(len(self.all_tuples)))
 
-        pickle.dump(self.all_tuples, open('tuples_501_1500.pickle', 'wb'))
+        pickle.dump(self.all_tuples, open('all_tuples.pickle', 'wb'))
 
-        if self.verbose: print("Dumped intermediate file to tuples_501_1500.pickle")
+        if self.verbose: print("Dumped intermediate file to all_tuples.pickle")
 
     def extract_article_tuples(self, text):
         if self.verbose: 
@@ -152,9 +152,10 @@ class RDFGraph:
             sentences = self.parser.get_parse(text['text'])['sentences']
         except:
             if self.verbose: print("Could not parse whole document; parsing by sentence.")
-
-            sentences = sent_tokenize(text['text'])
-
+            try:
+                sentences = sent_tokenize(text['text'])
+            except TypeError:
+                return None
         for sentence in sentences:
             try:
                 s = stanford_parse(self.parser, sentence, noop=True)
@@ -223,14 +224,14 @@ class RDFGraph:
                                 for tuple_x in tuple_pair]
 
         unique_entities = list(set(tuples_subj_obj_flat))
-        # unique_entities = Counter(tuples_subj_obj_flat).most_common()
-        # if top_n_ent is not None and isinstance(top_n_ent, int):
-        #     if top_n_ent > len(unique_entities):
-        #         max_entities = len(unique_entities)
-        #     else:
-        #         max_entities = top_n_ent
-        #     unique_entities = [unique_entities[i]
-        #                        for i in range(max_entities)]
+        unique_entities = Counter(tuples_subj_obj_flat).most_common()
+        if top_n_ent is not None and isinstance(top_n_ent, int):
+            if top_n_ent > len(unique_entities):
+                max_entities = len(unique_entities)
+            else:
+                max_entities = top_n_ent
+            unique_entities = [unique_entities[i]
+                               for i in range(max_entities)]
         return unique_entities
 
     @staticmethod
@@ -239,14 +240,14 @@ class RDFGraph:
 
         unique_relations = list(set(relations))
 
-        # unique_relations = Counter(relations).most_common()
-        # if top_n_rel is not None and isinstance(top_n_rel, int):
-        #     if top_n_rel > len(unique_relations):
-        #         max_entities = len(unique_relations)
-        #     else:
-        #         max_entities = top_n_rel
-        #     unique_relations = [unique_relations[i]
-        #                         for i in range(max_entities)]
+        unique_relations = Counter(relations).most_common()
+        if top_n_rel is not None and isinstance(top_n_rel, int):
+            if top_n_rel > len(unique_relations):
+                max_entities = len(unique_relations)
+            else:
+                max_entities = top_n_rel
+            unique_relations = [unique_relations[i]
+                                for i in range(max_entities)]
         return unique_relations
 
     def load_texts(self, src=None):
@@ -338,7 +339,8 @@ class RDFGraph:
 
     def preprocess_raw_tuples(self):
         # Temp - Remove tuples missing subject, predicate or object
-        tuples = [self.all_tuples[key] for key in self.all_tuples.keys()]
+        tuples = [self.all_tuples[key] for key in self.all_tuples.keys()
+                  if self.all_tuples[key] is not None]
         tuples_cleared = [tuple_x
                           for art in tuples
                           for sent in art
