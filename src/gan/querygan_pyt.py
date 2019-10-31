@@ -178,7 +178,7 @@ def run(cfg_dict):
     d_steps = gan_args['d_steps']
     k_steps = gan_args['k_steps']
     
-    use_cuda = gan_args['device'] == 'cuda'
+    use_cuda = args['cuda']
 
     if not torch.cuda.is_available():
         use_cuda = False
@@ -289,7 +289,18 @@ def run(cfg_dict):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description='Build and train a Generative Adversarial Network to '
+                    'produce coherent, well-formed English language questions. '
+                    'Provide a config file with parameters for the system, and '
+                    'optionally override any of these with commandline '
+                    'arguments. To override a config parameter, pass an argument'
+                    ' matching the parameter, but prefaced with the part of the'
+                    ' system it refers to. '
+                    'I.e., "--generator_pretrain_epochs 120" would override the'
+                    'generator parameter "pretrain_epochs" and set this value'
+                    'to "120". Valid system parts are "gan", "generator", and '
+                    '"discriminator".')
     parser.add_argument('--cuda', default=False, action='store_true', 
                         help='Enable GPU training.')
     parser.add_argument('-c', '--config', required=False, 
@@ -302,13 +313,21 @@ if __name__ == '__main__':
 
     i = 0
 
-    # while i < len(all_args[1]):
-    #     if all_args[1][i].startswith('--'):
-    #         args[all_args[1][i][2:]] = all_args[1][i+1]
-    #         i += 2
-    #     else if 
-    #         i += 1
+    while i < len(all_args[1]):
+        if all_args[1][i].startswith('--'):
+            key = all_args[1][i][2:]
+            value = all_args[1][i+1]
 
+            if value.startswith('--'):
+                args[key] = True
+                i += 1
+                continue
+            else:
+                args[key] = value
+                i += 2
+        else:
+            i += 1
+    
     cfg = configparser.ConfigParser()
     cfgDIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -320,7 +339,14 @@ if __name__ == '__main__':
     cfg_dict = cfg._sections
 
     # NEED TO IMPLEMENT ACTUALLY OVERRIDING THE config.cfg SETTINGS
-    cfg_dict['ARGS'] = args
+    for arg in args:
+        section, param = arg.split("_", 1)
+        try:
+            cfg[section.upper()][param] = args[arg]
+        except KeyError:
+            print("Section " + section.upper() + "not found in "
+                  "" + args['config'] + ", skipping.")
+            continue
 
     for name, section in cfg_dict.items():
         for carg in section:

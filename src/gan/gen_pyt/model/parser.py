@@ -18,7 +18,7 @@ from multivac.src.gan.gen_pyt.common.registerable import Registrable
 from multivac.src.gan.gen_pyt.components.decode_hypothesis import DecodeHypothesis
 from multivac.src.gan.gen_pyt.components.action_info import ActionInfo
 from multivac.src.gan.gen_pyt.components.dataset import Batch
-from multivac.src.gan.gen_pyt.common.utils import update_args, init_arg_parser
+# from multivac.src.gan.gen_pyt.common.utils import update_args, init_arg_parser
 from multivac.src.gan.gen_pyt.model import nn_utils
 from multivac.src.gan.gen_pyt.model.attention_util import AttentionUtil
 from multivac.src.gan.gen_pyt.model.nn_utils import LabelSmoothing
@@ -892,7 +892,7 @@ class Parser(nn.Module):
         transition_system = params['transition_system']
         saved_args = params['args']
         # update saved args
-        update_args(saved_args, init_arg_parser())
+        # update_args(saved_args, init_arg_parser())
         saved_state = params['state_dict']
         saved_args.cuda = cuda
 

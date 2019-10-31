@@ -20,7 +20,6 @@ from asdl import *
 from asdl.asdl import ASDLGrammar
 from common.registerable import Registrable
 from components.dataset import Dataset, Example
-from common.utils import update_args, init_arg_parser
 from datasets import *
 from model import nn_utils, utils
 
