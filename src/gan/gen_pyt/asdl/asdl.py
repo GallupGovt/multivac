@@ -2,9 +2,6 @@
 from collections import OrderedDict, Counter
 from itertools import chain
 
-from .utils import remove_comment
-
-
 class ASDLGrammar(object):
     """
     Collection of types, constructors and productions
@@ -84,79 +81,6 @@ class ASDLGrammar(object):
 
     def is_primitive_type(self, asdl_type):
         return asdl_type in self.primitive_types
-
-    @staticmethod
-    def from_text(text):
-        def _parse_field_from_text(_text):
-            d = _text.strip().split(' ')
-            name = d[1].strip()
-            type_str = d[0].strip()
-            cardinality = 'single'
-            if type_str[-1] == '*':
-                type_str = type_str[:-1]
-                cardinality = 'multiple'
-            elif type_str[-1] == '?':
-                type_str = type_str[:-1]
-                cardinality = 'optional'
-
-            if type_str in primitive_type_names:
-                return Field(name, ASDLPrimitiveType(type_str), cardinality=cardinality)
-            else:
-                return Field(name, ASDLCompositeType(type_str), cardinality=cardinality)
-
-        def _parse_constructor_from_text(_text):
-            _text = _text.strip()
-            fields = None
-            if '(' in _text:
-                name = _text[:_text.find('(')]
-                field_blocks = _text[_text.find('(') + 1:_text.find(')')].split(',')
-                fields = map(_parse_field_from_text, field_blocks)
-            else:
-                name = _text
-
-            if name == '': name = None
-
-            return ASDLConstructor(name, fields)
-
-        lines = remove_comment(text).split('\n')
-        lines = list(map(lambda l: l.strip(), lines))
-        lines = list(filter(lambda l: l, lines))
-        line_no = 0
-
-        # first line is always the primitive types
-        primitive_type_names = list(map(lambda x: x.strip(), lines[line_no].split(',')))
-        line_no += 1
-
-        all_productions = list()
-
-        while True:
-            type_block = lines[line_no]
-            type_name = type_block[:type_block.find('=')].strip()
-            constructors_blocks = type_block[type_block.find('=') + 1:].split('|')
-            i = line_no + 1
-            while i < len(lines) and lines[i].strip().startswith('|'):
-                t = lines[i].strip()
-                cont_constructors_blocks = t[1:].split('|')
-                constructors_blocks.extend(cont_constructors_blocks)
-
-                i += 1
-
-            constructors_blocks = filter(lambda x: x and x.strip(), constructors_blocks)
-
-            # parse type name
-            new_type = ASDLPrimitiveType(type_name) if type_name in primitive_type_names else ASDLCompositeType(type_name)
-            constructors = map(_parse_constructor_from_text, constructors_blocks)
-
-            productions = list(map(lambda c: ASDLProduction(new_type, c), constructors))
-            all_productions.extend(productions)
-
-            line_no = i
-            if line_no == len(lines):
-                break
-
-        grammar = ASDLGrammar(all_productions)
-
-        return grammar
 
 
 class ASDLProduction(object):
@@ -283,33 +207,3 @@ class ASDLCompositeType(ASDLType):
 
 class ASDLPrimitiveType(ASDLType):
     pass
-
-
-if __name__ == '__main__':
-    asdl_desc = """
-var, ent, num, var_type
-
-expr = Variable(var variable)
-| Entity(ent entity)
-| Number(num number)
-| Apply(pred predicate, expr* arguments)
-| Argmax(var variable, expr domain, expr body)
-| Argmin(var variable, expr domain, expr body)
-| Count(var variable, expr body)
-| Exists(var variable, expr body)
-| Lambda(var variable, var_type type, expr body)
-| Max(var variable, expr body)
-| Min(var variable, expr body)
-| Sum(var variable, expr domain, expr body)
-| The(var variable, expr body)
-| Not(expr argument)
-| And(expr* arguments)
-| Or(expr* arguments)
-| Compare(cmp_op op, expr left, expr right)
-
-cmp_op = GreaterThan | Equal | LessThan
-"""
-
-    grammar = ASDLGrammar.from_text(asdl_desc)
-    print(ASDLCompositeType('1') == ASDLPrimitiveType('1'))
-

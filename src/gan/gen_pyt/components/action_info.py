@@ -1,6 +1,6 @@
 # coding=utf-8
-from asdl.hypothesis import Hypothesis
-from asdl.transition_system import ApplyRuleAction, GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.hypothesis import Hypothesis
+from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, GenTokenAction
 
 
 class ActionInfo(object):

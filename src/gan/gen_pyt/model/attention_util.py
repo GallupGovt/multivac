@@ -1,5 +1,5 @@
 # coding=utf-8
-from asdl.transition_system import GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.transition_system import GenTokenAction
 
 
 LOGICAL_FORM_LEXICON = {

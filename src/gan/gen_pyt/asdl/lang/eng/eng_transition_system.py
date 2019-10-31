@@ -1,25 +1,27 @@
 # coding=utf-8
 
-from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast, python_ast_to_asdl_ast
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper \
+    import asdl_ast_to_english, english_ast_to_asdl_ast
 from multivac.src.rdf_graph.rdf_parse import tokenize_text
-from asdl.transition_system import TransitionSystem, GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.transition_system \
+    import TransitionSystem, GenTokenAction
 
-from common.registerable import Registrable
+from multivac.src.gan.gen_pyt.common.registerable import Registrable
 
 
 @Registrable.register('english')
 class EnglishTransitionSystem(TransitionSystem):
+    self.parser = StanfordParser(annots = "tokenize ssplit parse")
+
     def tokenize_text(self, text, mode=None):
         return tokenize_text(text, mode)
 
     def surface_text_to_ast(self, text):
-        py_ast = ast.parse(text).body[0]
-        return python_ast_to_asdl_ast(py_ast, self.grammar)
+        p = self.parser.get_parse(text)['parse']
+        return english_ast_to_asdl_ast(p)
 
     def ast_to_surface_text(self, asdl_ast):
-        py_ast = asdl_ast_to_python_ast(asdl_ast, self.grammar)
-        text = astor.to_source(py_ast).strip()
-
+        text = asdl_ast_to_english(asdl_ast)
         return text
 
     def compare_ast(self, hyp_ast, ref_ast):
@@ -33,19 +35,14 @@ class EnglishTransitionSystem(TransitionSystem):
 
     def get_primitive_field_actions(self, realized_field):
         actions = []
+
         if realized_field.value is not None:
-            if realized_field.cardinality == 'multiple':  # expr -> Global(identifier* names)
-                field_values = realized_field.value
-            else:
-                field_values = [realized_field.value]
+            field_values = [realized_field.value]
 
             tokens = []
-            if realized_field.type.name == 'string':
-                for field_val in field_values:
-                    tokens.extend(field_val.split(' ') + ['</primitive>'])
-            else:
-                for field_val in field_values:
-                    tokens.append(field_val)
+
+            for field_val in field_values:
+                tokens.extend(field_val.split(' ') + ['</primitive>'])
 
             for tok in tokens:
                 actions.append(GenTokenAction(tok))
@@ -55,8 +52,8 @@ class EnglishTransitionSystem(TransitionSystem):
     def is_valid_hypothesis(self, hyp, **kwargs):
         try:
             hyp_text = self.ast_to_surface_text(hyp.tree)
-            ast.parse(hyp_text)
-            self.tokenize_text(hyp_text)
+            new_tree = self.surface_text_to_ast(hyp_text)
+            assert hyp.tree == new_tree
         except:
             return False
         return True

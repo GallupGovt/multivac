@@ -17,6 +17,9 @@ def get_example_processor_cls(dataset):
     if dataset == 'django':
         from datasets.django.example_processor import DjangoExampleProcessor
         return DjangoExampleProcessor
+    elif dataset == 'english':
+        from datasets.english.example_processor import EnglishExampleProcessor
+        return EnglishExampleProcessor
     elif dataset == 'atis':
         from datasets.atis.example_processor import ATISExampleProcessor
         return ATISExampleProcessor

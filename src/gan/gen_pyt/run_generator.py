@@ -52,7 +52,7 @@ def train(args):
 
     vocab = pickle.load(open(args.vocab, 'rb'))
 
-    grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
+    #grammar = ASDLGrammar.from_text(open(args.asdl_file).read())
     transition_system = EnglishTransitionSystem(grammar)
 
     parser_cls = Registrable.by_name(args.parser)  # TODO: add arg

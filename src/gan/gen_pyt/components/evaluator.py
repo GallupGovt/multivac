@@ -1,8 +1,7 @@
-from __future__ import print_function
 
 import sys, traceback
 import numpy as np
-from common.registerable import Registrable
+from multivac.src.gan.gen_pyt.common.registerable import Registrable
 
 
 @Registrable.register('default_evaluator')

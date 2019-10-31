@@ -8,7 +8,7 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from model import nn_utils
+from multivac.src.gan.gen_pyt.model import nn_utils
 
 
 class Seq2SeqModel(nn.Module):

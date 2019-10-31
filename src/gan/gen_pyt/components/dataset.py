@@ -7,10 +7,10 @@ import pickle
 
 from torch.autograd import Variable
 
-from asdl.transition_system import ApplyRuleAction, ReduceAction
-from common.utils import cached_property
+from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, ReduceAction
+from multivac.src.gan.gen_pyt.common.utils import cached_property
 
-from model import nn_utils
+from multivac.src.gan.gen_pyt.model import nn_utils
 
 
 class Dataset(object):

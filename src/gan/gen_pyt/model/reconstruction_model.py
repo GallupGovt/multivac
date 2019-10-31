@@ -1,9 +1,7 @@
 # coding=utf-8
-from __future__ import print_function
 
 import os
 from itertools import chain
-from six.moves import range
 
 import sys
 import numpy as np
@@ -14,13 +12,13 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from common.registerable import Registrable
-from common.savable import Savable
-from components.reranker import RerankingFeature
-from model.pointer_net import PointerNet
-from model.seq2seq import Seq2SeqModel
-from model import nn_utils
-from model.seq2seq_copy import Seq2SeqWithCopy
+from multivac.src.gan.gen_pyt.common.registerable import Registrable
+from multivac.src.gan.gen_pyt.common.savable import Savable
+from multivac.src.gan.gen_pyt.components.reranker import RerankingFeature
+from multivac.src.gan.gen_pyt.model.pointer_net import PointerNet
+from multivac.src.gan.gen_pyt.model.seq2seq import Seq2SeqModel
+from multivac.src.gan.gen_pyt.model import nn_utils
+from multivac.src.gan.gen_pyt.model.seq2seq_copy import Seq2SeqWithCopy
 
 
 @Registrable.register('reconstructor')

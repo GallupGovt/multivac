@@ -2,8 +2,9 @@
 import argparse
 import re
 
-from multivac.src.gan.generator.astnode import *
-from multivac.src.gan.generator.lang.eng.grammar import EnglishGrammar
+from multivac.src.gan.gen_pyt.astnode import *
+from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishGrammar
+from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishASDLGrammar
 from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
 
@@ -135,7 +136,8 @@ def parse_raw(parser, query):
     return result
 
 
-def extract_grammar(source_file, output=None, clean=False, verbose=False):
+def extract_grammar(source_file, output=None, clean=False, verbose=False, 
+                    asdl=False):
     parse_trees = list()
     rules = set()
 
@@ -181,8 +183,13 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False):
     rules = list(sorted(rules, key=lambda x: x.__repr__()))
     grammar = EnglishGrammar(rules)
 
+    if asdl:
+        grammar = EnglishASDLGrammar(grammar)
+
     if verbose:
         print("Grammar induced successfully.")
+
+    import pdb; pdb.set_trace()
 
     if output is not None:
         with open(output, 'w') as f:
@@ -205,10 +212,13 @@ if __name__ == '__main__':
                         help='Pre-clean queries before populating.')
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='Print verbose output on progress.')
+    parser.add_argument('-a', '--asdl', action='store_true', default=False,
+                        help='Return grammar in ASDL mode.')
 
     args_dict = vars(parser.parse_args())
 
     extract_grammar(args_dict['queries'],
                     args_dict['output'], 
                     args_dict['clean'], 
-                    args_dict['verbose'])
+                    args_dict['verbose'],
+                    args_dict['asdl'])

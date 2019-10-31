@@ -1,6 +1,4 @@
 # coding=utf-8
-from __future__ import print_function
-
 import sys
 import traceback
 
@@ -13,10 +11,10 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from components.dataset import Example
-from model.prior import UniformPrior
-from parser import *
-from model.reconstruction_model import *
+from multivac.src.gan.gen_pyt.components.dataset import Example
+from multivac.src.gan.gen_pyt.model.prior import UniformPrior
+from multivac.src.gan.gen_pyt.parser import *
+from multivac.src.gan.gen_pyt.model.reconstruction_model import *
 
 
 class StructVAE(nn.Module):
@@ -44,7 +42,7 @@ class StructVAE(nn.Module):
         reconstruction_scores = self.decoder.score(samples)
 
         # compute prior probability
-        prior_scores = self.prior([e.tgt_code for e in samples])
+        prior_scores = self.prior([e.tgt_text for e in samples])
         if isinstance(self.prior, UniformPrior):
             prior_scores = Variable(sample_scores.data.new(prior_scores))
 
@@ -103,16 +101,16 @@ class StructVAE(nn.Module):
         for e_id, (example, hyps) in enumerate(zip(examples, hypotheses)):
             for hyp_id, hyp in enumerate(hyps):
                 try:
-                    code = self.transition_system.ast_to_surface_code(hyp.tree)
-                    self.transition_system.tokenize_code(code)  # make sure the code is tokenizable!
+                    text = self.transition_system.ast_to_surface_text(hyp.tree)
+                    self.transition_system.tokenize_text(text)  # make sure the text is tokenizable!
                     sampled_example = Example(idx='%d-sample%d' % (example.idx, hyp_id),
                                               src_sent=example.src_sent,
-                                              tgt_code=code,
+                                              tgt_text=text,
                                               tgt_actions=hyp.action_infos,
                                               tgt_ast=hyp.tree)
                     sampled_examples.append(sampled_example)
                 except:
-                    print("Exception in converting tree to code:", file=sys.stdout)
+                    print("Exception in converting tree to text:", file=sys.stdout)
                     print('-' * 60, file=sys.stdout)
                     traceback.print_exc(file=sys.stdout)
                     print('-' * 60, file=sys.stdout)

@@ -1,26 +1,21 @@
-import astor
 
-from common.registerable import Registrable
-from datasets.utils import ExampleProcessor
-from datasets.django.dataset import Django, replace_string_ast_nodes
-from asdl.lang.py.py_asdl_helper import asdl_ast_to_python_ast
+from multivac.src.gan.gen_pyt.common.registerable import Registrable
+from multivac.src.gan.gen_pyt.datasets.utils import ExampleProcessor
+from multivac.src.gan.gen_pyt.datasets.english.dataset import English
+from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
-
-@Registrable.register('django_example_processor')
-class DjangoExampleProcessor(ExampleProcessor):
+@Registrable.register('english_example_processor')
+class EnglishExampleProcessor(ExampleProcessor):
     def __init__(self, transition_system):
         self.transition_system = transition_system
+        self.parser = StanfordParser(annots = "tokenize ssplit parse")
 
     def pre_process_utterance(self, utterance):
-        canonical_utterance, str2slot_map = Django.canonicalize_query(utterance)
+        toks, text, parse_str, tree = English.canonicalize_example(utterance,
+                                                                   self.parser)
+        return toks, tree
 
-        meta_info = str2slot_map
-        return canonical_utterance.split(' '), meta_info
-
-    def post_process_hypothesis(self, hyp, meta_info, utterance=None):
+    def post_process_hypothesis(self, hyp):
         """traverse the AST and replace slot ids with original strings"""
-        slot2str_map = {v: k for k, v in meta_info.items()}
-        hyp_ast = asdl_ast_to_python_ast(hyp.tree, self.transition_system.grammar)
-        replace_string_ast_nodes(hyp_ast, slot2str_map)
-
-        hyp.code = astor.to_source(hyp_ast).strip()
+        text = self.transition_system.ast_to_surface_text(hyp.tree)
+        return text

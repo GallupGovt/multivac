@@ -3,8 +3,8 @@ import os
 
 import torch
 
-from model import nn_utils
-from model.neural_lm import LSTMLanguageModel
+from multivac.src.gan.gen_pyt.model import nn_utils
+from multivac.src.gan.gen_pyt.model.neural_lm import LSTMLanguageModel
 
 
 class Prior(object):

@@ -1,16 +1,11 @@
 # coding=utf-8
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-import numpy as np
-
-import torch
-import torch.nn as nn
 from torch.autograd import Variable
 import numpy as np
-
-from six.moves import xrange
 
 
 def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
@@ -57,8 +52,8 @@ def input_transpose(sents, pad_token):
     batch_size = len(sents)
 
     sents_t = []
-    for i in xrange(max_len):
-        sents_t.append([sents[k][i] if len(sents[k]) > i else pad_token for k in xrange(batch_size)])
+    for i in range(max_len):
+        sents_t.append([sents[k][i] if len(sents[k]) > i else pad_token for k in range(batch_size)])
 
     return sents_t
 
@@ -105,7 +100,7 @@ def batch_iter(examples, batch_size, shuffle=False):
         np.random.shuffle(index_arr)
 
     batch_num = int(np.ceil(len(examples) / float(batch_size)))
-    for batch_id in xrange(batch_num):
+    for batch_id in range(batch_num):
         batch_ids = index_arr[batch_size * batch_id: batch_size * (batch_id + 1)]
         batch_examples = [examples[i] for i in batch_ids]
 

@@ -1,8 +1,6 @@
 # coding=utf-8
-from __future__ import print_function
 
 import os
-from six.moves import xrange as range
 import math
 from collections import OrderedDict
 import numpy as np
@@ -14,19 +12,19 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
-from asdl.hypothesis import Hypothesis, GenTokenAction
-from asdl.transition_system import ApplyRuleAction, ReduceAction, Action
-from common.registerable import Registrable
-from components.decode_hypothesis import DecodeHypothesis
-from components.action_info import ActionInfo
-from components.dataset import Batch
-from common.utils import update_args, init_arg_parser
-from model import nn_utils
-from model.attention_util import AttentionUtil
-from model.nn_utils import LabelSmoothing
-from model.pointer_net import PointerNet
+from multivac.src.gan.gen_pyt.asdl.hypothesis import Hypothesis, GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, ReduceAction, Action
+from multivac.src.gan.gen_pyt.common.registerable import Registrable
+from multivac.src.gan.gen_pyt.components.decode_hypothesis import DecodeHypothesis
+from multivac.src.gan.gen_pyt.components.action_info import ActionInfo
+from multivac.src.gan.gen_pyt.components.dataset import Batch
+from multivac.src.gan.gen_pyt.common.utils import update_args, init_arg_parser
+from multivac.src.gan.gen_pyt.model import nn_utils
+from multivac.src.gan.gen_pyt.model.attention_util import AttentionUtil
+from multivac.src.gan.gen_pyt.model.nn_utils import LabelSmoothing
+from multivac.src.gan.gen_pyt.model.pointer_net import PointerNet
 
-from .lstm import ParentFeedingLSTMCell
+from multivac.src.gan.gen_pyt.model.lstm import ParentFeedingLSTMCell
 
 
 @Registrable.register('default_parser')

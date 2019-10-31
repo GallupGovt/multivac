@@ -1,11 +1,8 @@
 # coding=utf-8
 
-try:
-    from cStringIO import StringIO
-except:
-    from io import StringIO
+from io import StringIO
 
-from .asdl import *
+from multivac.src.gan.gen_pyt.asdl import *
 
 
 class AbstractSyntaxTree(object):
@@ -65,6 +62,16 @@ class AbstractSyntaxTree(object):
                     new_field.add_value(value)
 
         return new_tree
+
+    def get_productions(self):
+        productions = set()
+        productions.add(self.production)
+
+        for field in self.fields:
+            if isinstance(field.value, AbstractSyntaxTree):
+                productions.update(field.value.get_productions())
+
+        return productions
 
     def to_string(self, sb=None):
         is_root = False

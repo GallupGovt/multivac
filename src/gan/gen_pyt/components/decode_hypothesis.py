@@ -1,8 +1,8 @@
 # coding=utf-8
 
-from asdl.asdl import *
-from asdl.hypothesis import Hypothesis
-from asdl.transition_system import *
+from multivac.src.gan.gen_pyt.asdl.asdl import *
+from multivac.src.gan.gen_pyt.asdl.hypothesis import Hypothesis
+from multivac.src.gan.gen_pyt.asdl.transition_system import *
 
 
 class DecodeHypothesis(Hypothesis):

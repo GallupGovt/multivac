@@ -5,6 +5,7 @@ import math
 import numpy as np
 from torch.autograd import Variable
 
+from multivac.src.gan.gen_pyt.model.parser import Parser
 
 class GloveHelper(object):
     def __init__(self, glove_file):
@@ -65,11 +66,7 @@ def batch_iter(examples, batch_size, shuffle=False):
 
 
 def get_parser_class(lang):
-    if lang in ['python', 'lambda_dcs', 'prolog', 'python3']:
-        from model.parser import Parser
+    if lang in ['english', 'python', 'lambda_dcs', 'prolog', 'python3']:
         return Parser
-    elif lang == 'wikisql':
-        from model.wikisql.parser import WikiSqlParser
-        return WikiSqlParser
     else:
         raise ValueError('unknown parser class for %s' % lang)
