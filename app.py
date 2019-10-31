@@ -36,9 +36,6 @@ def results():
 		assert os.path.exists(out_dir)
 		assert os.path.exists(in_dir)
 
-		print(in_dir)
-		print(out_dir)
-
 		args_dict = {
 			'docker_folder_structure': [x for x in os.walk(os.getcwd())],
 			'dir': in_dir,
