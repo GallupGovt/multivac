@@ -24,9 +24,11 @@ RUN git clone https://github.com/thunlp/OpenKE && cd OpenKE && sh make.sh
 
 COPY . /multivac
 
+ENV PYTHONPATH "${PYTHONPATH}:/multivac"
+
 EXPOSE 5000
 
-CMD ["python3", "app.py"]
+CMD python3 app.py
 
 
 ### Look into this if issues with OpenKE sh (production image)

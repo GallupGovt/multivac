@@ -9,8 +9,9 @@ services:
     depends_on:
     - stanfordnlp
     - grobid
-    links:
     - jupyter
+    links:
+    - "jupyter"
     volumes:
       - "./:/app"
   stanfordnlp:
