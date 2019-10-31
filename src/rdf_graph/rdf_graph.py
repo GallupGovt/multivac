@@ -115,7 +115,7 @@ class RDFGraph:
             self.load_texts()
 
         # temp
-        self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)}
+        # self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)}
 
         if self.verbose: print("{} documents to parse".format(len(self.all_texts)))
 
@@ -230,7 +230,7 @@ class RDFGraph:
                 max_entities = len(unique_entities)
             else:
                 max_entities = top_n_ent
-            unique_entities = [unique_entities[i]
+            unique_entities = [unique_entities[i][0]
                                for i in range(max_entities)]
         return unique_entities
 
@@ -246,7 +246,7 @@ class RDFGraph:
                 max_entities = len(unique_relations)
             else:
                 max_entities = top_n_rel
-            unique_relations = [unique_relations[i]
+            unique_relations = [unique_relations[i][0]
                                 for i in range(max_entities)]
         return unique_relations
 
