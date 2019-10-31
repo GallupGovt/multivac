@@ -4,9 +4,10 @@ import pandas as pd
 from random import shuffle
 
 def run(args_dict):
-	f = open('{}/{}'.format(args_dict['output_dir'], args_dict['file']))
+	with open('{}/{}'.format(args_dict['output_dir'], args_dict['file'])) as f:
+		clean_txt = f.readlines()
+		f.close()
 
-	clean_txt = [line for line in f.readlines()]
 	df_clean = pd.DataFrame(clean_txt)
 	df_clean.columns = ['query']
 	# clean queries will contain a label of 1
