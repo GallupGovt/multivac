@@ -4,6 +4,7 @@ from corenlp import CoreNLPClient
 import pandas as pd
 import re
 
+
 def tokenize_text(text, parser=None):
     if parser is None:
         parser = StanfordParser()
@@ -51,13 +52,14 @@ def clean_queries(queries, verbose=False):
 
     return clean
 
+
 class StanfordParser(object):
     def __init__(self, nlp=None, annots=None, props=None):
         if annots is None:
-            annots = "tokenize pos lemma ner depparse"
+            annots = "tokenize pos lemma depparse"
 
         if nlp is None:       
-            self.nlp_client = CoreNLPClient(annotators = annots.split(), 
+            self.nlp_client = CoreNLPClient(annotators=annots,
                                             output_format='json')
         else:
             self.nlp_client = nlp
@@ -133,7 +135,8 @@ class stanford_token(object):
 
 
 class stanford_parse(object):
-    def __init__(self, parser, sentence, deptype='basicDependencies'):
+    def __init__(self, parser, sentence, deptype='basicDependencies', 
+                 noop=False, make_tree=False):
 
         if isinstance(sentence, str):
             self.text = sentence
@@ -143,39 +146,60 @@ class stanford_parse(object):
             self.parse = sentence
         self.tokens = []
         self.root = 0
-        self.rdfs = {}
+        self.rdfs = []
+        self.deps = []
 
         if 'parse' in self.parse:
             self.parse_string = re.sub(r"\s+", " ", self.parse['parse'])
         else:
             self.parse_string = ''
+        
+        if 'openie' in self.parse:
+            self.store_rdfs()
+        # self.substitute_rdfs()
+        # self.expand_rdfs()
 
-        self.deps = sorted(self.parse[deptype], key=lambda k: k['dependent'])
+        if not noop:
+            if deptype in self.parse:
+                self.deps = sorted(self.parse[deptype], 
+                                   key=lambda k: k['dependent'])
+            
+            for i, w in enumerate(self.parse['tokens']):
+                for prop in ['lemma','ner','pos']:
+                    if prop not in w:
+                        w[prop] = None
 
-        for i, w in enumerate(self.parse['tokens']):
-            tok = stanford_token(text=w['originalText'],
-                                 index=w['index'],
-                                 lemma_=w['lemma'],
-                                 pos_=w['pos'],
-                                 ner=w['ner'],
-                                 dep_=self.deps[i]['dep'].replace(":",""),
-                                 head=self.deps[i]['governor']-1)
-            self.tokens.append(tok)
-            if tok.dep_ == 'ROOT':
-                self.root = len(self.tokens)-1
+                if len(self.deps) == 0:
+                    dep = None
+                    governor = None
+                else:
+                    dep = self.deps[i]['dep'].replace(":","")
+                    governor = self.deps[i]['governor']-1
 
-        self._tokens = {t.text: t.i for t in self.tokens}
+                tok = stanford_token(text=w['originalText'],
+                                     index=w['index'],
+                                     lemma_=w['lemma'],
+                                     pos_=w['pos'],
+                                     ner=w['ner'],
+                                     dep_=dep,
+                                     head=governor)
 
-        for tok in self.tokens:
-            self.tokens[tok.head].has_children = True
+                self.tokens.append(tok)
 
-        self.dep_tree = parser.get_deps(self.parse, deptype, "tree")
+                if tok.dep_ == 'ROOT':
+                    self.root = len(self.tokens)-1
+            
+            self._tokens = {t.text: t.i for t in self.tokens}
+            
+            for tok in self.tokens:
+                self.tokens[tok.head].has_children = True
+            
+            if deptype in self.parse:
+                self.dep_tree = parser.get_deps(self.parse, deptype, "tree")
+            
+            if make_tree:
+                self.parse_tree = get_eng_tree(self.parse_string)
 
-        # self.parse_tree = get_eng_tree(self.parse_string)
-
-        # self.store_rdfs()
-        self.substitute_rdfs()
-        self.expand_rdfs()
 
     def __repr__(self):
         return ' '.join(["{}".format(t) for t in self.tokens])
@@ -205,7 +229,6 @@ class stanford_parse(object):
             result = self.rdfs
         elif how == 'list':
             result = self.rdfs.copy().values()
-            
             if not use_tokens:
                 for rdf in result:
                     for part in ['subject', 'relation', 'object']:
@@ -213,9 +236,8 @@ class stanford_parse(object):
                                           for t 
                                           in rdf[part]])
                         # result[rdf] = [x for x in result[rdf].values()]
-
             result = [list(x.values()) for x in result]
-            result = [x for sl in result for x in sl]
+            # result = [x for sl in result for x in sl]
         else:
             result = []
             longest = 0
@@ -292,14 +314,11 @@ class stanford_parse(object):
     def store_rdfs(self):
         # Legacy code, to store 'official' RDF triples as extracted by OpenIE
         # if we want to do that again.
-        for idx, rdf in enumerate(self.parse['openie']):
-            self.rdfs[idx] = {"subject": [],
-                              "relation": [],
-                              "object": []}
+        for rdf in self.parse['openie']:
+            self.rdfs.append((rdf["subject"],
+                              rdf["relation"],
+                              rdf["object"]))
 
-            for node in self.rdfs[idx]:
-                tok_range = range(*rdf[node+"Span"])
-                self.rdfs[idx][node] = [x for x in tok_range]
 
     def substitute_rdfs(self):
         # Find all nouns (and adjectives) and verbs (and adverbs)

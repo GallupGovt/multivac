@@ -5,26 +5,25 @@ import os
 import re
 import string
 import pickle
+import multiprocessing as mp
 
 # import xmltodict
 
-# from collections import Counter
+from collections import Counter
 from corenlp import CoreNLPClient
 from datetime import datetime
 from nltk import pos_tag, word_tokenize, sent_tokenize
 from nltk.stem import WordNetLemmatizer
-from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+from rdf_parse import StanfordParser, stanford_parse
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 
-nlp = CoreNLPClient()
-parser = StanfordParser(nlp)
-
 
 class RDFGraph:
-    def __init__(self, top_tfidf=20000, top_n_rel=None,
-                 top_n_ent=None, clust_dist_thres=0.2, coref_opt=False,
-                 openke_output_folder=os.curdir):
+    def __init__(self, top_tfidf=20000, top_n_rel=50,
+                 top_n_ent=50000, clust_dist_thres=0.2, coref_opt=False,
+                 openke_output_folder=os.curdir,
+                 verbose=False):
         '''Inputs:
         a) top_tfidf = number of top TF-IDF triples to use. To extract novel
                knowledge statements, we sort tuples by their mean TF-IDF scores and
@@ -54,6 +53,17 @@ class RDFGraph:
         self.coref_opt = coref_opt
         self.openke_output_folder = openke_output_folder
         self.source_path = None
+        self.verbose = verbose
+
+        annots =  "tokenize ssplit pos depparse natlog openie",
+        props  = {"timeout": 45000,
+                  "openie.triple.strict": "true"}
+
+        if coref_opt:
+            annots += "ner coref"
+            props["openie.openie.resolve_coref"] = "true"
+
+        self.parser = StanfordParser(annots=annots, props=props)
 
     @staticmethod
     def clean_out_html_tags(texts):
@@ -79,6 +89,7 @@ class RDFGraph:
         # Create distance matrix (vector) using cosine similarity
         # between all entity strings
         embeddings_array = np.array([embedding for embedding in embeddings_dict.values()])
+
         dist_vec = pdist(embeddings_array, 'cosine')
 
         # Cluster distance matrix to find co-referring entities
@@ -99,35 +110,64 @@ class RDFGraph:
 
         self.entity_cluster_results = output
 
-    def extract_raw_tuples(self):
+    def extract_raw_tuples(self, parallel=False, n_cores=5):
         if len(self.all_texts) == 0:
             self.load_texts()
 
-        parser = StanfordParser()
-        i = 0
+        # temp
+        # self.all_texts = {key: self.all_texts[key] for key in list(self.all_texts)}
+
+        if self.verbose: print("{} documents to parse".format(len(self.all_texts)))
 
         # Loop through articles or article batches:
-        for Id, text in self.all_texts.items():
-            print(i)
-            # Start information extraction
+        # for Id, text in self.all_texts.items():
+        if parallel:
+            if self.verbose: print("Processing in parallel.")
+            pool = mp.Pool(n_cores)
+            all_tuples = pool.map(self.extract_article_tuples, self.all_texts.values())
+        else:
+            if self.verbose: print("Processing in serial.")
+            all_tuples = list(map(self.extract_article_tuples, self.all_texts.values()))
 
-            tuples = []
-            sentences = sent_tokenize(text['text'])
+        self.all_tuples = {Id: art_tuples for Id, art_tuples in
+                           zip(self.all_texts.keys(), all_tuples)}
 
-            for sentence in sentences:
-                try:
-                    sentence = stanford_parse(parser, sentence)
-                except:
-                    print(sentence)
-                    continue
-                rdfs = [(' '.join(rel['subject']),
-                         ' '.join(rel['relation']),
-                         ' '.join(rel['object'])) for rel in
-                         sentence.get_rdfs(use_tokens=False, how='list')]
-                tuples.append(rdfs)
+        if self.verbose: print("{} tuples extracted.".format(len(self.all_tuples)))
 
-            self.all_tuples.update({Id: tuples})
-            i += 1
+        pickle.dump(self.all_tuples, open('all_tuples.pickle', 'wb'))
+
+        if self.verbose: print("Dumped intermediate file to all_tuples.pickle")
+
+    def extract_article_tuples(self, text):
+        if self.verbose: 
+            if 'meta' in text:
+                print("PARSING: " + text['meta']['title'])
+            else:
+                print("PARSING: " + text['metadata']['title'])
+            start = datetime.now()
+
+        tuples = []
+
+        try:
+            sentences = self.parser.get_parse(text['text'])['sentences']
+        except:
+            if self.verbose: print("Could not parse whole document; parsing by sentence.")
+            try:
+                sentences = sent_tokenize(text['text'])
+            except TypeError:
+                return None
+        for sentence in sentences:
+            try:
+                s = stanford_parse(self.parser, sentence, noop=True)
+            except:
+                print("Parse error: " + sentence)
+                continue
+
+            tuples.append(s.rdfs)
+
+        if self.verbose:
+            print("ELAPSED: {}".format(datetime.now() - start))
+        return tuples
 
     @staticmethod
     def filter_tuples(tuples, entities, relations):
@@ -184,14 +224,14 @@ class RDFGraph:
                                 for tuple_x in tuple_pair]
 
         unique_entities = list(set(tuples_subj_obj_flat))
-        # unique_entities = Counter(tuples_subj_obj_flat).most_common()
-        # if top_n_ent is not None and isinstance(top_n_ent, int):
-        #     if top_n_ent > len(unique_entities):
-        #         max_entities = len(unique_entities)
-        #     else:
-        #         max_entities = top_n_ent
-        #     unique_entities = [unique_entities[i]
-        #                        for i in range(max_entities)]
+        unique_entities = Counter(tuples_subj_obj_flat).most_common()
+        if top_n_ent is not None and isinstance(top_n_ent, int):
+            if top_n_ent > len(unique_entities):
+                max_entities = len(unique_entities)
+            else:
+                max_entities = top_n_ent
+            unique_entities = [unique_entities[i][0]
+                               for i in range(max_entities)]
         return unique_entities
 
     @staticmethod
@@ -200,14 +240,14 @@ class RDFGraph:
 
         unique_relations = list(set(relations))
 
-        # unique_relations = Counter(relations).most_common()
-        # if top_n_rel is not None and isinstance(top_n_rel, int):
-        #     if top_n_rel > len(unique_relations):
-        #         max_entities = len(unique_relations)
-        #     else:
-        #         max_entities = top_n_rel
-        #     unique_relations = [unique_relations[i]
-        #                         for i in range(max_entities)]
+        unique_relations = Counter(relations).most_common()
+        if top_n_rel is not None and isinstance(top_n_rel, int):
+            if top_n_rel > len(unique_relations):
+                max_entities = len(unique_relations)
+            else:
+                max_entities = top_n_rel
+            unique_relations = [unique_relations[i][0]
+                                for i in range(max_entities)]
         return unique_relations
 
     def load_texts(self, src=None):
@@ -253,10 +293,9 @@ class RDFGraph:
         return entity_embeddings
 
     def output_to_openke(self, timestamp=datetime.now()):
-        relation_list = [relation[0] for relation in self.unique_relations]
         final_tuples = self.filter_tuples(self.tuples_preprocessed,
                                           self.entity_cluster_results['cluster_rep'],
-                                          relation_list)
+                                          self.unique_relations)
         self.final_tuples = final_tuples
         relation_temp = list(set([tuple_x[1] for tuple_x in
                                   self.final_tuples]))
@@ -300,7 +339,8 @@ class RDFGraph:
 
     def preprocess_raw_tuples(self):
         # Temp - Remove tuples missing subject, predicate or object
-        tuples = [self.all_tuples[key] for key in self.all_tuples.keys()]
+        tuples = [self.all_tuples[key] for key in self.all_tuples.keys()
+                  if self.all_tuples[key] is not None]
         tuples_cleared = [tuple_x
                           for art in tuples
                           for sent in art

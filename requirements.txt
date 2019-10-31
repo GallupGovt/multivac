@@ -1,10 +1,12 @@
 antlr4-python3-runtime==4.7.2
 beautifulsoup4==4.7.1
 corenlp==0.0.14
+fastcluster==1.1.25
 feedparser==5.2.1
 interruptingcow==0.8
 lxml==4.3.3
 numpy==1.16.2
+nltk==3.4.5
 pandas==0.24.2
 pathlib==1.0.1
 python-dotenv==0.10.1

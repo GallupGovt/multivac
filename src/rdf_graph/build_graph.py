@@ -4,11 +4,10 @@ import argparse
 
 from datetime import datetime
 
-from src.rdf_graph.rdf_graph import RDFGraph
+from rdf_graph import RDFGraph
 
 
 def run(args_dict):
-
     # create timestamp
     timestamp = datetime.now().strftime('%d%b%Y-%H:%M:%S')
 
@@ -29,7 +28,7 @@ def run(args_dict):
     # cluster all entities using fast
     # agglomerative clustering and cosine distance of averaged word embeddings
     print('\nClustering entities from relation triples')
-    knowledge_graph.cluster_entities()
+    knowledge_graph.cluster_entities(args_dict['glove'])
     print('\n{} entity clusters were found'
           .format(len(knowledge_graph.entity_cluster_results['cluster_members'])))
 
@@ -42,9 +41,10 @@ def run(args_dict):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Fetcher to retrieve articles '
                                      'for modeling.')
-    parser.add_argument('-s', '--sources', required=True, choices=['pubmed',
-                        'arxiv'], nargs='*', help='Select a source for article '
-                        'retrieval.')
+    parser.add_argument('-s', '--sources', required=True,
+                        help='Select a source for article retrieval.')
+    parser.add_argument('-g', '--glove', required=True,
+                        help='Path to pickle file containing glove embeddings')
     args_dict = vars(parser.parse_args())
 
     run(args_dict)
