@@ -86,7 +86,6 @@ class Batch(object):
         for e in self.examples:
             if t < len(e.tgt_actions):
                 ids.append(self.grammar.field2id[e.tgt_actions[t].frontier_field])
-                # assert self.grammar.id2field[ids[-1]] == e.tgt_actions[t].frontier_field
             else:
                 ids.append(0)
 
@@ -97,7 +96,6 @@ class Batch(object):
         for e in self.examples:
             if t < len(e.tgt_actions):
                 ids.append(self.grammar.prod2id[e.tgt_actions[t].frontier_prod])
-                # assert self.grammar.id2prod[ids[-1]] == e.tgt_actions[t].frontier_prod
             else:
                 ids.append(0)
 
@@ -108,7 +106,6 @@ class Batch(object):
         for e in self.examples:
             if t < len(e.tgt_actions):
                 ids.append(self.grammar.type2id[e.tgt_actions[t].frontier_field.type])
-                # assert self.grammar.id2type[ids[-1]] == e.tgt_actions[t].frontier_field.type
             else:
                 ids.append(0)
 
@@ -137,7 +134,6 @@ class Batch(object):
 
                     if isinstance(action, ApplyRuleAction):
                         app_rule_idx = self.grammar.prod2id[action.production]
-                        # assert self.grammar.id2prod[app_rule_idx] == action.production
                         app_rule_mask = 1
                     elif isinstance(action, ReduceAction):
                         app_rule_idx = len(self.grammar)
@@ -164,17 +160,6 @@ class Batch(object):
                         if token_can_copy:
                             assert action_info.copy_from_src
                             assert action_info.src_token_position in token_pos_list
-
-                        # # cannot copy, only generation
-                        # # could be unk!
-                        # if not action_info.copy_from_src:
-                        #     gen_token_mask = 1
-                        # else:  # copy
-                        #     copy_mask = 1
-                        #     copy_pos = action_info.src_token_position
-                        #     if token_idx != self.vocab.primitive.unk_id:
-                        #         # both copy and generate from vocabulary
-                        #         gen_token_mask = 1
 
                 app_rule_idx_row.append(app_rule_idx)
                 app_rule_mask_row.append(app_rule_mask)

@@ -63,20 +63,26 @@ class English(object):
             print(("Performing basic clean on {} queries.".format(len(queries))))
 
         for query in queries:
-            # strip whitespace, and quotes
-            # Remove any sentence fragments preceding question
-            # Remove non-alphabetic characters at the start of the string
+            # strip whitespace, and convert and strip 'smart' quotes
             query = query.strip()
             query = re.sub(r"“|”", "\"", query)
             query = re.sub(r"‘|’", "\'", query)
             query = re.sub(r"`", "\'", query)
             query = query.strip("\"")
             query = query.strip("\'")
+
+            # Remove any sentence fragments preceding question
             query = query[query.index(re.split(r"\"", query)[-1]):]
             query = query[query.index(re.split(r"NumericCitation", query, re.IGNORECASE)[-1]):]
             query = query[query.index(re.split(r"[\.\!\?]\s+", query)[-1]):]
+
+            # Remove non-alphabetic characters at the start of the string
             query = re.sub(r"^(?!\()[^a-zA-Z]+","", query)
             query = re.sub(r"^(\(.*\))?\W+","", query)
+
+            # Remove whitespace preceding right-hand-side punctuation and
+            #  following left-hand-side puncuation. I.e., "( we like it )"
+            #  becomes "(we like it)"
             query = re.sub(r"(\s+)([\)\]\}\.\,\?\!])", r"\2", query)
             query = re.sub(r"([\(\[\{])(\s+)", r"\1", query)
 

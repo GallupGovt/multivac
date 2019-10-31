@@ -1,4 +1,4 @@
-# coding=utf-8
+# -*- coding: utf-8 -*-
 from collections import OrderedDict, Counter
 from itertools import chain
 

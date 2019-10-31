@@ -294,29 +294,3 @@ class Rule(ASTNode):
 
         return '%s -> %s' % (parent, ', '.join([repr(c) for c in self.children]))
 
-
-if __name__ == '__main__':
-    import ast
-    t1 = ASTNode('root', children=[
-        ASTNode(str, 'a1_label', children=[ASTNode(int, children=[ASTNode('a21', value=123)]),
-                                            ASTNode(ast.NodeTransformer, children=[ASTNode('a21', value='hahaha')])]
-                ),
-        ASTNode('a2', children=[ASTNode('a21', value='asdf')])
-    ])
-
-    t2 = ASTNode('root', children=[
-        ASTNode(str, 'a1_label', children=[ASTNode(int, children=[ASTNode('a21', value=123)]),
-                                           ASTNode(ast.NodeTransformer, children=[ASTNode('a21', value='hahaha')])]
-                ),
-        ASTNode('a2', children=[ASTNode('a21', value='asdf')])
-    ])
-
-    print((t1 == t2))
-
-
-    a, b = t1.get_productions(include_value_node=True)
-
-    # t = ASTNode('root', children=ASTNode('sdf'))
-
-    print((t1.__repr__()))
-    print((t1.pretty_print()))

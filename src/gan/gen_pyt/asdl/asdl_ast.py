@@ -28,8 +28,6 @@ class AbstractSyntaxTree(object):
                 self.add_child(RealizedField(field))
 
     def add_child(self, realized_field):
-        # if isinstance(realized_field.value, AbstractSyntaxTree):
-        #     realized_field.value.parent = self
         self.fields.append(realized_field)
         realized_field.parent_node = self
 

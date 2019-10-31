@@ -67,10 +67,6 @@ def get_actions(parse_tree, query_tokens, grammar, terminal_vocab):
 
                 d = {'literal': terminal_token, 'rule': rule, 
                      'parent_rule': parent_rule, 'parent_t': parent_t}
-
-                # cannot copy, only generation
-                # could be unk!
-                # import pdb; pdb.set_trace()
                 
                 if tok_src_idx < 0:
                         action = Action(GEN_TOKEN, d)
@@ -211,9 +207,6 @@ def parse_eng_dataset(annot_file, text_file,
                           tgt_ast=parse_tree,
                           meta={'raw_text': entry['raw_text'], 'str_map': None})
 
-        # example = DataEntry(idx, query_tokens, parse_tree, text, actions, 
-        #                     {'str_map': None, 'raw_text': entry['raw_text']})
-
         if can_fully_reconstructed:
             can_fully_reconstructed_examples_num += 1
 
@@ -334,9 +327,6 @@ def generate_dataset(annot_file, text_file, grammar, vocab):
                           tgt_text=text,
                           tgt_ast=parse_tree,
                           meta={'raw_text': entry['raw_text'], 'str_map': None})
-
-        # example = DataEntry(idx, query_tokens, parse_tree, text, actions, 
-        #                     {'str_map': None, 'raw_text': entry['raw_text']})
 
         data_set.add(example)
 
