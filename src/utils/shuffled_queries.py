@@ -6,7 +6,6 @@ from random import shuffle
 def run(args_dict):
 	with open('{}/{}'.format(args_dict['output_dir'], args_dict['file'])) as f:
 		clean_txt = f.readlines()
-		f.close()
 
 	df_clean = pd.DataFrame(clean_txt)
 	df_clean.columns = ['query']
