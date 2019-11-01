@@ -236,7 +236,6 @@ class stanford_parse(object):
                         rdf[part] = ' '.join([self.tokens[int(t)].text 
                                           for t 
                                           in rdf[part]])
-                        # result[rdf] = [x for x in result[rdf].values()]
 
             result = [list(x.values()) for x in result]
             result = [x for sl in result for x in sl]

@@ -22,19 +22,15 @@ class RecurrentDropoutLSTMCell(RNNCellBase):
 
         self.W_i = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_i = Parameter(torch.Tensor(hidden_size, hidden_size))
-        # self.b_i = Parameter(torch.Tensor(hidden_size))
 
         self.W_f = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_f = Parameter(torch.Tensor(hidden_size, hidden_size))
-        # self.b_f = Parameter(torch.Tensor(hidden_size))
 
         self.W_c = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_c = Parameter(torch.Tensor(hidden_size, hidden_size))
-        # self.b_c = Parameter(torch.Tensor(hidden_size))
 
         self.W_o = Parameter(torch.Tensor(hidden_size, input_size))
         self.U_o = Parameter(torch.Tensor(hidden_size, hidden_size))
-        # self.b_o = Parameter(torch.Tensor(hidden_size))
 
         self.bias_ih = Parameter(torch.Tensor(4 * hidden_size))
         self.bias_hh = Parameter(torch.Tensor(4 * hidden_size))
@@ -76,9 +72,6 @@ class RecurrentDropoutLSTMCell(RNNCellBase):
             else: return mask[idx][:input.size(0)]
 
         h_tm1, c_tm1 = hidden_state
-
-        # if self._input_dropout_mask is None:
-        #     self.set_dropout_masks(input.size(0))
 
         xi_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 0), self.W_i)
         xf_t = F.linear(input * get_mask_slice(self._input_dropout_mask, 1), self.W_f)
