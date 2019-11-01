@@ -4,14 +4,16 @@ from corenlp import CoreNLPClient
 import pandas as pd
 import re
 
-
 def tokenize_text(text, parser=None):
     if parser is None:
-        parser = StanfordParser()
+        parser = StanfordParser(annots="tokenize")
 
-    p = stanford_parse(parser, text)
+    p = parser.get_parse(text)
 
-    return [x.text for x in p.tokens]
+    if 'sentences' in p.keys():
+        p = p['sentences'][0]
+
+    return [x['word'] for x in p['tokens']]
 
 
 def clean_queries(queries, verbose=False):
@@ -52,7 +54,6 @@ def clean_queries(queries, verbose=False):
 
     return clean
 
-
 class StanfordParser(object):
     def __init__(self, nlp=None, annots=None, props=None):
         if annots is None:
@@ -75,7 +76,7 @@ class StanfordParser(object):
 
     def get_deps(self, sentence, deptype='basicDependencies', ret='asis'):
         if isinstance(sentence, str):
-            sentence = self.get_parse(sentence, deptype)
+            sentence = self.get_parse(sentence)['sentences'][0]
 
         deps = sentence[deptype]
 
@@ -235,9 +236,9 @@ class stanford_parse(object):
                         rdf[part] = ' '.join([self.tokens[int(t)].text 
                                           for t 
                                           in rdf[part]])
-                        # result[rdf] = [x for x in result[rdf].values()]
+
             result = [list(x.values()) for x in result]
-            # result = [x for sl in result for x in sl]
+            result = [x for sl in result for x in sl]
         else:
             result = []
             longest = 0
