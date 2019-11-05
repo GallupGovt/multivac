@@ -591,6 +591,7 @@ class Parser(nn.Module):
         # the same surface form `aggregated_primitive_tokens` stores the 
         # position of occurrence of each source token
         aggregated_primitive_tokens = OrderedDict()
+
         for token_pos, token in enumerate(src_sent):
             aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
 
@@ -970,3 +971,25 @@ class Parser(nn.Module):
                 self.save(os.path.join(self.args['sample_dir'], 
                                        "pretrained_gen_model.pth"))
                 break
+                
+    def pgtrain(self, samples, rollout, netD):
+        zeros = torch.zeros(batch_size, 1, dtype=torch.int64)
+
+        if self.use_cuda:
+            zeros = zeros.cuda()
+
+        inputs = torch.cat([zeros, samples.data], dim=1)[:, :-1].contiguous()
+        targets = samples.data.contiguous().view(-1)
+
+        # calculate reward
+        rewards = np.array(rollout.get_reward(samples, netD))
+                    
+        prob = F.log_softmax(self(inputs), dim=1)
+        loss = self.adv_criterion(prob, targets, rewards)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+
+
