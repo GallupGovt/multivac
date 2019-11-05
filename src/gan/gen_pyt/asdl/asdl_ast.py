@@ -2,7 +2,7 @@
 
 from io import StringIO
 
-from multivac.src.gan.gen_pyt.asdl import *
+from multivac.src.gan.gen_pyt.asdl.asdl import *
 
 
 class AbstractSyntaxTree(object):

@@ -1,14 +1,18 @@
 import copy
 import numpy as np
+import os
 
 import torch
 import torch.nn as nn
 
+from gen_pyt.model.parser import Parser
 
 class Rollout(object):
     def __init__(self, net, update_rate, rollout_num):
         self.ori_net = net
-        self.new_net = copy.deepcopy(net)
+        self.new_net = Parser.load(os.path.join(net.args['sample_dir'], 
+                                                'pretrained_gen_model.pth'),
+                                   net.args['cuda'])
         self.rollout_num = rollout_num
         self.update_rate = update_rate
 
@@ -21,12 +25,14 @@ class Rollout(object):
         netD.eval()
 
         rewards = []
+
         for i in range(self.rollout_num):
             for j in range(1, seq_len):
                 data = x[:, 0:j]
                 samples = self.ori_net.sample(batch_size, seq_len, data)
                 pred = netD(samples)
                 pred = pred.cpu().data[:, 1].numpy()
+
                 if i == 0:
                     rewards.append(pred)
                 else:
@@ -34,18 +40,22 @@ class Rollout(object):
 
             pred = netD(x)
             pred = pred.cpu().data[:, 1].numpy()
+
             if i == 0:
                 rewards.append(pred)
             else:
                 rewards[seq_len - 1] += pred
 
         rewards = np.transpose(np.array(rewards)) / (1.0 * self.rollout_num)
+
         return rewards
 
     def update_params(self):
         dct = {}
+
         for name, param in self.ori_net.named_parameters():
             dct[name] = param.data
+
         for name, param in self.new_net.named_parameters():
             if name.startswith('emb'):
                 param.data = dct[name]

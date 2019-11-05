@@ -66,7 +66,11 @@ class Example(object):
 class Batch(object):
     def __init__(self, examples, grammar, vocab, copy=True, cuda=False):
         self.examples = examples
-        self.max_action_num = max(len(e.tgt_actions) for e in self.examples)
+        try:
+            self.max_action_num = max(len(e.tgt_actions) for e in self.examples)
+        except:
+            import pdb; pdb.set_trace()
+            raise
 
         self.src_sents = [e.src_sent for e in self.examples]
         self.src_sents_len = [len(e.src_sent) for e in self.examples]
@@ -141,7 +145,7 @@ class Batch(object):
                     else:
                         src_sent = self.src_sents[e_id]
                         token = str(action.token)
-                        token_idx = self.vocab.primitive[action.token]
+                        token_idx = self.vocab[action.token]
 
                         token_can_copy = False
 
@@ -151,7 +155,7 @@ class Batch(object):
                             copy_mask = 1
                             token_can_copy = True
 
-                        if token_can_copy is False or token_idx != self.vocab.primitive.unk_id:
+                        if token_can_copy is False or token_idx != self.vocab.unk:
                             # if the token is not copied, we can only generate this token from the vocabulary,
                             # even if it is a <unk>.
                             # otherwise, we can still generate it from the vocabulary
@@ -191,7 +195,7 @@ class Batch(object):
 
     @cached_property
     def src_sents_var(self):
-        return nn_utils.to_input_variable(self.src_sents, self.vocab.source,
+        return nn_utils.to_input_variable(self.src_sents, self.vocab,
                                           cuda=self.cuda)
 
     @cached_property

@@ -26,7 +26,7 @@ def load_word_vectors(path):
         with open(path, "rb") as f:
             glove = pickle.load(f)
 
-        vectors = torch.from_numpy(glove['embeddings'])
+        vectors = torch.from_numpy(glove['embeddings']).float()
         vocab = Vocab(data=glove['vocab'])
 
         return vocab, vectors

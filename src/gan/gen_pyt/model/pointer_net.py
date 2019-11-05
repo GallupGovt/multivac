@@ -43,7 +43,7 @@ class PointerNet(nn.Module):
         if src_token_mask is not None:
             # (tgt_action_num, batch_size, src_sent_len)
             src_token_mask = src_token_mask.unsqueeze(0).expand_as(weights)
-            weights.data.masked_fill_(src_token_mask, -float('inf'))
+            weights.data.masked_fill_(src_token_mask.bool(), -float('inf'))
 
         ptr_weights = F.softmax(weights, dim=-1)
 

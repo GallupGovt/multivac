@@ -1,8 +1,8 @@
 # coding=utf-8
 
-from multivac.src.gan.gen_pyt.asdl import *
-from multivac.src.gan.gen_pyt.asdl_ast import AbstractSyntaxTree
-from multivac.src.gan.gen_pyt.transition_system import *
+from multivac.src.gan.gen_pyt.asdl.asdl import *
+from multivac.src.gan.gen_pyt.asdl.asdl_ast import AbstractSyntaxTree
+from multivac.src.gan.gen_pyt.asdl.transition_system import *
 
 
 class Hypothesis(object):

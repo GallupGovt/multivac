@@ -8,6 +8,8 @@ from multivac.src.gan.gen_pyt.asdl.asdl import ASDLGrammar, ASDLProduction, \
                                                Field, ASDLCompositeType, \
                                                ASDLPrimitiveType, \
                                                ASDLConstructor
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper \
+    import english_ast_to_asdl_ast, asdl_ast_to_english
 
 BRACKET_TYPES = {
     ASDLPrimitiveType('-LRB-'): '(',
@@ -82,6 +84,10 @@ class EnglishASDLGrammar(ASDLGrammar):
 
             self.root_type = ASDLCompositeType("ROOT")
         elif grammar is not None:
+            if isinstance(grammar, ASDLGrammar):
+                self = grammar
+                return
+
             for rule in grammar.rules:
                 fields = []
 
@@ -104,8 +110,8 @@ class EnglishASDLGrammar(ASDLGrammar):
                 self._constructor_production_map[constructor.name] = production
 
             self.root_type = ASDLCompositeType(grammar.root_node.type)
-        self.size = sum(len(head) for head in self._productions.values())
 
+        self.size = sum(len(head) for head in self._productions.values())
         self.terminal_types = set(self.primitive_types)
         self.terminal_types.update(TERMINAL_TYPES)
         self.terminal_types.update(BRACKET_TYPES.keys())
@@ -121,4 +127,30 @@ class EnglishASDLGrammar(ASDLGrammar):
         self.id2prod = {i: prod for i, prod in enumerate(self.productions)}
         self.id2type = {i: type for i, type in enumerate(self.types)}
         self.id2field = {i: field for i, field in enumerate(self.fields)}
+
+    @staticmethod
+    def from_text(text, parser):
+        productions = set()
+
+        if isinstance(text, list):
+            text = '\n'.join(text)
+
+        for s in text:
+            try:
+                p = parser.get_parse(s)['sentences'][0]['parse']
+            except:
+                continue
+            try:
+                parse_tree = english_ast_to_asdl_ast(p.parse_string)
+            except: 
+                continue
+
+            productions.update(parse_tree.get_productions())
+
+        productions = sorted(productions, key=lambda x: x.__repr__)
+
+        grammar = EnglishASDLGrammar(productions=productions)
+
+
+
 

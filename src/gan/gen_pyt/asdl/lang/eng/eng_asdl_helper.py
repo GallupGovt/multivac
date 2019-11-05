@@ -1,6 +1,19 @@
 # coding=utf-8
 
 from multivac.src.gan.gen_pyt.asdl.asdl_ast import RealizedField, AbstractSyntaxTree
+from multivac.src.gan.gen_pyt.asdl.asdl import *
+
+def find_match_paren(s):
+    count = 0
+
+    for i, c in enumerate(s):
+        if c == "(":
+            count += 1
+        elif c == ")":
+            count -= 1
+
+        if count == 0:
+            return i
 
 def english_ast_to_asdl_ast(text, depth=0, debug=False):
     ''' Takes a constituency parse string of an English sentence and creates
@@ -42,6 +55,7 @@ def english_ast_to_asdl_ast(text, depth=0, debug=False):
                 all_fields.append(child)
 
             node_fields.append(asdl_field)
+            tree_str = tree_str[next_idx + 1:]
             
 
         field_str = ', '.join(["({})".format(f.name) for f in node_fields])
@@ -66,7 +80,7 @@ def asdl_ast_to_english(asdl_ast_node):
         field_value = None
 
         if isinstance(field.type, ASDLCompositeType):
-            field_value = asdl_ast_to_english_ast(field.value)
+            field_value = asdl_ast_to_english(field.value)
         else:
             field_value = field.value
 

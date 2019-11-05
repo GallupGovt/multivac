@@ -18,7 +18,7 @@ def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
     # (batch_size, src_sent_len)
     att_weight = torch.bmm(src_encoding_att_linear, h_t.unsqueeze(2)).squeeze(2)
     if mask is not None:
-        att_weight.data.masked_fill_(mask, -float('inf'))
+        att_weight.data.masked_fill_(mask.bool(), -float('inf'))
     att_weight = F.softmax(att_weight, dim=-1)
 
     att_view = (att_weight.size(0), 1, att_weight.size(1))
@@ -67,9 +67,9 @@ def word2id(sents, vocab):
 
 def id2word(sents, vocab):
     if type(sents[0]) == list:
-        return [[vocab.id2word[w] for w in s] for s in sents]
+        return [[vocab.idxToLabel[w] for w in s] for s in sents]
     else:
-        return [vocab.id2word[w] for w in sents]
+        return [vocab.idxToLabel[w] for w in sents]
 
 
 def to_input_variable(sequences, vocab, cuda=False, training=True, append_boundary_sym=False):

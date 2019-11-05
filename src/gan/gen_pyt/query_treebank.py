@@ -1,60 +1,13 @@
 
 import argparse
+import pickle
 import re
 
 from multivac.src.gan.gen_pyt.astnode import *
 from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishGrammar
 from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishASDLGrammar
-from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+from multivac.src.rdf_graph.rdf_parse import clean_queries, check_parse, StanfordParser, stanford_parse
 
-
-def check_parse(query):
-    parseable = True
-
-    if any([x.pos_.upper().startswith('VB') for x in query.tokens]):
-        pass
-    else:
-        parseable = False
-
-    return parseable
-
-def clean_queries(queries, verbose=False):
-    clean = list()
-
-    if verbose:
-        print(("Performing basic clean on {} queries.".format(len(queries))))
-
-    for query in queries:
-        # strip whitespace, and quotes
-        # Remove any sentence fragments preceding question
-        # Remove non-alphabetic characters at the start of the string
-        query = query.strip()
-        query = re.sub(r"“|”", "\"", query)
-        query = re.sub(r"‘|’", "\'", query)
-        query = re.sub(r"`", "\'", query)
-        query = query.strip("\"")
-        query = query.strip("\'")
-        query = query[query.index(re.split(r"\"", query)[-1]):]
-        query = query[query.index(re.split(r"NumericCitation", query, re.IGNORECASE)[-1]):]
-        query = query[query.index(re.split(r"[\.\!\?]\s+", query)[-1]):]
-        query = re.sub(r"^(?!\()[^a-zA-Z]+","", query)
-        query = re.sub(r"^(\(.*\))?\W+","", query)
-        query = re.sub(r"(\s+)([\)\]\}\.\,\?\!])", r"\2", query)
-        query = re.sub(r"([\(\[\{])(\s+)", r"\1", query)
-
-        if len(query) > 0:
-            tok_chk = [len(x) for x in query.split()]
-
-            if sum(tok_chk)/len(tok_chk) < 2:
-                continue
-
-            query = query[0].upper() + query[1:]
-            clean.append(query)
-
-    if verbose:
-        print(("{} cleaned queries remaining.".format(len(queries))))
-
-    return clean
 
 def find_match_paren(s):
     count = 0
@@ -139,9 +92,13 @@ def parse_raw(parser, query):
 def extract_grammar(source_file, output=None, clean=False, verbose=False, 
                     asdl=False):
     parse_trees = list()
-    rules = set()
 
-    parser = StanfordParser(annots = "tokenize pos lemma ner parse")
+    if asdl:
+        parse_func = english_ast_to_asdl_ast
+    else:
+        parse_func = get_eng_tree
+
+    parser = StanfordParser(annots = "tokenize ssplit parse")
 
     with open(source_file, 'r') as f:
         queries = f.readlines()
@@ -162,7 +119,7 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False,
 
         if check_parse(query):
             try:
-                parse_trees.append(get_eng_tree(query.parse_string))
+                parse_trees.append(parse_func(query.parse_string))
             except:
                 print(("Could not interpret query parse {}: '{}'".format(i, query)))
                 continue
@@ -174,29 +131,31 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False,
         print(("{} queries successfully parsed.".format(len(parse_trees))))
         print("Extracting grammar production rules.")
 
-    for parse_tree in parse_trees:
-        parse_tree_rules, _ = parse_tree.get_productions()
-
-        for rule in parse_tree_rules:
-            rules.add(rule)
-
-    rules = list(sorted(rules, key=lambda x: x.__repr__()))
-    grammar = EnglishGrammar(rules)
-
     if asdl:
-        grammar = EnglishASDLGrammar(grammar)
+        productions = set()
+
+        for parse_tree in parse_trees:
+            productions.update(parse_tree.get_productions())
+
+        grammar = EnglishASDLGrammar(productions=productions)
+    else:
+        rules = set()
+        
+        for parse_tree in parse_trees:
+            parse_tree_rules, _ = parse_tree.get_productions()
+
+            for rule in parse_tree_rules:
+                rules.add(rule)
+
+        rules = list(sorted(rules, key=lambda x: x.__repr__()))
+        grammar = EnglishGrammar(rules)        
 
     if verbose:
         print("Grammar induced successfully.")
 
-    import pdb; pdb.set_trace()
-
     if output is not None:
-        with open(output, 'w') as f:
-            for rule in rules:
-                rule_kids = [str(x) for x in rule.children]
-                out_str = str(rule.parent) + ' -> ' + ', '.join(rule_kids)
-                f.write(out_str + '\n')
+        with open(output, 'wb') as f:
+            pickle.dump(grammar, f)
     else:
         return grammar, parse_trees
 
