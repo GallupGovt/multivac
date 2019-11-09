@@ -9,12 +9,12 @@ import numpy as np
 import os
 import re
 import time
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from discriminator.treelstm import QueryGAN_Discriminator, MULTIVACDataset
 from discriminator.treelstm import Trainer, utils
@@ -51,6 +51,7 @@ def DiscriminatorDataset(real_dir, fake_dir, vocab):
         if item == 1:
             combined_file.trees.append(real_file.trees[i])
             combined_file.sentences.append(real_file.sentences[i])
+            combined_file.labels = labels
 
     combined_file.size = combined_file.labels.size(0)
 
@@ -313,15 +314,20 @@ def run(cfg_dict):
     print('\n#####################################################')
     print('Adversarial training...\n')
 
+    discriminator_losses = []
+    generator_losses = []
+
     for epoch in range(total_epochs):
         for step in range(g_steps):
             samples = generate_samples(netG, transition_system, glove_vocab, 
                                        seq_len, generated_num)
+            hyps, examples = list(zip(*samples))
             step_begin = time.time()
-            pgloss = netG.pgtrain(samples, rollout, netD)
+            pgloss = netG.pgtrain(hyps, examples, rollout, netD)
             print('[Generator {}]  step elapsed {}s'.format(step, 
                                                             time.time() - step_begin))
             print('Generator adversarial loss={}'.format(pgloss))
+            generator_losses.append(pgloss)
 
         for d_step in range(d_steps):
             # train discriminator
@@ -337,8 +343,11 @@ def run(cfg_dict):
             for k_step in range(k_steps):
                 loss = trainer.train(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
+                discriminator_losses.append(loss)
                 
         rollout.update_params()
+
+        save_progress(trainer, netG, samples, epoch, discriminator_losses, generator_losses)
 
         # generate_samples(netG, BATCH_SIZE, GENERATED_NUM, EVAL_FILE)
         # val_set = GeneratorDataset(EVAL_FILE)
@@ -346,12 +355,48 @@ def run(cfg_dict):
         #                        batch_size=BATCH_SIZE,
         #                        shuffle=True)
         # loss = oracle.val(valloader)
-        print('Epoch {} adversarial generator val loss: {}'.format(epoch + 1, loss))
+        # print('Epoch {} adversarial generator val loss: {}'.format(epoch + 1, loss))
 
-        # SAVE MODELS OUT TO DISK
 
-        # ALSO - query_gen.py; which takes a query token or set of tokens and 
-        # using the generator model, produces a question about those tokens
+def save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses):
+    # Save Generator model state and metadata
+    gen_save = os.path.join(netG.args['output_dir'], "gen_checkpoint.pth")
+    gen_checkpoint = {'epoch': epoch,
+                      'state_dict': netG.state_dict(),
+                      'args': netG.args,
+                      'transition_system': netG.transition_system,
+                      'vocab': netG.vocab,
+                      'optimizer': netG.optimizer.state_dict()}
+    torch.save(gen_checkpoint, gen_save)
+
+    # Save Discriminator model state and metadata
+    disc_save = os.path.join(netG.args['output_dir'], "disc_checkpoint.pth")
+    dis_checkpoint = {'epoch': epoch,
+                      'state_dict': trainer.model.state_dict(),
+                      'args': trainer.model.args,
+                      'optimizer': trainer.optimizer.state_dict(),
+                      'criterion': trainer.criterion}
+    torch.save(dis_checkpoint, disc_save)
+
+    # Save loss histories
+    with open(os.path.join(netG.args['output_dir'], 
+                           "generator_losses.csv"), "w") as f:
+        for l in generator_losses:
+            f.write(str(l))
+
+    with open(os.path.join(netG.args['output_dir'], 
+                           "discriminator_losses.csv"), "w") as f:
+        for l in discriminator_losses:
+            f.write(str(l))
+
+    # Save example generator outputs for qualitative assessment of progress
+    save_examples = random.sample(examples, 10)
+
+    with open(os.path.join(netG.args['output_dir'], 
+                           "samples_{}.csv".format(epoch)), "w") as f:
+        for e in save_examples:
+            f.write(e.tgt_text)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(

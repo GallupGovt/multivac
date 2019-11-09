@@ -969,11 +969,9 @@ class Parser(nn.Module):
                                        "pretrained_gen_model.pth"))
                 break
 
-    def pgtrain(self, samples, rollout, netD):
+    def pgtrain(self, hyps, examples, rollout, netD):
         # calculate reward
         self.optimizer.zero_grad()
-
-        hyps, examples = list(zip(*samples))
 
         rewards = np.array(rollout.get_tree_reward(examples, 
                                                    hyps, 
