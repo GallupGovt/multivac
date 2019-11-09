@@ -190,7 +190,7 @@ class English(object):
 
     @staticmethod
     def generate_dataset(annot_file, text_file, grammar=None, max_query_len=None,
-                         verbose=False):
+                         vocab_freq_cutoff=1, verbose=False):
         processed_examples, productions = English.preprocess_dataset(annot_file, 
                                                                      text_file,
                                                                      verbose)
@@ -219,7 +219,11 @@ class English(object):
                                         meta={'raw_text': text, 
                                               'str_map': None}))
 
-        return all_examples, grammar
+        # generate vocabulary for the tgt_text tokens!
+        tokens = [tokenize_text(e.tgt_text) for e in all_examples]
+        vocab = Vocab.from_corpus(tokens, freq_cutoff=vocab_freq_cutoff)
+
+        return all_examples, vocab, grammar
 
 if __name__ == '__main__':
     English.parse_english_dataset()

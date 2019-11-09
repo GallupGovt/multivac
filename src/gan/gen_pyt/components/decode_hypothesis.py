@@ -35,3 +35,8 @@ class DecodeHypothesis(Hypothesis):
         new_hyp.update_frontier_info()
 
         return new_hyp
+
+    def apply_action_info(self, action_info):
+        self.apply_action(action_info.action)
+        self.action_infos.append(action_info)
+

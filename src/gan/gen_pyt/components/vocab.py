@@ -40,6 +40,10 @@ class Vocab(object):
         return iter(list(self.labelToIdx.keys()))
 
     @property
+    def pad(self):
+        return self.labelToIdx['<pad>']
+
+    @property
     def unk(self):
         return self.labelToIdx['<unk>']
 

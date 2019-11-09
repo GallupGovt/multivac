@@ -92,8 +92,8 @@ class MULTIVACDataset(data.Dataset):
         super().__init__()
         self.vocab = vocab
         self.sentences = self.read_sentences(os.path.join(path, 'text.toks'))
-        self.trees = self.read_trees(os.path.join(path, 'text.parents'))
-        self.labels = self.read_labels(os.path.join(path, 'cat.txt'))
+        self.trees = MULTIVACDataset.read_trees(os.path.join(path, 'text.parents'))
+        self.labels = MULTIVACDataset.read_labels(os.path.join(path, 'cat.txt'))
         self.size = self.labels.size(0)
 
     def __len__(self):
@@ -117,14 +117,20 @@ class MULTIVACDataset(data.Dataset):
 
         return torch.tensor(indices, dtype=torch.long, device='cpu')
 
-    def read_trees(self, filename):
+    @staticmethod
+    def read_trees(filename):
         with open(filename, 'r') as f:
-            trees = [self.read_tree(line) for line in tqdm(f.readlines())]
+            trees = [MULTIVACDataset.read_tree(line) for line in tqdm(f.readlines())]
 
         return trees
 
-    def read_tree(self, line):
-        parents = list(map(int, line.split()))
+    @staticmethod
+    def read_tree(line):
+        if isinstance(line, list):
+            parents = line
+        else:
+            parents = list(map(int, line.split()))
+        
         trees = dict()
         root = None
 
@@ -159,7 +165,8 @@ class MULTIVACDataset(data.Dataset):
 
         return root
 
-    def read_labels(self, filename):
+    @staticmethod
+    def read_labels(filename):
         with open(filename, 'r') as f:
             labels = list(map(float, f.readlines()))
             labels = torch.tensor(labels, dtype=torch.float, device='cpu')

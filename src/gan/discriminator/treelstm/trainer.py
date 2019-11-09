@@ -27,10 +27,7 @@ class Trainer(object):
             inputs = inputs.to(self.device)
             label = label.to(self.device)
             output = self.model(tree, inputs)
-            try:
-                loss = self.criterion(output, label)
-            except:
-                import pdb; pdb.set_trace()
+            loss = self.criterion(output, label)
             total_loss += loss.item()
             loss.backward()
 

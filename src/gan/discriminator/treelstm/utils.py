@@ -7,8 +7,7 @@ import math
 
 import torch
 
-from .vocab import Vocab
-
+from gen_pyt.components.vocab import Vocab
 
 # loading GLOVE word vectors
 # if .pth file is found, will load that

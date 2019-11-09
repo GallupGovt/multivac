@@ -21,16 +21,16 @@ class ChildSumTreeLSTM(nn.Module):
 
         iou = self.ioux(inputs) + self.iouh(child_h_sum)
         i, o, u = torch.split(iou, iou.size(1) // 3, dim=1)
-        i, o, u = F.sigmoid(i), F.sigmoid(o), F.tanh(u)
+        i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
 
-        f = F.sigmoid(
+        f = torch.sigmoid(
             self.fh(child_h) +
             self.fx(inputs).repeat(len(child_h), 1)
         )
         fc = torch.mul(f, child_c)
 
         c = torch.mul(i, u) + torch.sum(fc, dim=0, keepdim=True)
-        h = torch.mul(o, F.tanh(c))
+        h = torch.mul(o, torch.tanh(c))
         return c, h
 
     def forward(self, tree, inputs):
@@ -63,7 +63,7 @@ class Similarity(nn.Module):
         abs_dist = torch.abs(torch.add(lvec, -rvec))
         vec_dist = torch.cat((mult_dist, abs_dist), 1)
 
-        out = F.sigmoid(self.wh(vec_dist))
+        out = torch.sigmoid(self.wh(vec_dist))
         out = F.log_softmax(self.wp(out), dim=1)
         return out
 
@@ -88,17 +88,17 @@ class SimilarityTreeLSTM(nn.Module):
 
 
 class QueryGAN_Discriminator(nn.Module):
-    def __init__(self, cfg): #vocab_size, in_dim, mem_dim, sparsity, freeze):
+    def __init__(self, args, vocab): #vocab_size, in_dim, mem_dim, sparsity, freeze):
         super().__init__()
-        self.cfg = cfg
-        self.vocab_size = self.cfg['vocab_size']
-        self.in_dim = self.cfg['input_dim']
-        self.mem_dim = self.cfg['mem_dim']
-        self.sparsity = self.cfg['sparse']
-        self.freeze = self.cfg['freeze_embed']
+        self.args = args
+        self.vocab_size = len(vocab)
+        self.in_dim = self.args['input_dim']
+        self.mem_dim = self.args['mem_dim']
+        self.sparsity = self.args['sparse']
+        self.freeze = self.args['freeze_embed']
         self.emb = nn.Embedding(self.vocab_size, 
                                 self.in_dim, 
-                                padding_idx=Constants.PAD, 
+                                padding_idx=vocab.pad, 
                                 sparse=self.sparsity)
         if self.freeze:
             self.emb.weight.requires_grad = False
@@ -108,7 +108,7 @@ class QueryGAN_Discriminator(nn.Module):
     def forward(self, tree, inputs):
         inputs = self.emb(inputs)
         state, hidden = self.childsumtreelstm(tree, inputs)
-        output = F.sigmoid(self.confidence(state))
+        output = torch.sigmoid(self.confidence(state))
         return output
 
 

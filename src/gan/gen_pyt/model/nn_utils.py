@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-from torch.autograd import Variable
 import numpy as np
 
 
@@ -83,7 +82,7 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
     word_ids = word2id(sequences, vocab)
     sents_t = input_transpose(word_ids, vocab['<pad>'])
 
-    sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
+    sents_var = torch.LongTensor(sents_t)
     if cuda:
         sents_var = sents_var.cuda()
 
@@ -176,7 +175,7 @@ class LabelSmoothing(nn.Module):
     def forward(self, model_prob, target):
         # (batch_size, *, tgt_vocab_size)
         dim = list(model_prob.size())[:-1] + [1]
-        true_dist = Variable(self.one_hot, requires_grad=False).repeat(*dim)
+        true_dist = self.one_hot.repeat(*dim)
         true_dist.scatter_(-1, target.unsqueeze(-1), self.confidence)
         # true_dist = model_prob.data.clone()
         # true_dist.fill_(self.smoothing / (model_prob.size(1) - 1))  # FIXME: no label smoothing for <pad> <s> and </s>

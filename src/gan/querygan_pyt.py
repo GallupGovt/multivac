@@ -8,6 +8,7 @@ import random
 import numpy as np
 import os
 import re
+import time
 
 import torch
 import torch.nn as nn
@@ -72,77 +73,73 @@ def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
     model.emb.weight.data.copy_(emb)
     model.to(device), criterion.to(device)
 
-    if model.cfg['optim'] == 'adam':
+    if model.args['optim'] == 'adam':
         opt = optim.Adam
-    elif model.cfg['optim'] == 'adagrad':
+    elif model.args['optim'] == 'adagrad':
         opt = optim.Adagrad
-    elif model.cfg['optim'] == 'sgd':
+    elif model.args['optim'] == 'sgd':
         opt = optim.SGD
 
     optimizer = opt(filter(lambda p: p.requires_grad,
                                   model.parameters()), 
-                           lr=model.cfg['lr'], weight_decay=model.cfg['wd'])
+                           lr=model.args['lr'], weight_decay=model.args['wd'])
 
-    return Trainer(model.cfg, model, criterion, optimizer, device)
+    return Trainer(model.args, model, criterion, optimizer, device)
 
 def generate_samples(net, transition_system, vocab, seq_len, 
-                     generated_num, oracle=False):
-    examples = [''] * generated_num
-    samples = [''] * generated_num
+                     generated_num, oracle=False, writeout=False):
+    samples = [[]] * generated_num
+    texts = examples = [''] * generated_num
     max_query_len = 0
     max_actions_len = 0
     dst_dir = net.args['sample_dir']
+    parser = StanfordParser(annots="depparse")
 
     for i in tqdm(range(generated_num), desc='Generating Samples... '):
-        query = vocab.convertToLabels(random.sample(range(vocab.size()), 
-                                      seq_len))
-        sample = net.parse(query, beam_size=net.args['beam_size'])
+        sample = []
 
-        try:
-            text = asdl_ast_to_english(sample[0].tree)
-        except IndexError:
+        while len(sample) == 0:
             query = vocab.convertToLabels(random.sample(range(vocab.size()), 
                                           seq_len))
             sample = net.parse(query, beam_size=net.args['beam_size'])
-            text = asdl_ast_to_english(sample[0].tree)
 
-        samples[i] = text
+        text = asdl_ast_to_english(sample[0].tree)
 
-        if oracle:
-            actions = transition_system.get_actions(sample[0].tree)
-            tgt_actions = get_action_infos(query, actions)
-            example = Example(src_sent=query, tgt_actions=tgt_actions, 
-                              tgt_text=text,  tgt_ast=sample[0].tree, idx=i)
-            examples[i] = example
+        actions = transition_system.get_actions(sample[0].tree)
+        tgt_actions = get_action_infos(query, actions)
+        example = Example(src_sent=query, tgt_actions=tgt_actions, 
+                          tgt_text=text,  tgt_ast=sample[0].tree, idx=i)
 
-            if len(example.src_sent) > max_query_len:
-                max_query_len = len(example.src_sent)
+        if len(example.src_sent) > max_query_len:
+            max_query_len = len(example.src_sent)
 
-            if len(example.tgt_actions) > max_actions_len:
-                max_actions_len = len(example.tgt_actions)
+        if len(example.tgt_actions) > max_actions_len:
+            max_actions_len = len(example.tgt_actions)
+
+        samples[i]  = sample[0]
+        examples[i] = example
 
     if oracle:
-        ds = Dataset(examples)
-        serialize_to_file(ds, os.path.join(dst_dir, "samples.pkl"))
-    else:
-        parser = StanfordParser(annots="depparse")
-        sample_parses = parser.get_parse('?\n'.join(samples))
+        return Dataset(examples)
+    elif writeout:
+        sample_parses = parser.get_parse('?\n'.join([e.tgt_text for e in examples]))
 
-        for i, parse in enumerate(sample_parses['sentences']):
-            tokens = [x['word'] for x in parse['tokens']]
-            deps = sorted(parse['basicDependencies'], 
-                          key=lambda x: x['dependent'])
-            parents = [x['governor'] for x in deps]
-            samples[i] = (tokens, parents)
+        with open(os.path.join(dst_dir, 'text.toks'   ), 'w') as tokfile, \
+             open(os.path.join(dst_dir, 'text.parents'), 'w') as parfile, \
+             open(os.path.join(dst_dir, 'cat.txt'     ), 'w') as catfile:
 
-        with open(os.path.join(dst_dir, 'text.toks'), 'w') as tokfile, \
-                open(os.path.join(dst_dir, 'text.parents'), 'w') as parfile, \
-                open(os.path.join(dst_dir, 'cat.txt'), 'w') as catfile:
+            for i, parse in enumerate(sample_parses['sentences']):
+                tokens = [x['word'] for x in parse['tokens']]
+                deps = sorted(parse['basicDependencies'], 
+                              key=lambda x: x['dependent'])
+                parents = [x['governor'] for x in deps]
+                tree = MULTIVACDataset.read_tree(parents)
 
-            for tokens, parents in samples:
                 parfile.write(' '.join([str(x) for x in parents]) + '\n')
                 tokfile.write(' '.join(tokens) + '\n')
                 catfile.write('0' + '\n')
+    
+    return zip(samples, examples)
 
 def query_to_data(query, annot_vocab):
     if isinstance(query, str):
@@ -164,20 +161,28 @@ def emulate_embeddings(embeds, shape, device='cpu'):
     samples.normal_(torch.mean(embeds), torch.std(embeds))
     return samples
 
-def load_to_layer(layer, embeds, vocab):
+def load_to_layer(layer, embeds, vocab, words=None):
+
+    if words is None:
+        words = vocab
+
+    words = sorted(words.labelToIdx.items(), key=lambda x: x[1])
+
     new_tensor = layer.weight.data.new
-    word_ids = set(range(layer.num_embeddings))
+    layer_rows = set(range(layer.num_embeddings))
 
-    for word in vocab.labelToIdx:
-        if vocab.getIndex(word) < embeds.size(0):
+    assert len(words) == layer.num_embeddings
+
+    for word, idx in words:
+        if word in vocab and vocab.getIndex(word) < embeds.size(0):
             word_id = vocab.getIndex(word)
-            word_ids.remove(word_id)
-            layer.weight[word_id].data = new_tensor(embeds[word_id])
+            layer.weight[idx].data = new_tensor(embeds[word_id])
+            layer_rows.remove(idx)
 
-    word_ids = list(word_ids)
-    layer.weight[word_ids].data = new_tensor(emulate_embeddings(embeds=embeds, 
-                                                                shape=(len(word_ids), 
-                                                                       layer.embedding_dim)))
+    layer_rows = list(layer_rows)
+    layer.weight[layer_rows].data = new_tensor(emulate_embeddings(embeds=embeds, 
+                                                                  shape=(len(layer_rows), 
+                                                                         layer.embedding_dim)))
 
 def run(cfg_dict):
     # Set up model and training parameters based on config file and runtime
@@ -209,7 +214,9 @@ def run(cfg_dict):
         use_cuda = False
 
     gargs['cuda'] = use_cuda
+    gargs['verbose'] = gan_args['verbose']
     dargs['cuda'] = use_cuda
+    dargs['verbose'] = gan_args['verbose']
 
     random.seed(seed)
     np.random.seed(seed)
@@ -219,6 +226,8 @@ def run(cfg_dict):
     # 
     #   - given a grammar file
     #   - given GloVe vocab list
+
+    if gan_args['verbose']: print("Checking for existing grammar...")
 
     if gargs['grammar']:
         grammar = deserialize_from_file(gargs['grammar'])
@@ -232,16 +241,17 @@ def run(cfg_dict):
     # HERE'S WHERE WE PUT IN THE PYTORCH VERSION OF THE GENERATOR
     # 
 
-    samples_data, grammar = English.generate_dataset(gargs['annot_file'],
-                                                     gargs['texts_file'],
-                                                     grammar)
+    samples_data, prim_vocab, grammar = English.generate_dataset(gargs['annot_file'],
+                                                                      gargs['texts_file'],
+                                                                      grammar)
     transition_system = EnglishTransitionSystem(grammar)
 
-    #parser_cls = Registrable.by_name(gargs['parser'])
-    netG = Parser(gargs, glove_vocab, transition_system)
-    netG.train()
+    if gan_args['verbose']: print("Grammar and language transition system initiated.")
 
-    evaluator = Evaluator(transition_system, args=gargs)
+    if gan_args['verbose']: print("Loading Generator component...")
+
+    netG = Parser(gargs, glove_vocab, prim_vocab, transition_system)
+    netG.train()
 
     optimizer_cls = eval('torch.optim.%s' % gargs['optimizer'])  # FIXME: this is evil!
     netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'])
@@ -254,13 +264,18 @@ def run(cfg_dict):
         print('use glorot initialization')
         nn_utils.glorot_init(netG.parameters())
 
+    if gan_args['verbose']: print("Loading GloVe vectors as Generator embeddings...")
+
     load_to_layer(netG.src_embed, glove_emb, glove_vocab)
+    load_to_layer(netG.primitive_embed, glove_emb, glove_vocab, prim_vocab)
     if gargs['cuda']: netG.cuda()
 
     # Set up Discriminator component with given parameters
 
+    if gan_args['verbose']: print("Loading Discriminator component...")
+
     dargs['vocab_size'] = glove_vocab.size()
-    netD = QueryGAN_Discriminator(dargs)
+    netD = QueryGAN_Discriminator(dargs, glove_vocab)
     trainer = disc_trainer(netD, glove_emb, glove_vocab, use_cuda)
 
     # Set up Oracle component with given parameters
@@ -270,15 +285,12 @@ def run(cfg_dict):
 
     # Generate starting samples
     seq_len = 6
-    generate_samples(netG, transition_system, glove_vocab, seq_len, 
-                     generated_num, oracle=True)
+    gen_set = generate_samples(netG, transition_system, glove_vocab, seq_len, 
+                               generated_num, oracle=True)
 
     # 
     # PRETRAIN GENERATOR
     # 
-
-    gen_set = deserialize_from_file(os.path.join(gargs['sample_dir'],
-                                                 "samples.pkl"))
 
     print('\nPretraining generator...\n')
     # Pre-train epochs are set in config.cfg file
@@ -287,16 +299,12 @@ def run(cfg_dict):
     rollout = Rollout(netG, update_rate=rollout_update_rate, rollout_num=rollout_num)
 
     # pretrain discriminator
-    print('\nPretraining discriminator...\n')
-    # for epoch in range(d_steps):
-        # generate_samples(netG, grammar, glove_vocab, seq_len, generated_num, 
-        #                  netG.cfg['sample_dir'])
-    dis_set = MULTIVACDataset(os.path.join(netD.cfg['data'], "train"), 
+    print('Loading Discriminator pretraining dataset.')
+    dis_set = MULTIVACDataset(os.path.join(netD.args['data'], "train"), 
                               glove_vocab)
-    # disloader = DataLoader(dataset=dis_set,
-    #                        batch_size=batch_size,
-    #                        shuffle=True)
     
+    if gan_args['verbose']: print("Pretraining discriminator...")
+
     for epoch in range(k_steps):
         loss = trainer.train(dis_set)
         print('Epoch {} pretrain discriminator training loss: {}'.format(epoch + 1, loss))
@@ -306,33 +314,44 @@ def run(cfg_dict):
     print('Adversarial training...\n')
 
     for epoch in range(total_epochs):
-        for _ in range(g_steps):
-            learner.pgtrain(batch_size, sequence_len, rollout, netD)
+        for step in range(g_steps):
+            samples = generate_samples(netG, transition_system, glove_vocab, 
+                                       seq_len, generated_num)
+            step_begin = time.time()
+            pgloss = netG.pgtrain(samples, rollout, netD)
+            print('[Generator {}]  step elapsed {}s'.format(step, 
+                                                            time.time() - step_begin))
+            print('Generator adversarial loss={}'.format(pgloss))
 
         for d_step in range(d_steps):
             # train discriminator
-            generate_samples(netG, batch_size, generated_num, FAKE_FILE)
-            dis_set = DiscriminatorDataset(os.path.join(netD.cfg['data'], "train"), 
-                                           netG.cfg['sample_dir'],
+            _ = generate_samples(netG, transition_system, glove_vocab, 
+                                 seq_len, generated_num, writeout=True)
+            dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
+                                           netG.args['sample_dir'],
                                            glove_vocab)
             # disloader = DataLoader(dataset=dis_set,
             #                        batch_size=BATCH_SIZE,
             #                        shuffle=True)
         
             for k_step in range(k_steps):
-                loss = netD.dtrain(dis_set)
+                loss = trainer.train(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 
         rollout.update_params()
 
-        generate_samples(netG, BATCH_SIZE, GENERATED_NUM, EVAL_FILE)
-        val_set = GeneratorDataset(EVAL_FILE)
-        valloader = DataLoader(dataset=val_set,
-                               batch_size=BATCH_SIZE,
-                               shuffle=True)
-        loss = oracle.val(valloader)
+        # generate_samples(netG, BATCH_SIZE, GENERATED_NUM, EVAL_FILE)
+        # val_set = GeneratorDataset(EVAL_FILE)
+        # valloader = DataLoader(dataset=val_set,
+        #                        batch_size=BATCH_SIZE,
+        #                        shuffle=True)
+        # loss = oracle.val(valloader)
         print('Epoch {} adversarial generator val loss: {}'.format(epoch + 1, loss))
 
+        # SAVE MODELS OUT TO DISK
+
+        # ALSO - query_gen.py; which takes a query token or set of tokens and 
+        # using the generator model, produces a question about those tokens
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
