@@ -238,10 +238,6 @@ def run(cfg_dict):
     glove_vocab, glove_emb = utils.load_word_vectors(
         os.path.join(gan_args['glove_dir'], gan_args['glove_file']))
 
-    #
-    # HERE'S WHERE WE PUT IN THE PYTORCH VERSION OF THE GENERATOR
-    # 
-
     samples_data, prim_vocab, grammar = English.generate_dataset(gargs['annot_file'],
                                                                       gargs['texts_file'],
                                                                       grammar)
@@ -348,7 +344,7 @@ def run(cfg_dict):
                 
         rollout.update_params()
 
-        save_progress(trainer, netG, samples, epoch, discriminator_losses, generator_losses)
+        save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
 
         # generate_samples(netG, BATCH_SIZE, GENERATED_NUM, EVAL_FILE)
         # val_set = GeneratorDataset(EVAL_FILE)
@@ -383,7 +379,7 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
     with open(os.path.join(netG.args['output_dir'], 
                            "generator_losses.csv"), "w") as f:
         for l in generator_losses:
-            f.write(str(l) + '\n')
+            f.write(str(l.item()) + '\n')
 
     with open(os.path.join(netG.args['output_dir'], 
                            "discriminator_losses.csv"), "w") as f:
