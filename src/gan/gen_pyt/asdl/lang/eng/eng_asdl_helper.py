@@ -79,7 +79,7 @@ def asdl_ast_to_english(asdl_ast_node):
         # for composite node
         field_value = None
 
-        if isinstance(field.type, ASDLCompositeType):
+        if isinstance(field.type, ASDLCompositeType) and field.value:
             field_value = asdl_ast_to_english(field.value)
         else:
             field_value = field.value

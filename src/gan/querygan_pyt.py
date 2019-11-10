@@ -286,8 +286,8 @@ def run(cfg_dict):
 
     # Generate starting samples
     seq_len = 6
-    gen_set = generate_samples(netG, transition_system, glove_vocab, seq_len, 
-                               generated_num, oracle=True)
+    # gen_set = generate_samples(netG, transition_system, glove_vocab, seq_len, 
+    #                            generated_num, oracle=True)
 
     # 
     # PRETRAIN GENERATOR
@@ -295,7 +295,8 @@ def run(cfg_dict):
 
     print('\nPretraining generator...\n')
     # Pre-train epochs are set in config.cfg file
-    netG.pretrain(gen_set)
+    netG.pretrain(Dataset(samples_data))
+    # netG.pretrain(gen_set)
 
     rollout = Rollout(netG, update_rate=rollout_update_rate, rollout_num=rollout_num)
 
@@ -382,12 +383,12 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
     with open(os.path.join(netG.args['output_dir'], 
                            "generator_losses.csv"), "w") as f:
         for l in generator_losses:
-            f.write(str(l))
+            f.write(str(l) + '\n')
 
     with open(os.path.join(netG.args['output_dir'], 
                            "discriminator_losses.csv"), "w") as f:
         for l in discriminator_losses:
-            f.write(str(l))
+            f.write(str(l) + '\n')
 
     # Save example generator outputs for qualitative assessment of progress
     save_examples = random.sample(examples, 10)
@@ -395,7 +396,7 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
     with open(os.path.join(netG.args['output_dir'], 
                            "samples_{}.csv".format(epoch)), "w") as f:
         for e in save_examples:
-            f.write(e.tgt_text)
+            f.write(e.tgt_text + '\n')
 
 
 if __name__ == '__main__':
