@@ -62,6 +62,7 @@ class Rollout(object):
 
                     if netD.args['cuda']:
                         inp = inp.cuda()
+                        
                     preds[k] = netD(tree, inp).item()
 
                 if i == 0:
@@ -72,6 +73,11 @@ class Rollout(object):
             texts = [self.hyp_to_parse(e.tgt_text, vocab) for e in examples]
 
             for k in range(len(samples[0])):
+                tree, inp = texts[k]
+
+                if netD.args['cuda']:
+                    inp = inp.cuda()
+
                 preds[k] = netD(*texts[k]).item()
 
             if i == 0:
