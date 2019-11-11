@@ -980,6 +980,9 @@ class Parser(nn.Module):
                                                    verbose=self.args['verbose']))
         rewards = torch.from_numpy(rewards).float()
 
+        if self.args['cuda']:
+            rewards = rewards.cuda()
+
         prob = F.log_softmax(self.score(examples)[0])
         loss = prob * rewards
         loss = -torch.mean(loss)

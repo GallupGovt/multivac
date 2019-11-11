@@ -4,6 +4,7 @@ import re
 import numpy as np
 import pickle
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from multivac.src.gan.gen_pyt.asdl.hypothesis import *
 from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishASDLGrammar
@@ -201,7 +202,8 @@ class English(object):
         all_examples = []
         action_len = []
 
-        for idx, example in enumerate(processed_examples):
+        for idx, example in tqdm(enumerate(processed_examples), desc='Generating Dataset... '):
+        # for idx, example in enumerate(processed_examples):
             toks, text, tree = example
 
             if max_query_len is not None:

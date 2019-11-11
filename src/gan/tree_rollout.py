@@ -174,7 +174,7 @@ def rollout_samples(mod, src_sents, samples):
 
             # if src_unk_pos_list:
             #     primitive_prob[:, mod.vocab.unk] = 1.e-10
-        for hyp_id, h in enumerate(hypotheses):
+        for hyp_id, h in tqdm(enumerate(hypotheses), desc="Computing hypotheses from step {}...".format(t)):
             hyp = h.clone_and_apply_action_info(samples[hyp_id].action_infos[0])
             aggregated_primitive_tokens = OrderedDict()
 

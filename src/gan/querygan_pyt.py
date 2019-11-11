@@ -3,10 +3,12 @@ import argparse
 from collections import namedtuple
 import configparser
 import copy
+from itertools import compress
 import math
 import random
 import numpy as np
 import os
+import random
 import re
 import time
 from tqdm import tqdm
@@ -44,21 +46,28 @@ def DiscriminatorDataset(real_dir, fake_dir, vocab):
     real_file = MULTIVACDataset(real_dir, vocab)
     combined_file = MULTIVACDataset(fake_dir, vocab)
 
+    if sum(real_file.labels==1) > len(combined_file):
+        true_items = real_file.labels==1
+        real_file.sentences = list(compress(real_file.sentences, true_items))
+        real_file.trees = list(compress(real_file.trees, true_items))
+        real_file.labels = real_file.labels[true_items]
+        indices = random.sample(range(real_file.size), combined_file.size)
+    else:
+        indices = list(range(real_file.size))
+    
+    for i in indices:
+        combined_file.trees.append(real_file.trees[i])
+        combined_file.sentences.append(real_file.sentences[i])
+
     labels = torch.cat((combined_file.labels, 
-                        real_file.labels[real_file.labels==1]), dim=0)
-
-    for i, item in enumerate(real_file.labels):
-        if item == 1:
-            combined_file.trees.append(real_file.trees[i])
-            combined_file.sentences.append(real_file.sentences[i])
-            combined_file.labels = labels
-
+                        torch.ones(len(indices))), dim=0)
+    combined_file.labels = labels
     combined_file.size = combined_file.labels.size(0)
 
     return combined_file
 
 def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
-    device = torch.device("cuda:0" if use_cuda else "cpu")
+    device = torch.device("cuda" if use_cuda else "cpu")
     criterion = nn.MSELoss()
     emb = torch.zeros(glove_vocab.size(), glove_emb.size(1), dtype=torch.float, 
                       device=device)
@@ -209,14 +218,14 @@ def run(cfg_dict):
     d_steps = gan_args['d_steps']
     k_steps = gan_args['k_steps']
     
-    use_cuda = args['cuda']
+    # use_cuda = args['cuda']
 
-    if not torch.cuda.is_available():
-        use_cuda = False
+    # if not torch.cuda.is_available():
+    #     use_cuda = False
 
-    gargs['cuda'] = use_cuda
+    # gargs['cuda'] = use_cuda
     gargs['verbose'] = gan_args['verbose']
-    dargs['cuda'] = use_cuda
+    # dargs['cuda'] = use_cuda
     dargs['verbose'] = gan_args['verbose']
 
     random.seed(seed)
@@ -342,7 +351,7 @@ def run(cfg_dict):
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
                 
-        rollout.update_params()
+        #rollout.update_params()
 
         save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
 

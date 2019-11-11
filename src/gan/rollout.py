@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import os
+from tqdm import tqdm
 
 import torch
 import torch.nn as nn
@@ -15,7 +16,7 @@ from multivac.src.rdf_graph.rdf_parse import StanfordParser
 class Rollout(object):
     def __init__(self, net, update_rate, rollout_num):
         self.ori_net = net
-        self.new_net = copy.deepcopy(net)
+        #self.new_net = copy.deepcopy(net)
         self.rollout_num = rollout_num
         self.update_rate = update_rate
         self.parser = StanfordParser(annots='tokenize ssplit pos depparse')
@@ -56,8 +57,12 @@ class Rollout(object):
             for j in range(seq_len):
                 preds = np.zeros(len(samples[0]))
 
-                for k in range(len(samples[0])):
-                    preds[k] = netD(*inputs[j][k]).item()
+                for k in tqdm(range(len(samples[0])), desc="Rating action step {}...".format(j)):
+                    tree, inp = *inputs[j][k]
+
+                    if netD.args['cuda']:
+                        inp = inp.cuda()
+                    preds[k] = netD(tree, inp).item()
 
                 if i == 0:
                     rewards.append(preds)
@@ -110,15 +115,15 @@ class Rollout(object):
 
         return rewards
 
-    def update_params(self):
-        dct = {}
+    # def update_params(self):
+    #     dct = {}
 
-        for name, param in self.ori_net.named_parameters():
-            dct[name] = param.data
+    #     for name, param in self.ori_net.named_parameters():
+    #         dct[name] = param.data
 
-        for name, param in self.new_net.named_parameters():
-            if name.startswith('emb'):
-                param.data = dct[name]
-            else:
-                param.data = self.update_rate * param.data + (1 - self.update_rate) * dct[name]
+    #     for name, param in self.new_net.named_parameters():
+    #         if name.startswith('emb'):
+    #             param.data = dct[name]
+    #         else:
+    #             param.data = self.update_rate * param.data + (1 - self.update_rate) * dct[name]
 
