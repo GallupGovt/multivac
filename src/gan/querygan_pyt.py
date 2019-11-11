@@ -218,24 +218,22 @@ def run(cfg_dict):
     d_steps = gan_args['d_steps']
     k_steps = gan_args['k_steps']
     
-    # use_cuda = args['cuda']
+    use_cuda = args['cuda']
 
-    # if not torch.cuda.is_available():
-    #     use_cuda = False
+    if not torch.cuda.is_available():
+        use_cuda = False
 
-    # gargs['cuda'] = use_cuda
+    gargs['cuda'] = use_cuda
     gargs['verbose'] = gan_args['verbose']
-    # dargs['cuda'] = use_cuda
+    dargs['cuda'] = use_cuda
     dargs['verbose'] = gan_args['verbose']
 
     random.seed(seed)
     np.random.seed(seed)
 
-    # 
-    # NEED A DATASET FIRST, TO DEFINE EMBEDDINGS/RULES SIZES
-    # 
-    #   - given a grammar file
-    #   - given GloVe vocab list
+
+    # Load input files for Generator: grammar and transition system, vocab,
+    # word embeddings
 
     if gan_args['verbose']: print("Checking for existing grammar...")
 
@@ -254,7 +252,8 @@ def run(cfg_dict):
 
     if gan_args['verbose']: print("Grammar and language transition system initiated.")
 
-    if gan_args['verbose']: print("Loading Generator component...")
+
+    # Build Generator model
 
     netG = Parser(gargs, glove_vocab, prim_vocab, transition_system)
     netG.train()
@@ -263,11 +262,12 @@ def run(cfg_dict):
     netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'])
 
     if gargs['uniform_init']:
-        print('uniformly initialize parameters [-{}, +{}]'.format(gargs['uniform_init'], 
+        if gan_args['verbose']: 
+            print('uniformly initialize parameters [-{}, +{}]'.format(gargs['uniform_init'], 
                                                                   gargs['uniform_init']))
         nn_utils.uniform_init(-gargs['uniform_init'], gargs['uniform_init'], netG.parameters())
     elif gargs['glorot_init']:
-        print('use glorot initialization')
+        if gan_args['verbose']: print('use glorot initialization')
         nn_utils.glorot_init(netG.parameters())
 
     if gan_args['verbose']: print("Loading GloVe vectors as Generator embeddings...")
@@ -275,6 +275,7 @@ def run(cfg_dict):
     load_to_layer(netG.src_embed, glove_emb, glove_vocab)
     load_to_layer(netG.primitive_embed, glove_emb, glove_vocab, prim_vocab)
     if gargs['cuda']: netG.cuda()
+
 
     # Set up Discriminator component with given parameters
 
@@ -284,29 +285,18 @@ def run(cfg_dict):
     netD = QueryGAN_Discriminator(dargs, glove_vocab)
     trainer = disc_trainer(netD, glove_emb, glove_vocab, use_cuda)
 
-    # Set up Oracle component with given parameters
-    # ### This is super expensive memory wise. let's figure something else out
-    # oracle = copy.deepcopy(netG)
-    # oracle.oracle = True
-
-    # Generate starting samples
-    seq_len = 6
-    # gen_set = generate_samples(netG, transition_system, glove_vocab, seq_len, 
-    #                            generated_num, oracle=True)
 
     # 
-    # PRETRAIN GENERATOR
+    # PRETRAIN GENERATOR & DISCRIMINATOR
     # 
 
-    print('\nPretraining generator...\n')
+    if gan_args['verbose']: print('\nPretraining generator...\n')
     # Pre-train epochs are set in config.cfg file
     netG.pretrain(Dataset(samples_data))
-    # netG.pretrain(gen_set)
-
     rollout = Rollout(netG, update_rate=rollout_update_rate, rollout_num=rollout_num)
 
     # pretrain discriminator
-    print('Loading Discriminator pretraining dataset.')
+    if gan_args['verbose']: print('Loading Discriminator pretraining dataset.')
     dis_set = MULTIVACDataset(os.path.join(netD.args['data'], "train"), 
                               glove_vocab)
     
@@ -316,7 +306,11 @@ def run(cfg_dict):
         loss = trainer.train(dis_set)
         print('Epoch {} pretrain discriminator training loss: {}'.format(epoch + 1, loss))
 
-    # adversarial training
+
+    #
+    # ADVERSARIAL TRAINING
+    # 
+
     print('\n#####################################################')
     print('Adversarial training...\n')
 
@@ -325,6 +319,7 @@ def run(cfg_dict):
 
     for epoch in range(total_epochs):
         for step in range(g_steps):
+            # train generator
             samples = generate_samples(netG, transition_system, glove_vocab, 
                                        seq_len, generated_num)
             hyps, examples = list(zip(*samples))
@@ -342,26 +337,13 @@ def run(cfg_dict):
             dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
                                            netG.args['sample_dir'],
                                            glove_vocab)
-            # disloader = DataLoader(dataset=dis_set,
-            #                        batch_size=BATCH_SIZE,
-            #                        shuffle=True)
         
             for k_step in range(k_steps):
                 loss = trainer.train(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
                 
-        #rollout.update_params()
-
         save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
-
-        # generate_samples(netG, BATCH_SIZE, GENERATED_NUM, EVAL_FILE)
-        # val_set = GeneratorDataset(EVAL_FILE)
-        # valloader = DataLoader(dataset=val_set,
-        #                        batch_size=BATCH_SIZE,
-        #                        shuffle=True)
-        # loss = oracle.val(valloader)
-        # print('Epoch {} adversarial generator val loss: {}'.format(epoch + 1, loss))
 
 
 def save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses):
