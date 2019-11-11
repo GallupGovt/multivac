@@ -58,11 +58,11 @@ class Rollout(object):
                 preds = np.zeros(len(samples[0]))
 
                 for k in tqdm(range(len(samples[0])), desc="Rating action step {}...".format(j)):
-                    tree, inp = *inputs[j][k]
+                    tree, inp = inputs[j][k]
 
                     if netD.args['cuda']:
                         inp = inp.cuda()
-                        
+
                     preds[k] = netD(tree, inp).item()
 
                 if i == 0:
@@ -78,7 +78,7 @@ class Rollout(object):
                 if netD.args['cuda']:
                     inp = inp.cuda()
 
-                preds[k] = netD(*texts[k]).item()
+                preds[k] = netD(tree, inp).item()
 
             if i == 0:
                 rewards.append(preds)
