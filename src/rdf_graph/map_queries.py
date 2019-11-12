@@ -322,9 +322,24 @@ def run(args_dict):
 
     # fit run-determined parameters
     if 'fit' in args_dict['run']:
-        con.set_train_times(1000)
-        con.set_nbatches(100)
-        con.set_alpha(0.001)
+        if args_dict['traintimes'] is None:
+            traintimes = 100
+        else:
+            traintimes = int(args_dict['traintimes'])
+            
+        if args_dict['alpha'] is None:
+            alpha = 0.001
+        else:
+            alpha = float(args_dict['alpha'])
+        
+        if args_dict['nbatches'] is None:
+            nbatches = 100
+        else:
+            nbatches  = int(args_dict['nbatches'])
+
+        con.set_train_times(traintimes)
+        con.set_nbatches(nbatches)
+        con.set_alpha(alpha)
         con.set_margin(1.0)
         con.set_bern(0)
         con.set_ent_neg_rate(1)
@@ -494,6 +509,13 @@ if __name__ == '__main__':
                         help='Searches to execute. Either a path to a CSV '
                         'containing triples or a triple in the format '
                         '"subject terms ::: relation terms ::: object terms"')
+    parser.add_argument('-j', '--traintimes', required=False, 
+                        help='Number of train times (epochs); default is 100')
+    parser.add_argument('-a', '--alpha', required=False, 
+                        help='Learning rate; default is 0.001')
+    parser.add_argument('-b', '--nbatches', required=False, 
+                        help='To split the training triples into several batches, nbatches is the number of batches; default is 100')
+
     args_dict = vars(parser.parse_args())
 
     run(args_dict)
