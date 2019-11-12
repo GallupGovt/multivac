@@ -14,11 +14,9 @@ from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
 
 from multivac.src.gan.gen_pyt.asdl.hypothesis import Hypothesis
 from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, ReduceAction, Action, GenTokenAction
-from multivac.src.gan.gen_pyt.common.registerable import Registrable
 from multivac.src.gan.gen_pyt.components.decode_hypothesis import DecodeHypothesis
 from multivac.src.gan.gen_pyt.components.action_info import ActionInfo
 from multivac.src.gan.gen_pyt.components.dataset import Batch, Dataset
-# from multivac.src.gan.gen_pyt.common.utils import update_args, init_arg_parser
 from multivac.src.gan.gen_pyt.model import nn_utils
 from multivac.src.gan.gen_pyt.model.attention_util import AttentionUtil
 from multivac.src.gan.gen_pyt.model.nn_utils import LabelSmoothing

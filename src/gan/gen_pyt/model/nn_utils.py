@@ -88,55 +88,6 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
 
     return sents_var
 
-
-def variable_constr(x, v, cuda=False):
-    return Variable(torch.cuda.x(v)) if cuda else Variable(torch.x(v))
-
-
-def batch_iter(examples, batch_size, shuffle=False):
-    index_arr = np.arange(len(examples))
-    if shuffle:
-        np.random.shuffle(index_arr)
-
-    batch_num = int(np.ceil(len(examples) / float(batch_size)))
-    for batch_id in range(batch_num):
-        batch_ids = index_arr[batch_size * batch_id: batch_size * (batch_id + 1)]
-        batch_examples = [examples[i] for i in batch_ids]
-
-        yield batch_examples
-
-
-def isnan(data):
-    data = data.cpu().numpy()
-    return np.isnan(data).any() or np.isinf(data).any()
-
-
-def log_sum_exp(inputs, dim=None, keepdim=False):
-    """Numerically stable logsumexp.
-       source: https://github.com/pytorch/pytorch/issues/2591
-
-    Args:
-        inputs: A Variable with any shape.
-        dim: An integer.
-        keepdim: A boolean.
-
-    Returns:
-        Equivalent of log(sum(exp(inputs), dim=dim, keepdim=keepdim)).
-    """
-    # For a 1-D array x (any array along a single dimension),
-    # log sum exp(x) = s + log sum exp(x - s)
-    # with s = max(x) being a common choice.
-
-    if dim is None:
-        inputs = inputs.view(-1)
-        dim = 0
-    s, _ = torch.max(inputs, dim=dim, keepdim=True)
-    outputs = s + (inputs - s).exp().sum(dim=dim, keepdim=True).log()
-    if not keepdim:
-        outputs = outputs.squeeze(dim)
-    return outputs
-
-
 def uniform_init(lower, upper, params):
     for p in params:
         p.data.uniform_(lower, upper)

@@ -8,7 +8,7 @@ import pickle
 from torch.autograd import Variable
 
 from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, ReduceAction
-from multivac.src.gan.gen_pyt.common.utils import cached_property
+from multivac.src.gan.utilities.utils import cached_property
 
 from multivac.src.gan.gen_pyt.model import nn_utils
 

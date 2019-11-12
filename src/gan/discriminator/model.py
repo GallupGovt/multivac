@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from . import Constants
-
 
 # module for childsumtreelstm
 class ChildSumTreeLSTM(nn.Module):
@@ -46,46 +44,6 @@ class ChildSumTreeLSTM(nn.Module):
 
         tree.state = self.node_forward(inputs[tree.idx], child_c, child_h)
         return tree.state
-
-
-# module for distance-angle similarity
-class Similarity(nn.Module):
-    def __init__(self, mem_dim, hidden_dim, num_classes):
-        super(Similarity, self).__init__()
-        self.mem_dim = mem_dim
-        self.hidden_dim = hidden_dim
-        self.num_classes = num_classes
-        self.wh = nn.Linear(2 * self.mem_dim, self.hidden_dim)
-        self.wp = nn.Linear(self.hidden_dim, self.num_classes)
-
-    def forward(self, lvec, rvec):
-        mult_dist = torch.mul(lvec, rvec)
-        abs_dist = torch.abs(torch.add(lvec, -rvec))
-        vec_dist = torch.cat((mult_dist, abs_dist), 1)
-
-        out = torch.sigmoid(self.wh(vec_dist))
-        out = F.log_softmax(self.wp(out), dim=1)
-        return out
-
-
-# putting the whole model together
-class SimilarityTreeLSTM(nn.Module):
-    def __init__(self, vocab_size, in_dim, mem_dim, hidden_dim, num_classes, sparsity, freeze):
-        super(SimilarityTreeLSTM, self).__init__()
-        self.emb = nn.Embedding(vocab_size, in_dim, padding_idx=Constants.PAD, sparse=sparsity)
-        if freeze:
-            self.emb.weight.requires_grad = False
-        self.childsumtreelstm = ChildSumTreeLSTM(in_dim, mem_dim)
-        self.similarity = Similarity(mem_dim, hidden_dim, num_classes)
-
-    def forward(self, ltree, linputs, rtree, rinputs):
-        linputs = self.emb(linputs)
-        rinputs = self.emb(rinputs)
-        lstate, lhidden = self.childsumtreelstm(ltree, linputs)
-        rstate, rhidden = self.childsumtreelstm(rtree, rinputs)
-        output = self.similarity(lstate, rstate)
-        return output
-
 
 class QueryGAN_Discriminator(nn.Module):
     def __init__(self, args, vocab): #vocab_size, in_dim, mem_dim, sparsity, freeze):

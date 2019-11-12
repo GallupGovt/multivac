@@ -1,7 +1,7 @@
 from collections import OrderedDict, defaultdict
 
 from multivac.src.gan.gen_pyt.astnode import ASTNode
-from multivac.src.gan.gen_pyt.asdl.lang.util import typename
+from multivac.src.gan.utilities.utils import typename
 
 
 class Grammar(object):

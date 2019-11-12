@@ -88,23 +88,3 @@ def asdl_ast_to_english(asdl_ast_node):
 
     return ' '.join([x if x else '<None>' for x in tokens])
 
-
-# def unroll(asdl_ast_node):
-#     rep_str = []
-
-#     rep_str.append()
-
-#     for field in asdl_ast_node.fields:
-#         # for composite node
-#         field_value = None
-
-#         if isinstance(field.type, ASDLCompositeType) and field.value is not None:
-#             field_value = asdl_ast_to_english(field.value)
-#         else:
-#             field_value = field.value
-
-#         tokens.append(field_value)
-
-#     return ' '.join([tok for tok in tokens if tok])
-
-

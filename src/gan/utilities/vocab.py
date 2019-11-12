@@ -99,14 +99,16 @@ class Vocab(object):
     # Optionally insert `bosWord` at the beginning and `eosWord` at the .
     def convertToIdx(self, labels, unkWord=None, bosWord=None, eosWord=None):
         if unkWord is None:
-            unkWord = self.unk
+            unk = self.unk
+        else:
+            unk = self.getIndex(unkWord)
 
         vec = []
 
         if bosWord is not None:
             vec += [self.getIndex(bosWord)]
 
-        unk = self.getIndex(unkWord)
+        
         vec += [self.getIndex(label, default=unk) for label in labels]
 
         if eosWord is not None:

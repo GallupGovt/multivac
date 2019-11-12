@@ -17,6 +17,8 @@ def run(args):
 
     if isinstance(args['query'], str):
         query = args['query'].split()
+    elif args['query'] is None:
+        query = [] # get list of query tokens from KG graph 
     else:
         query = args['query']
 
@@ -30,8 +32,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', 
                         help='Path to model checkpoint file.')
-    parser.add_argument('-q', '--query', nargs='+',
+    parser.add_argument('-q', '--query', nargs='+', required=False,
                         help='Query tokens for generating a question.')
+    parser.add_argument('-l', '--length', nargs='+', required=False,
+                        help='Number of query tokens to use for generating '
+                             'a question.')
 
     args = vars(parser.parse_args())
 

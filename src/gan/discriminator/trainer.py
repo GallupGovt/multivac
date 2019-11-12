@@ -2,8 +2,6 @@ from tqdm import tqdm
 
 import torch
 
-from . import utils
-
 
 class Trainer(object):
     def __init__(self, args, model, criterion, optimizer, device):

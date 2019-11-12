@@ -1,37 +1,27 @@
 #!usr/bin/env/python
 import argparse
-from collections import namedtuple
 import configparser
-import copy
 from itertools import compress
-import math
-import random
 import numpy as np
 import os
 import random
-import re
 import time
 from tqdm import tqdm
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 
-from discriminator.treelstm import QueryGAN_Discriminator, MULTIVACDataset
-from discriminator.treelstm import Trainer, utils
+from discriminator import QueryGAN_Discriminator, MULTIVACDataset, Trainer
 from gen_pyt.datasets.english.dataset import English
-from gen_pyt.asdl.asdl import *
-from gen_pyt.asdl.lang.eng.eng_asdl_helper import asdl_ast_to_english, english_ast_to_asdl_ast
+from gen_pyt.asdl.lang.eng.eng_asdl_helper import asdl_ast_to_english
 from gen_pyt.asdl.lang.eng.eng_transition_system import EnglishTransitionSystem
-from gen_pyt.common.registerable import Registrable
 from gen_pyt.components.action_info import get_action_infos
-from gen_pyt.components.dataset import Example, Batch, Dataset
-from gen_pyt.components.evaluator import Evaluator
+from gen_pyt.components.dataset import Example, Dataset
 from gen_pyt.model import nn_utils
 from gen_pyt.model.parser import Parser
-from gen_pyt.utils.io_utils import deserialize_from_file, serialize_to_file
-from rollout import Rollout
+from utilities.rollout import Rollout
+from utilities.utils import load_word_vectors, deserialize_from_file
 
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
@@ -155,21 +145,6 @@ def generate_samples(net, transition_system, vocab, seq_len,
     
     return zip(samples, examples)
 
-def query_to_data(query, annot_vocab):
-    if isinstance(query, str):
-        query_tokens = query.split(' ')
-    else:
-        query_tokens = query
-
-    data = np.zeros((1, len(query_tokens)), dtype='int32')
-
-    for tid, token in enumerate(query_tokens):
-        token_id = annot_vocab[token]
-
-        data[0, tid] = token_id
-
-    return data
-
 def emulate_embeddings(embeds, shape, device='cpu'):
     samples = torch.zeros(*shape, dtype=torch.float)
     samples.normal_(torch.mean(embeds), torch.std(embeds))
@@ -247,8 +222,9 @@ def run(cfg_dict):
     else:
         grammar = None
 
-    glove_vocab, glove_emb = utils.load_word_vectors(
-        os.path.join(gan_args['glove_dir'], gan_args['glove_file']))
+    glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'], 
+                                                            gan_args['glove_file']),
+                                               lowercase=gan_args['glove_lower'])
 
     samples_data, prim_vocab, grammar = English.generate_dataset(gargs['annot_file'],
                                                                       gargs['texts_file'],

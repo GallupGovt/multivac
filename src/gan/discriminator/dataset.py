@@ -5,7 +5,7 @@ from copy import deepcopy
 import torch
 import torch.utils.data as data
 
-from . import Constants
+from multivac.src.gan.utilities.vocab import Vocab
 from .tree import Tree
 
 # Dataset class for MULTIVAC dataset
@@ -35,9 +35,13 @@ class MULTIVACDataset(data.Dataset):
         return sentences
 
     def read_sentence(self, line):
-        indices = self.vocab.convertToIdx(line.split(), Constants.UNK_WORD)
+        indices = self.vocab.convertToIdx(line.split())
+        try:
+            result = torch.tensor(indices, dtype=torch.long, device='cpu')
+        except:
+            import pdb; pdb.set_trace()
 
-        return torch.tensor(indices, dtype=torch.long, device='cpu')
+        return result
 
     @staticmethod
     def read_trees(filename):
