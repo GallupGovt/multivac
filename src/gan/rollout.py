@@ -54,8 +54,8 @@ class Rollout(object):
             inputs = [[]] * len(samples)
 
             for x in tqdm(range(len(samples)), "Translating trees to discriminator..."):
-                for n, hyp in enumerate(samples[x]):
-                    inputs[x][n] = self.hyp_to_parse(hyp, vocab)
+                for hyp in samples[x]:
+                    inputs[x].append(self.hyp_to_parse(hyp, vocab))
 
             seq_len = len(inputs)
 

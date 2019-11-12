@@ -44,22 +44,29 @@ def DiscriminatorDataset(real_dir, fake_dir, vocab):
     real_file = MULTIVACDataset(real_dir, vocab)
     combined_file = MULTIVACDataset(fake_dir, vocab)
 
-    if sum(real_file.labels==1) > len(combined_file):
-        true_items = real_file.labels==1
-        real_file.sentences = list(compress(real_file.sentences, true_items))
-        real_file.trees = list(compress(real_file.trees, true_items))
-        real_file.labels = real_file.labels[true_items]
+    true_items = real_file.labels==1
+    real_file.sentences = list(compress(real_file.sentences, true_items))
+    real_file.trees = list(compress(real_file.trees, true_items))
+    real_file.labels = real_file.labels[true_items]
+    real_file.size = real_file.labels.size(0)
+
+    if len(real_file) > len(combined_file):
         indices = random.sample(range(real_file.size), combined_file.size)
+        
+        for i in indices:
+            combined_file.trees.append(real_file.trees[i])
+            combined_file.sentences.append(real_file.sentences[i])
+
+        labels = torch.cat((combined_file.labels, 
+                            torch.ones(len(indices))), dim=0)
+        combined_file.labels = labels
     else:
         indices = list(range(real_file.size))
-    
-    for i in indices:
-        combined_file.trees.append(real_file.trees[i])
-        combined_file.sentences.append(real_file.sentences[i])
+        combined_file.trees.extend(real_file.trees)
+        combined_file.sentences.extend(real_file.sentences)
+        combined_file.labels = torch.cat((combined_file.labels, 
+                                          real_file.labels), dim=0)
 
-    labels = torch.cat((combined_file.labels, 
-                        torch.ones(len(indices))), dim=0)
-    combined_file.labels = labels
     combined_file.size = combined_file.labels.size(0)
 
     return combined_file
