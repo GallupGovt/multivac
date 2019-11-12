@@ -34,9 +34,7 @@ from gen_pyt.utils.io_utils import deserialize_from_file, serialize_to_file
 from rollout import Rollout
 
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
-# from generator.learner import Learner
-# from generator.components import Hyp
-# from generator.dataset import DataEntry, DataSet, Vocab, Action
+
 
 def DiscriminatorDataset(real_dir, fake_dir, vocab):
     '''
@@ -97,13 +95,12 @@ def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
     return Trainer(model.args, model, criterion, optimizer, device)
 
 def generate_samples(net, transition_system, vocab, seq_len, 
-                     generated_num, oracle=False, writeout=False):
+                     generated_num, parser, oracle=False, writeout=False):
     samples = [[]] * generated_num
     texts = examples = [''] * generated_num
     max_query_len = 0
     max_actions_len = 0
     dst_dir = net.args['sample_dir']
-    parser = StanfordParser(annots="depparse")
 
     for i in tqdm(range(generated_num), desc='Generating Samples... '):
         sample = []
@@ -208,7 +205,7 @@ def run(cfg_dict):
     total_epochs = gan_args['total_epochs']
     generated_num = gan_args['generated_num']
     vocab_size = gan_args['vocab_size']
-    sequence_len = gan_args['sequence_len']
+    seq_len = gan_args['sequence_len']
 
     # rollout params
     rollout_update_rate = gan_args['rollout_update_rate']
@@ -231,6 +228,7 @@ def run(cfg_dict):
     random.seed(seed)
     np.random.seed(seed)
 
+    parser = StanfordParser(annots="depparse")
 
     # Load input files for Generator: grammar and transition system, vocab,
     # word embeddings
@@ -321,7 +319,7 @@ def run(cfg_dict):
         for step in range(g_steps):
             # train generator
             samples = generate_samples(netG, transition_system, glove_vocab, 
-                                       seq_len, generated_num)
+                                       seq_len, generated_num, parser)
             hyps, examples = list(zip(*samples))
             step_begin = time.time()
             pgloss = netG.pgtrain(hyps, examples, rollout, netD)
@@ -333,7 +331,7 @@ def run(cfg_dict):
         for d_step in range(d_steps):
             # train discriminator
             _ = generate_samples(netG, transition_system, glove_vocab, 
-                                 seq_len, generated_num, writeout=True)
+                                 seq_len, generated_num, parser, writeout=True)
             dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
                                            netG.args['sample_dir'],
                                            glove_vocab)
@@ -354,6 +352,7 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
                       'args': netG.args,
                       'transition_system': netG.transition_system,
                       'vocab': netG.vocab,
+                      'prim_vocab': netG.prim_vocab,
                       'optimizer': netG.optimizer.state_dict()}
     torch.save(gen_checkpoint, gen_save)
 

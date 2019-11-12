@@ -1,6 +1,7 @@
 
 from collections import OrderedDict
 import numpy as np
+from tqdm import tqdm
 
 import torch
 import torch.nn.functional as F
@@ -144,11 +145,7 @@ def rollout_samples(mod, src_sents, samples):
     ref_hyp_states = get_hyp_states(mod, src_encodings, dec_init_vec, 
                                     samples, max_action_len)
 
-    # for t in range(max_action_len):
-    #     aggregated_primitive_tokens = OrderedDict()
-
-    #     for token_pos, token in enumerate(src_sent):
-    #         aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
+    print("{} steps for {} sample Hypotheses.".format(max_action_len-1, len(hypotheses)))
 
     for t in range(1, max_action_len):
         computed_hyps[t] = []
@@ -172,8 +169,6 @@ def rollout_samples(mod, src_sents, samples):
             # Variable(batch_size, mod.vocab_size)
             primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
 
-            # if src_unk_pos_list:
-            #     primitive_prob[:, mod.vocab.unk] = 1.e-10
         for hyp_id, h in tqdm(enumerate(hypotheses), desc="Computing hypotheses from step {}...".format(t)):
             hyp = h.clone_and_apply_action_info(samples[hyp_id].action_infos[0])
             aggregated_primitive_tokens = OrderedDict()

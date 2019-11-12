@@ -51,7 +51,12 @@ class Rollout(object):
             samples = rollout_samples(self.ori_net, src_sents, hyps)
             if verbose: print("Samples generated of shape ({},{})".format(len(samples), len(samples[0])))
 
-            inputs = [[self.hyp_to_parse(hyp, vocab) for hyp in x] for x in samples]
+            inputs = [[]] * len(samples)
+
+            for x in tqdm(range(len(samples)), "Translating trees to discriminator..."):
+                for n, hyp in enumerate(samples[x]):
+                    inputs[x][n] = self.hyp_to_parse(hyp, vocab)
+
             seq_len = len(inputs)
 
             for j in range(seq_len):
@@ -72,7 +77,7 @@ class Rollout(object):
 
             texts = [self.hyp_to_parse(e.tgt_text, vocab) for e in examples]
 
-            for k in range(len(samples[0])):
+            for k in tqdm(range(len(samples[0])), desc="Rating action step {}...".format(seq_len)):
                 tree, inp = texts[k]
 
                 if netD.args['cuda']:

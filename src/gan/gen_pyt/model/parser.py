@@ -885,21 +885,29 @@ class Parser(nn.Module):
         torch.save(params, path)
 
     @classmethod
-    def load(cls, model_path, cuda=False):
+    def load(cls, model_path, cuda=None):
         params = torch.load(model_path, map_location=lambda storage, loc: storage)
         vocab = params['vocab']
         transition_system = params['transition_system']
         saved_args = params['args']
-        # update saved args
-        # update_args(saved_args, init_arg_parser())
         saved_state = params['state_dict']
-        saved_args['cuda'] = cuda
 
-        parser = cls(saved_args, vocab, transition_system)
+        if 'prim_vocab' not in params:
+            prim_vocab = vocab
+        else:
+            prim_vocab = params['prim_vocab']
+
+        parser = cls(saved_args, vocab, prim_vocab, transition_system)
 
         parser.load_state_dict(saved_state)
 
-        if cuda: parser = parser.cuda()
+        if parser.args['cuda']: parser.cuda()
+        if cuda is not None: 
+            if cuda:
+                parser = parser.cuda()
+            else:
+                parser = parser.cpu()
+
         parser.eval()
 
         return parser
