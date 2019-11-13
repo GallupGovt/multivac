@@ -19,7 +19,7 @@ from datetime import datetime
 from numpy import array
 from OpenKE.openke import config
 from OpenKE.openke.module import model
-from rdf_parse import StanfordParser, stanford_parse
+from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
 def get_best_score(x):
     if isinstance(x, tuple):

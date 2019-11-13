@@ -14,7 +14,7 @@ from corenlp import CoreNLPClient
 from datetime import datetime
 from nltk import pos_tag, word_tokenize, sent_tokenize
 from nltk.stem import WordNetLemmatizer
-from rdf_parse import StanfordParser, stanford_parse
+from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 from scipy.spatial.distance import pdist
 from scipy.cluster.hierarchy import fcluster
 
