@@ -15,10 +15,11 @@ import pandas as pd
 import sys
 
 from datetime import datetime
-from settings import models_dir
+#from multivac.settings import models_dir
 from numpy import array
-from OpenKE import config, models
-from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+from OpenKE.openke import config
+from OpenKE.openke.module import model
+from rdf_parse import StanfordParser, stanford_parse
 
 def get_best_score(x):
     if isinstance(x, tuple):
@@ -289,6 +290,33 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
                       args_dict['timestamp'])), 'w') as f:
         json.dump(out, f)
 
+def get_con(args):
+    con = config.Config()
+
+    if args_dict['dir'].endswith(os.path.sep):
+        con.set_in_path(args_dict['dir'])
+    else:
+        con.set_in_path(args_dict['dir']+os.path.sep)
+
+    con.set_work_threads(8)
+    con.set_dimension(100)
+    con.set_test_link_prediction(True)
+    con.set_test_triple_classification(True)
+
+    files = glob.glob(os.path.join(args_dict['out'],'*tf*'))
+
+    if not files:
+        raise Exception('No models to predict on; generate one first.')
+
+    times = list(set([file.split('.')[2] for file in files]))
+    ifile = max([datetime.strptime(x, '%d%b%Y-%H:%M:%S') for
+                x in times]).strftime('%d%b%Y-%H:%M:%S')
+    con.set_import_files(os.path.join(args_dict['out'],
+                                      'model.vec.{}.tf'.format(ifile)))
+    con.init()
+    kem = set_model_choice(args_dict['model'])
+    con.set_model(kem)
+
 
 def run(args_dict):
     # setup
@@ -445,23 +473,23 @@ def run(args_dict):
 
 def set_model_choice(model):
     if 'analogy' in model:
-        kem = models.Analogy
+        kem = model.Analogy
     elif 'complex' in model:
-        kem = models.ComplEx
+        kem = model.ComplEx
     elif 'distmult' in model:
-        kem = models.DistMult
+        kem = model.DistMult
     elif 'hole' in model:
-        kem = models.HolE
+        kem = model.HolE
     elif 'rescal' in model:
-        kem = models.RESCAL
+        kem = model.RESCAL
     elif 'transd' in model:
-        kem = models.TransD
+        kem = model.TransD
     elif 'transe' in model:
-        kem = models.TransE
+        kem = model.TransE
     elif 'transh' in model:
-        kem = models.TransH
+        kem = model.TransH
     else:
-        kem = models.TransR
+        kem = model.TransR
 
     return kem
 
