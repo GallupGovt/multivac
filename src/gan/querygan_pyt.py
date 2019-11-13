@@ -178,6 +178,10 @@ def run(cfg_dict):
     # arguments
 
     args = cfg_dict['ARGS']
+
+    if 'continue' in args:
+        continue_training(cfg_dict, args['gen_chk'], args['disc_chk'])
+
     gargs = cfg_dict['GENERATOR']
     dargs = cfg_dict['DISCRIMINATOR']
     gan_args = cfg_dict['GAN']
@@ -239,7 +243,7 @@ def run(cfg_dict):
     netG = Parser(gargs, glove_vocab, prim_vocab, transition_system)
     netG.train()
 
-    optimizer_cls = eval('torch.optim.%s' % gargs['optimizer'])  # FIXME: this is evil!
+    optimizer_cls = eval('torch.optim.%s' % gargs['optimizer'])
     netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'])
 
     if gargs['uniform_init']:
@@ -326,6 +330,107 @@ def run(cfg_dict):
                 
         save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
 
+def continue_training(cfg, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=None, use_cuda=False):
+    gargs = cfg_dict['GENERATOR']
+    dargs = cfg_dict['DISCRIMINATOR']
+    gan_args = cfg_dict['GAN']
+
+    seed = gan_args['seed']
+    batch_size = gan_args['batch_size']
+    total_epochs = gan_args['total_epochs']
+    generated_num = gan_args['generated_num']
+    vocab_size = gan_args['vocab_size']
+    seq_len = gan_args['sequence_len']
+
+    # rollout params
+    rollout_update_rate = gan_args['rollout_update_rate']
+    rollout_num = gan_args['rollout_num']
+
+    g_steps = gan_args['g_steps']
+    d_steps = gan_args['d_steps']
+    k_steps = gan_args['k_steps']
+    
+    use_cuda = args['cuda']
+
+    if not torch.cuda.is_available():
+        use_cuda = False
+
+    gargs['cuda'] = use_cuda
+    gargs['verbose'] = gan_args['verbose']
+    dargs['cuda'] = use_cuda
+    dargs['verbose'] = gan_args['verbose']
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    parser = StanfordParser(annots="depparse")
+
+    print('\n#####################################################')
+    print('Adversarial training...\n')
+
+    if disc_loss is None:
+        discriminator_losses = []
+    
+    if gen_loss is None:
+        generator_losses = []
+
+    if isinstance(gen_chk, str):
+        netG = Parser.load(gen_chk)
+    else:
+        netG = gen_chk
+
+    if isinstance(disc_chk, str):
+        device = torch.device("cuda" if use_cuda else "cpu")
+        disc_params = torch.load(disc_chk, map_location=lambda storage, loc: storage)
+        netD = QueryGAN_Discriminator(disc_params['args'], netG.vocab)
+        netD.load_state_dict(disc_params['state_dict'])
+
+        if epoch == 0:
+            epoch = disc_params['epoch']
+
+        if netD.args['optim'] == 'adam':
+            opt = optim.Adam
+        elif netD.args['optim'] == 'adagrad':
+            opt = optim.Adagrad
+        elif netD.args['optim'] == 'sgd':
+            opt = optim.SGD
+
+        optimizer = opt(netD.parameters(), 
+                        lr=netD.args['lr'], 
+                        weight_decay=netD.args['wd'])
+        optimizer.load_state_dict(disc_params['optimizer'])
+        trainer = Trainer(netD.args, netD, nn.MSELoss(), optimizer, device)
+    else:
+        trainer = disc_chk
+
+    for epoch in range(total_epochs):
+        for step in range(g_steps):
+            # train generator
+            samples = generate_samples(netG, transition_system, glove_vocab, 
+                                       seq_len, generated_num, parser)
+            hyps, examples = list(zip(*samples))
+            step_begin = time.time()
+            pgloss = netG.pgtrain(hyps, examples, rollout, netD)
+            print('[Generator {}]  step elapsed {}s'.format(step, 
+                                                            time.time() - step_begin))
+            print('Generator adversarial loss={}'.format(pgloss))
+            generator_losses.append(pgloss)
+
+        for d_step in range(d_steps):
+            # train discriminator
+            _ = generate_samples(netG, transition_system, glove_vocab, 
+                                 seq_len, generated_num, parser, writeout=True)
+            dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
+                                           netG.args['sample_dir'],
+                                           glove_vocab)
+        
+            for k_step in range(k_steps):
+                loss = trainer.train(dis_set)
+                print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
+                discriminator_losses.append(loss)
+                
+        save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
+
 
 def save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses):
     # Save Generator model state and metadata
@@ -352,12 +457,12 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
     with open(os.path.join(netG.args['output_dir'], 
                            "generator_losses.csv"), "w") as f:
         for l in generator_losses:
-            f.write(str(l.item()) + '\n')
+            f.write("{},{}\n".format(epoch, l.item()))
 
     with open(os.path.join(netG.args['output_dir'], 
                            "discriminator_losses.csv"), "w") as f:
         for l in discriminator_losses:
-            f.write(str(l) + '\n')
+            f.write("{},{}\n".format(epoch, l))
 
     # Save example generator outputs for qualitative assessment of progress
     save_examples = random.sample(examples, 10)
@@ -387,6 +492,12 @@ if __name__ == '__main__':
                         help='Config file with updated parameters for generator;'
                              'defaults to "config.cfg" in this directory '
                              'otherwise.')
+    parser.add_argument('-o', '--continue', default=False, action='store_true', 
+                        help='Continue training from a previous checkpoint.')
+    parser.add_argument('-g', '--gen_chk', required=False,
+                        help='Path to Generator component checkpoint file.')
+    parser.add_argument('-d', '--disc_chk', default=False, action='store_true', 
+                        help='Path to Discriminator component checkpoint file.')
 
     all_args = parser.parse_known_args()
     args = vars(all_args[0])
