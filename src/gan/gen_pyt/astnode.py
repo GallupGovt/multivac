@@ -2,7 +2,7 @@ from collections import namedtuple
 from collections import Iterable, OrderedDict, defaultdict
 from io import StringIO
 
-from multivac.src.gan.gen_pyt.asdl.lang.util import typename
+from multivac.src.gan.utilities.utils import typename
 
 class ASTNode(object):
     def __init__(self, node_type, label=None, value=None, children=None):

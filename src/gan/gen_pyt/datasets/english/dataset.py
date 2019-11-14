@@ -12,15 +12,11 @@ from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper \
     import english_ast_to_asdl_ast
 from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_transition_system \
     import EnglishTransitionSystem
-
 from multivac.src.gan.gen_pyt.components.action_info \
     import ActionInfo, get_action_infos
 from multivac.src.gan.gen_pyt.components.dataset import Example
-from multivac.src.gan.gen_pyt.components.vocab import Vocab
-
-from multivac.src.gan.gen_pyt.utils.io_utils \
-    import serialize_to_file, deserialize_from_file
-
+from multivac.src.gan.utilities.vocab import Vocab
+from multivac.src.gan.utilities.utils import serialize_to_file
 from multivac.src.rdf_graph.rdf_parse import tokenize_text, StanfordParser, stanford_parse
 
 class English(object):

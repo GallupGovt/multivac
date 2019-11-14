@@ -1,5 +1,3 @@
-from __future__ import division
-from __future__ import print_function
 
 import os
 import pickle
@@ -7,16 +5,58 @@ import math
 
 import torch
 
-from gen_pyt.components.vocab import Vocab
+from multivac.src.gan.utilities.vocab import Vocab
+
+
+# write unique words from a set of files to a new file
+def build_vocab(filenames, vocabfile, lowercase=True):
+    vocab = set()
+
+    for filename in filenames:
+        with open(filename, 'r') as f:
+            for line in f:
+                if lowercase:
+                    line = line.lower()
+
+                tokens = line.rstrip('\n').split(' ')
+                vocab |= set(tokens)
+
+    with open(vocabfile, 'w') as f:
+        for token in sorted(vocab):
+            f.write(token + '\n')
+
+class cached_property(object):
+    """ A property that is only computed once per instance and then replaces
+        itself with an ordinary attribute. Deleting the attribute resets the
+        property.
+
+        Source: https://github.com/bottlepy/bottle/commit/fa7733e075da0d790d809aa3d2f53071897e6f76
+        """
+
+    def __init__(self, func):
+        self.__doc__ = getattr(func, '__doc__')
+        self.func = func
+
+    def __get__(self, obj, cls):
+        if obj is None:
+            return self
+        value = obj.__dict__[self.func.__name__] = self.func(obj)
+        return value
+
+def deserialize_from_file(path):
+    with open(path, 'rb') as f:
+        obj = pickle.load(f)
+    
+    return obj
 
 # loading GLOVE word vectors
 # if .pth file is found, will load that
 # else will load from .txt file & save
-def load_word_vectors(path):
+def load_word_vectors(path, lowercase=True):
     if os.path.isfile(path + '.pth') and os.path.isfile(path + '.vocab'):
         print('==> File found, loading to memory')
         vectors = torch.load(path + '.pth')
-        vocab = Vocab(filename=path + '.vocab')
+        vocab = Vocab(filename=path + '.vocab', lower=lowercase)
 
         return vocab, vectors
     elif path.endswith('.pkl'):
@@ -26,7 +66,7 @@ def load_word_vectors(path):
             glove = pickle.load(f)
 
         vectors = torch.from_numpy(glove['embeddings']).float()
-        vocab = Vocab(data=glove['vocab'])
+        vocab = Vocab(data=glove['vocab'], lower=lowercase)
 
         return vocab, vectors
 
@@ -63,32 +103,11 @@ def load_word_vectors(path):
 
     return vocab, vectors
 
+def serialize_to_file(obj, path, protocol=pickle.HIGHEST_PROTOCOL):
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f, protocol=protocol)
 
-# write unique words from a set of files to a new file
-def build_vocab(filenames, vocabfile):
-    vocab = set()
-
-    for filename in filenames:
-        with open(filename, 'r') as f:
-            for line in f:
-                tokens = line.rstrip('\n').split(' ')
-                vocab |= set(tokens)
-
-    with open(vocabfile, 'w') as f:
-        for token in sorted(vocab):
-            f.write(token + '\n')
-
-
-# mapping from scalar to vector
-def map_label_to_target(label, num_classes):
-    target = torch.zeros(1, num_classes, dtype=torch.float, device='cpu')
-    ceil = int(math.ceil(label))
-    floor = int(math.floor(label))
-
-    if ceil == floor:
-        target[0, floor-1] = 1
-    else:
-        target[0, floor-1] = ceil - label
-        target[0, ceil-1] = label - floor
-
-    return target
+def typename(x):
+    if isinstance(x, str):
+        return x
+    return x.__name__

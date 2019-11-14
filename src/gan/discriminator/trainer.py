@@ -2,8 +2,6 @@ from tqdm import tqdm
 
 import torch
 
-from . import utils
-
 
 class Trainer(object):
     def __init__(self, args, model, criterion, optimizer, device):
@@ -51,7 +49,7 @@ class Trainer(object):
                 tree, inputs, label = dataset[idx]
                 inputs, label = inputs.to(self.device), label.to(self.device).view(1,1)
                 output = self.model(tree, inputs)
-                loss = self.criterion(output.item(), label)
+                loss = self.criterion(output, label)
                 total_loss += loss.item()
                 output = output.squeeze().to('cpu')
                 predictions[idx] = torch.round(output)

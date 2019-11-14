@@ -39,6 +39,16 @@ class Vocab(object):
     def __iter__(self):
         return iter(list(self.labelToIdx.keys()))
 
+    def __eq__(self, other):
+        return all([self.idxToLabel == other.idxToLabel, 
+                    self.labelToIdx == other.labelToIdx,
+                    self.lower      == other.lower, 
+                    self.special    == other.special])
+
+    @property
+    def pad(self):
+        return self.labelToIdx['<pad>']
+
     @property
     def unk(self):
         return self.labelToIdx['<unk>']
@@ -68,16 +78,26 @@ class Vocab(object):
 
     def getLabel(self, idx, default=None):
         return self.idxToLabel.get(idx, default)
+
+    def add_from_data(self, label, idx=None):
+        if idx:
+            self.idxToLabel[idx] = label
+            self.labelToIdx[label] = idx
+        else:
+            idx = self.add(label)
         
     # Mark this `label` and `idx` as special
-    def addSpecial(self, label, idx=None):
+    def addSpecial(self, label):
         idx = self.add(label)
         self.special += [idx]
 
     # Mark all labels in `labels` as specials
     def addSpecials(self, labels):
         for label in labels:
-            self.addSpecial(label)
+            if isinstance(label, tuple):
+                self.add_from_data(*label)
+            else:
+                self.addSpecial(label)
 
     # Add `label` in the dictionary. Use `idx` as its index if given.
     def add(self, label):
@@ -95,14 +115,16 @@ class Vocab(object):
     # Optionally insert `bosWord` at the beginning and `eosWord` at the .
     def convertToIdx(self, labels, unkWord=None, bosWord=None, eosWord=None):
         if unkWord is None:
-            unkWord = self.unk
+            unk = self.unk
+        else:
+            unk = self.getIndex(unkWord)
 
         vec = []
 
         if bosWord is not None:
             vec += [self.getIndex(bosWord)]
 
-        unk = self.getIndex(unkWord)
+        
         vec += [self.getIndex(label, default=unk) for label in labels]
 
         if eosWord is not None:
@@ -144,5 +166,14 @@ class Vocab(object):
 
             if len(vocab) == size:
                 break
+
+        return vocab
+
+    @staticmethod
+    def from_dict(vocab):
+        vocab = Vocab()
+
+        for key, value in vocab.items():
+            setattr(vocab, key, value)
 
         return vocab
