@@ -1,87 +1,152 @@
-# coding=utf-8
 
-import argparse
 from collections import Counter
 from itertools import chain
-import torch
 
-class VocabEntry(object):
-    def __init__(self):
-        self.word2id = dict()
-        self.unk_id = 3
-        self.word2id['<pad>'] = 0
-        self.word2id['<s>'] = 1
-        self.word2id['</s>'] = 2
-        self.word2id['<unk>'] = 3
+class Vocab(object):
+    def __init__(self, filename=None, data=None, lower=False):
+        self.idxToLabel = {}
+        self.labelToIdx = {}
+        self.lower = lower
 
-        self.id2word = {v: k for k, v in self.word2id.items()}
+        # Special entries will not be pruned.
+        self.special = []
 
-    def __getitem__(self, word):
-        return self.word2id.get(word, self.unk_id)
+        if data is not None:
+            self.addSpecials(data)
+        if filename is not None:
+            self.loadFile(filename)
 
-    def __contains__(self, word):
-        return word in self.word2id
+        self.add('<pad>')
+        self.add('<unk>')
+        self.add('<eos>')
+
+    def __getitem__(self, item):
+            return self.labelToIdx.get(item, self.unk)
+
+    def __contains__(self, item):
+            return item in self.labelToIdx
+
+    @property
+    def size(self):
+        return len(self.idxToLabel)
 
     def __setitem__(self, key, value):
-        raise ValueError('vocabulary is readonly')
+        self.labelToIdx[key] = value
 
     def __len__(self):
-        return len(self.word2id)
+        return len(self.labelToIdx)
 
-    def __repr__(self):
-        return 'Vocabulary[size=%d]' % len(self)
+    def __iter__(self):
+        return iter(list(self.labelToIdx.keys()))
 
-    def id2word(self, wid):
-        return self.id2word[wid]
+    @property
+    def pad(self):
+        return self.labelToIdx['<pad>']
 
-    def add(self, word):
-        if word not in self:
-            wid = self.word2id[word] = len(self)
-            self.id2word[wid] = word
-            return wid
-        else:
-            return self[word]
+    @property
+    def unk(self):
+        return self.labelToIdx['<unk>']
+
+    @property
+    def eos(self):
+        return self.labelToIdx['<eos>']
 
     def is_unk(self, word):
         return word not in self
 
+    def size(self):
+        return len(self.idxToLabel)
+
+    # Load entries from a file.
+    def loadFile(self, filename):
+        idx = 0
+        for line in open(filename, 'r', encoding='utf8', errors='ignore'):
+            token = line.rstrip('\n')
+            self.add(token)
+            idx += 1
+
+    def getIndex(self, key, default=None):
+        key = key.lower() if self.lower else key
+
+        return self.labelToIdx.get(key, default)
+
+    def getLabel(self, idx, default=None):
+        return self.idxToLabel.get(idx, default)
+        
+    # Mark this `label` and `idx` as special
+    def addSpecial(self, label, idx=None):
+        idx = self.add(label)
+        self.special += [idx]
+
+    # Mark all labels in `labels` as specials
+    def addSpecials(self, labels):
+        for label in labels:
+            self.addSpecial(label)
+
+    # Add `label` in the dictionary. Use `idx` as its index if given.
+    def add(self, label):
+        label = label.lower() if self.lower else label
+
+        if label in self.labelToIdx:
+            idx = self.labelToIdx[label]
+        else:
+            idx = len(self.idxToLabel)
+            self.idxToLabel[idx] = label
+            self.labelToIdx[label] = idx
+        return idx
+
+    # Convert `labels` to indices. Use `unkWord` if not found.
+    # Optionally insert `bosWord` at the beginning and `eosWord` at the .
+    def convertToIdx(self, labels, unkWord=None, bosWord=None, eosWord=None):
+        if unkWord is None:
+            unkWord = self.unk
+
+        vec = []
+
+        if bosWord is not None:
+            vec += [self.getIndex(bosWord)]
+
+        unk = self.getIndex(unkWord)
+        vec += [self.getIndex(label, default=unk) for label in labels]
+
+        if eosWord is not None:
+            vec += [self.getIndex(eosWord)]
+
+        return vec
+
+    # Convert `idx` to labels. If index `stop` is reached, convert it and return.
+    def convertToLabels(self, idx, stop=None):
+        labels = []
+
+        for i in idx:
+            labels += [self.getLabel(i)]
+            if i == stop:
+                break
+
+        return labels
+
+
     @staticmethod
-    def from_corpus(corpus, size, freq_cutoff=0):
-        vocab_entry = VocabEntry()
+    def from_corpus(corpus, size=None, freq_cutoff=0):
+        vocab = Vocab()
 
         word_freq = Counter(chain(*corpus))
         non_singletons = [w for w in word_freq if word_freq[w] > 1]
         singletons = [w for w in word_freq if word_freq[w] == 1]
-        print('number of word types: %d, number of word types w/ frequency > 1: %d' % (len(word_freq),
-                                                                                       len(non_singletons)))
-        print('singletons: %s' % singletons)
+        top_k_words = sorted(word_freq.keys(), reverse=True, key=word_freq.get)
 
-        top_k_words = sorted(word_freq.keys(), reverse=True, key=word_freq.get)[:size]
+        if size is not None:
+            top_k_words = top_k_words[:size]
+
         words_not_included = []
+
         for word in top_k_words:
-            if len(vocab_entry) < size:
-                if word_freq[word] >= freq_cutoff:
-                    vocab_entry.add(word)
-                else:
-                    words_not_included.append(word)
+            if word_freq[word] >= freq_cutoff:
+                vocab.add(word)
+            else:
+                words_not_included.append(word)
 
-        print('word types not included: %s' % words_not_included)
+            if len(vocab) == size:
+                break
 
-        return vocab_entry
-
-
-class Vocab(object):
-    def __init__(self, **kwargs):
-        self.entries = []
-        for key, item in kwargs.items():
-            assert isinstance(item, VocabEntry)
-            self.__setattr__(key, item)
-
-            self.entries.append(key)
-
-    def __repr__(self):
-        return 'Vocab(%s)' % (', '.join('%s %swords' % (entry, getattr(self, entry)) for entry in self.entries))
-
-
-if __name__ == '__main__':
-    raise NotImplementedError
+        return vocab

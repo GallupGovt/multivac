@@ -1,10 +1,8 @@
 
 import sys, traceback
 import numpy as np
-from multivac.src.gan.gen_pyt.common.registerable import Registrable
 
 
-@Registrable.register('default_evaluator')
 class Evaluator(object):
     def __init__(self, transition_system=None, args=None):
         self.transition_system = transition_system
@@ -52,7 +50,6 @@ class Evaluator(object):
         return eval_results
 
 
-@Registrable.register('cached_evaluator')
 class CachedExactMatchEvaluator(Evaluator):
     def is_hyp_correct(self, example, hyp):
         raise hyp.is_correct

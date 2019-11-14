@@ -4,45 +4,44 @@ import re
 import numpy as np
 import pickle
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
 from multivac.src.gan.gen_pyt.asdl.hypothesis import *
+from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishASDLGrammar
 from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper \
-    import english_ast_to_asdl_ast, asdl_ast_to_english_ast
+    import english_ast_to_asdl_ast
 from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_transition_system \
     import EnglishTransitionSystem
 
 from multivac.src.gan.gen_pyt.components.action_info \
     import ActionInfo, get_action_infos
 from multivac.src.gan.gen_pyt.components.dataset import Example
-from multivac.src.gan.gen_pyt.components.vocab import Vocab, VocabEntry
+from multivac.src.gan.gen_pyt.components.vocab import Vocab
 
 from multivac.src.gan.gen_pyt.utils.io_utils \
     import serialize_to_file, deserialize_from_file
 
-from multivac.src.rdf_graph.rdf_parse import tokenize_text
+from multivac.src.rdf_graph.rdf_parse import tokenize_text, StanfordParser, stanford_parse
 
 class English(object):
     @staticmethod
-    def canonicalize_example(query, text, parser):
+    def canonicalize_example(text, parser, verbose=False):
         '''
         If we want to do any cleaning on the text, here's where to do it.
         '''
         try:
-            query = stanford_parse(parser, query)
+            parse = stanford_parse(parser, text)
         except:
-            print('Could not parse query: {}'.format(query))
-            return None, None, None
+            print('Could not parse query: {}'.format(text))
+            return None
 
-        try:
-            parse_tree = english_ast_to_asdl_ast(query.parse_string)
-        except: 
-            print("Could not interpret query parse: {}".format(query.parse_string))
-            return None, None, None
+        # try:
+        parse_tree = english_ast_to_asdl_ast(parse.parse_string)
+        # except: 
+        #     print("Could not interpret query parse: {}".format(parse.parse_string))
+        #     return None
 
-        query_tokens = [x.text for x in query.tokens]
-        parse_str = query.parse_string
-
-        return query_tokens, text, parse_str, parse_tree
+        return parse_tree
 
     @staticmethod
     def check_parse(query):
@@ -114,7 +113,7 @@ class English(object):
                 return i
 
     @staticmethod
-    def preprocess_dataset(annot_file, text_file):
+    def preprocess_dataset(annot_file, text_file, verbose=False):
         parser = StanfordParser(annots = "tokenize ssplit parse")
 
         processed_examples = []
@@ -122,28 +121,30 @@ class English(object):
 
         for idx, (src_query, tgt_text) in enumerate(zip(open(annot_file), 
                                                         open(text_file))):
-            src_query = src_query.strip()
+            query_toks = src_query.strip().split()
             tgt_text = tgt_text.strip()
 
-            toks, text, parse_str, tree = English.canonicalize_example(src_query, 
-                                                                       tgt_text, 
-                                                                       parser)
-            productions.update(tree.get_productions())
-            processed_examples.append((toks, text, parse_str, tree))
+            tree = English.canonicalize_example(tgt_text, parser)
 
-        productions = sorted(productions, key=lambda x: x.__repr__)
+            if tree is not None:
+                productions.update(tree.get_productions())
+                processed_examples.append((query_toks, tgt_text, tree))
+
+        productions = sorted(productions, key=lambda x: x.__repr__())
 
         return processed_examples, productions
 
     @staticmethod
-    def parse_english_dataset(annot_file, text_file, 
+    def parse_english_dataset(annot_file, text_file, grammar=None,
                               max_query_len=70, vocab_freq_cutoff=1,
                               train_size=.8, dev_size=.1, test_size=.1):
 
         processed_examples, productions = English.preprocess_dataset(annot_file, 
                                                                      text_file)
 
-        grammar = EnglishASDLGrammar(productions=productions)
+        if grammar is None:
+            grammar = EnglishASDLGrammar(productions=productions)
+
         transition_system = EnglishTransitionSystem(grammar)
 
         serialize_to_file(grammar, 
@@ -154,7 +155,7 @@ class English(object):
         action_len = []
 
         for idx, example in enumerate(processed_examples):
-            toks, text, parse_str, tree = example
+            toks, text, tree = example
 
             if max_query_len is not None:
                 toks = toks[:max_query_len]
@@ -180,42 +181,30 @@ class English(object):
         print('Avg action len: {}'.format(np.average(action_len)))
         print('Actions larger than 100: {}'.format(len(list(filter(lambda x: x > 100, action_len)))))
 
-        src_vocab = VocabEntry.from_corpus([e.src_sent for e in train_examples], 
-                                           size=5000, 
-                                           freq_cutoff=vocab_freq_cutoff)
-
-        primitive_tokens = [map(lambda a: a.action.token,
-                                filter(lambda a: isinstance(a.action, 
-                                                            GenTokenAction), e.tgt_actions))
-                            for e in train_examples]
-
-        primitive_vocab = VocabEntry.from_corpus(primitive_tokens, 
-                                                 size=5000, 
-                                                 freq_cutoff=vocab_freq_cutoff)
-
         # generate vocabulary for the code tokens!
         tokens = [tokenize_text(e.tgt_text) for e in train_examples]
-        tgt_vocab = VocabEntry.from_corpus(tokens, 
-                                           size=5000, 
-                                           freq_cutoff=vocab_freq_cutoff)
+        vocab = Vocab.from_corpus(tokens, freq_cutoff=vocab_freq_cutoff)
 
-        vocab = Vocab(source=src_vocab, 
-                      primitive=primitive_vocab, 
-                      code=tgt_vocab)
         print('generated vocabulary {}'.format(repr(vocab)))
 
-        return (train_examples, dev_examples, test_examples), vocab
+        return (train_examples, dev_examples, test_examples), vocab, grammar
 
     @staticmethod
-    def generate_dataset(annot_file, text_file, grammar):
+    def generate_dataset(annot_file, text_file, grammar=None, max_query_len=None,
+                         vocab_freq_cutoff=1, verbose=False):
         processed_examples, productions = English.preprocess_dataset(annot_file, 
-                                                                     text_file)
+                                                                     text_file,
+                                                                     verbose)
+        if grammar is None:
+            grammar = EnglishASDLGrammar(productions=productions)
+
         transition_system = EnglishTransitionSystem(grammar)
         all_examples = []
         action_len = []
 
-        for idx, example in enumerate(processed_examples):
-            toks, text, parse_str, tree = example
+        for idx, example in tqdm(enumerate(processed_examples), desc='Generating Dataset... '):
+        # for idx, example in enumerate(processed_examples):
+            toks, text, tree = example
 
             if max_query_len is not None:
                 toks = toks[:max_query_len]
@@ -232,22 +221,11 @@ class English(object):
                                         meta={'raw_text': text, 
                                               'str_map': None}))
 
-        return all_examples
+        # generate vocabulary for the tgt_text tokens!
+        tokens = [tokenize_text(e.tgt_text) for e in all_examples]
+        vocab = Vocab.from_corpus(tokens, freq_cutoff=vocab_freq_cutoff)
 
-def generate_vocab_for_paraphrase_model(vocab_path, save_path):
-    from components.vocab import VocabEntry, Vocab
-
-    vocab = pickle.load(open(vocab_path))
-    para_vocab = VocabEntry()
-    for i in range(0, 10):
-        para_vocab.add('<unk_%d>' % i)
-    for word in vocab.source.word2id:
-        para_vocab.add(word)
-    for word in vocab.code.word2id:
-        para_vocab.add(word)
-
-    pickle.dump(para_vocab, open(save_path, 'w'))
-
+        return all_examples, vocab, grammar
 
 if __name__ == '__main__':
     English.parse_english_dataset()

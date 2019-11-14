@@ -1,8 +1,6 @@
 # coding=utf-8
 
-from io import StringIO
-
-from multivac.src.gan.gen_pyt.asdl import *
+from multivac.src.gan.gen_pyt.asdl.asdl import *
 
 
 class AbstractSyntaxTree(object):
@@ -71,37 +69,46 @@ class AbstractSyntaxTree(object):
 
         return productions
 
-    def to_string(self, sb=None):
+    def to_string(self, sb=None, pretty=False, depth=0):
         is_root = False
+
+        tab_depth = '\t' * depth
+
         if sb is None:
             is_root = True
-            sb = StringIO()
+            sb = ''
+        elif pretty:
+            sb += '\n' + tab_depth
 
-        sb.write('(')
-        sb.write(self.production.constructor.name)
+        sb += ('(')
+        sb += (self.production.constructor.name)
 
         for field in self.fields:
-            sb.write(' ')
-            sb.write('(')
-            sb.write(field.type.name)
-            sb.write(Field.get_cardinality_repr(field.cardinality))
-            sb.write('-')
-            sb.write(field.name)
+            if pretty:
+                sb += '\n' + tab_depth
+            sb += (' ')
+            sb += ('(')
+            sb += (field.type.name)
+            sb += (Field.get_cardinality_repr(field.cardinality))
+            sb += ('-')
+            sb += (field.name)
 
             if field.value is not None:
                 for val_node in field.as_value_list:
-                    sb.write(' ')
+                    sb += (' ')
+
                     if isinstance(field.type, ASDLCompositeType):
-                        val_node.to_string(sb)
+                        sb = val_node.to_string(sb, pretty=pretty, depth=depth+1)
                     else:
-                        sb.write(str(val_node).replace(' ', '-SPACE-'))
+                        sb += (str(val_node).replace(' ', '-SPACE-'))
+            else:
+                sb += '<None>'
 
-            sb.write(')')  # of field
+            sb += (')')  # of field
 
-        sb.write(')')  # of node
+        sb += (')')  # of node
 
-        if is_root:
-            return sb.getvalue()
+        return sb
 
     def __hash__(self):
         code = hash(self.production)

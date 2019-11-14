@@ -7,8 +7,7 @@ import math
 
 import torch
 
-from .vocab import Vocab
-
+from gen_pyt.components.vocab import Vocab
 
 # loading GLOVE word vectors
 # if .pth file is found, will load that
@@ -26,7 +25,7 @@ def load_word_vectors(path):
         with open(path, "rb") as f:
             glove = pickle.load(f)
 
-        vectors = torch.from_numpy(glove['embeddings'])
+        vectors = torch.from_numpy(glove['embeddings']).float()
         vocab = Vocab(data=glove['vocab'])
 
         return vocab, vectors

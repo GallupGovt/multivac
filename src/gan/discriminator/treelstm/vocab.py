@@ -1,4 +1,7 @@
-# vocab object from harvardnlp/opennmt-py
+
+from collections import Counter
+from itertools import chain
+
 class Vocab(object):
     def __init__(self, filename=None, data=None, lower=False):
         self.idxToLabel = {}
@@ -18,15 +21,9 @@ class Vocab(object):
         self.add('<eos>')
 
     def __getitem__(self, item):
-        if isinstance(item, int):
-            return self.getLabel(item)
-        else:
-            return self.getIndex(item)
+            return self.labelToIdx.get(item, self.unk)
 
     def __contains__(self, item):
-        if isinstance(item, int):
-            return item in self.idxToLabel
-        else:
             return item in self.labelToIdx
 
     @property
@@ -50,6 +47,9 @@ class Vocab(object):
     def eos(self):
         return self.labelToIdx['<eos>']
 
+    def is_unk(self, word):
+        return word not in self
+
     def size(self):
         return len(self.idxToLabel)
 
@@ -64,17 +64,11 @@ class Vocab(object):
     def getIndex(self, key, default=None):
         key = key.lower() if self.lower else key
 
-        if key in self.labelToIdx:
-            return self.labelToIdx[key]
-        else:
-            return default
+        return self.labelToIdx.get(key, default)
 
     def getLabel(self, idx, default=None):
-        if idx in self.idxToLabel:
-            return self.idxToLabel[idx]
-        else:
-            return default
-
+        return self.idxToLabel.get(idx, default)
+        
     # Mark this `label` and `idx` as special
     def addSpecial(self, label, idx=None):
         idx = self.add(label)
@@ -126,3 +120,29 @@ class Vocab(object):
                 break
 
         return labels
+
+
+    @staticmethod
+    def from_corpus(corpus, size=None, freq_cutoff=0):
+        vocab = Vocab()
+
+        word_freq = Counter(chain(*corpus))
+        non_singletons = [w for w in word_freq if word_freq[w] > 1]
+        singletons = [w for w in word_freq if word_freq[w] == 1]
+        top_k_words = sorted(word_freq.keys(), reverse=True, key=word_freq.get)
+
+        if size is not None:
+            top_k_words = top_k_words[:size]
+
+        words_not_included = []
+
+        for word in top_k_words:
+            if word_freq[word] >= freq_cutoff:
+                vocab.add(word)
+            else:
+                words_not_included.append(word)
+
+            if len(vocab) == size:
+                break
+
+        return vocab

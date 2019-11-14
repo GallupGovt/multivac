@@ -25,12 +25,9 @@ class Trainer(object):
         for idx in tqdm(range(len(dataset)), desc='Training epoch ' + str(self.epoch + 1) + ''):
             tree, inputs, label = dataset[indices[idx]]
             inputs = inputs.to(self.device)
-            label = label.to(self.device)
+            label = label.to(self.device).view(1,1)
             output = self.model(tree, inputs)
-            try:
-                loss = self.criterion(output, label)
-            except:
-                import pdb; pdb.set_trace()
+            loss = self.criterion(output, label)
             total_loss += loss.item()
             loss.backward()
 
@@ -52,9 +49,9 @@ class Trainer(object):
 
             for idx in tqdm(range(len(dataset)), desc='Testing epoch  ' + str(self.epoch) + ''):
                 tree, inputs, label = dataset[idx]
-                inputs, label = inputs.to(self.device), label.to(self.device)
+                inputs, label = inputs.to(self.device), label.to(self.device).view(1,1)
                 output = self.model(tree, inputs)
-                loss = self.criterion(output, label)
+                loss = self.criterion(output.item(), label)
                 total_loss += loss.item()
                 output = output.squeeze().to('cpu')
                 predictions[idx] = torch.round(output)

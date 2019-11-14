@@ -4,7 +4,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-from torch.autograd import Variable
 import numpy as np
 
 
@@ -18,7 +17,7 @@ def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
     # (batch_size, src_sent_len)
     att_weight = torch.bmm(src_encoding_att_linear, h_t.unsqueeze(2)).squeeze(2)
     if mask is not None:
-        att_weight.data.masked_fill_(mask, -float('inf'))
+        att_weight.data.masked_fill_(mask.bool(), -float('inf'))
     att_weight = F.softmax(att_weight, dim=-1)
 
     att_view = (att_weight.size(0), 1, att_weight.size(1))
@@ -67,9 +66,9 @@ def word2id(sents, vocab):
 
 def id2word(sents, vocab):
     if type(sents[0]) == list:
-        return [[vocab.id2word[w] for w in s] for s in sents]
+        return [[vocab.idxToLabel[w] for w in s] for s in sents]
     else:
-        return [vocab.id2word[w] for w in sents]
+        return [vocab.idxToLabel[w] for w in sents]
 
 
 def to_input_variable(sequences, vocab, cuda=False, training=True, append_boundary_sym=False):
@@ -83,7 +82,7 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
     word_ids = word2id(sequences, vocab)
     sents_t = input_transpose(word_ids, vocab['<pad>'])
 
-    sents_var = Variable(torch.LongTensor(sents_t), volatile=(not training), requires_grad=False)
+    sents_var = torch.LongTensor(sents_t)
     if cuda:
         sents_var = sents_var.cuda()
 
@@ -176,7 +175,7 @@ class LabelSmoothing(nn.Module):
     def forward(self, model_prob, target):
         # (batch_size, *, tgt_vocab_size)
         dim = list(model_prob.size())[:-1] + [1]
-        true_dist = Variable(self.one_hot, requires_grad=False).repeat(*dim)
+        true_dist = self.one_hot.repeat(*dim)
         true_dist.scatter_(-1, target.unsqueeze(-1), self.confidence)
         # true_dist = model_prob.data.clone()
         # true_dist.fill_(self.smoothing / (model_prob.size(1) - 1))  # FIXME: no label smoothing for <pad> <s> and </s>
