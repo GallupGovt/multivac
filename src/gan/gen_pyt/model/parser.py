@@ -4,6 +4,7 @@ from collections import OrderedDict
 import math
 import numpy as np
 import os
+import sys
 import time
 
 import torch
@@ -21,6 +22,7 @@ from multivac.src.gan.gen_pyt.model import nn_utils
 from multivac.src.gan.gen_pyt.model.attention_util import AttentionUtil
 from multivac.src.gan.gen_pyt.model.nn_utils import LabelSmoothing
 from multivac.src.gan.gen_pyt.model.pointer_net import PointerNet
+from multivac.src.gan.utilities.vocab import Vocab
 
 from multivac.src.gan.gen_pyt.model.lstm import ParentFeedingLSTMCell
 
@@ -877,15 +879,20 @@ class Parser(nn.Module):
         params = {
             'args': self.args,
             'transition_system': self.transition_system,
-            'vocab': self.vocab,
+            'vocab': self.vocab.__dict__,
             'state_dict': self.state_dict()
         }
         torch.save(params, path)
 
     @classmethod
     def load(cls, model_path, cuda=None):
+        sys.modules['Vocab'] = Vocab
         params = torch.load(model_path, map_location=lambda storage, loc: storage)
         vocab = params['vocab']
+
+        if isinstance(vocab, dict):
+            vocab = Vocab.from_dict(vocab)
+
         transition_system = params['transition_system']
         saved_args = params['args']
         saved_state = params['state_dict']
@@ -894,6 +901,9 @@ class Parser(nn.Module):
             prim_vocab = vocab
         else:
             prim_vocab = params['prim_vocab']
+
+            if isinstance(prim_vocab, dict):
+                prim_vocab = Vocab.from_dict(prim_vocab)
 
         parser = cls(saved_args, vocab, prim_vocab, transition_system)
 

@@ -91,8 +91,8 @@ def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
 
     return Trainer(model.args, model, criterion, optimizer, device)
 
-def generate_samples(net, transition_system, vocab, seq_len, 
-                     generated_num, parser, oracle=False, writeout=False):
+def generate_samples(net, seq_len, generated_num, parser, oracle=False, 
+                     writeout=False):
     samples = [[]] * generated_num
     texts = examples = [''] * generated_num
     max_query_len = 0
@@ -103,13 +103,13 @@ def generate_samples(net, transition_system, vocab, seq_len,
         sample = []
 
         while len(sample) == 0:
-            query = vocab.convertToLabels(random.sample(range(vocab.size()), 
+            query = net.vocab.convertToLabels(random.sample(range(net.vocab.size()), 
                                           seq_len))
             sample = net.parse(query, beam_size=net.args['beam_size'])
 
         text = asdl_ast_to_english(sample[0].tree)
 
-        actions = transition_system.get_actions(sample[0].tree)
+        actions = net.transition_system.get_actions(sample[0].tree)
         tgt_actions = get_action_infos(query, actions)
         example = Example(src_sent=query, tgt_actions=tgt_actions, 
                           tgt_text=text,  tgt_ast=sample[0].tree, idx=i)
@@ -179,7 +179,7 @@ def run(cfg_dict):
 
     args = cfg_dict['ARGS']
 
-    if 'continue' in args:
+    if args['continue']:
         continue_training(cfg_dict, args['gen_chk'], args['disc_chk'])
 
     gargs = cfg_dict['GENERATOR']
@@ -305,8 +305,7 @@ def run(cfg_dict):
     for epoch in range(total_epochs):
         for step in range(g_steps):
             # train generator
-            samples = generate_samples(netG, transition_system, glove_vocab, 
-                                       seq_len, generated_num, parser)
+            samples = generate_samples(netG, seq_len, generated_num, parser)
             hyps, examples = list(zip(*samples))
             step_begin = time.time()
             pgloss = netG.pgtrain(hyps, examples, rollout, netD)
@@ -317,8 +316,7 @@ def run(cfg_dict):
 
         for d_step in range(d_steps):
             # train discriminator
-            _ = generate_samples(netG, transition_system, glove_vocab, 
-                                 seq_len, generated_num, parser, writeout=True)
+            _ = generate_samples(netG, seq_len, generated_num, parser, writeout=True)
             dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
                                            netG.args['sample_dir'],
                                            glove_vocab)
@@ -365,9 +363,6 @@ def continue_training(cfg, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=
 
     parser = StanfordParser(annots="depparse")
 
-    print('\n#####################################################')
-    print('Adversarial training...\n')
-
     if disc_loss is None:
         discriminator_losses = []
     
@@ -375,13 +370,17 @@ def continue_training(cfg, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=
         generator_losses = []
 
     if isinstance(gen_chk, str):
+        gen_params = torch.load(gen_chk)
         netG = Parser.load(gen_chk)
+        optimizer_cls = eval('torch.optim.%s' % netG.args['optimizer'])
+        netG.optimizer = optimizer_cls(netG.parameters(), lr=netG.args['lr'])
+        netG.optimizer.load_state_dict(gen_params['optimizer'])
     else:
         netG = gen_chk
 
     if isinstance(disc_chk, str):
         device = torch.device("cuda" if use_cuda else "cpu")
-        disc_params = torch.load(disc_chk, map_location=lambda storage, loc: storage)
+        disc_params = torch.load(disc_chk)
         netD = QueryGAN_Discriminator(disc_params['args'], netG.vocab)
         netD.load_state_dict(disc_params['state_dict'])
 
@@ -395,19 +394,24 @@ def continue_training(cfg, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=
         elif netD.args['optim'] == 'sgd':
             opt = optim.SGD
 
-        optimizer = opt(netD.parameters(), 
+        optimizer = opt(filter(lambda p: p.requires_grad, netD.parameters()),
                         lr=netD.args['lr'], 
                         weight_decay=netD.args['wd'])
         optimizer.load_state_dict(disc_params['optimizer'])
         trainer = Trainer(netD.args, netD, nn.MSELoss(), optimizer, device)
     else:
         trainer = disc_chk
+        netD = trainer.model
 
-    for epoch in range(total_epochs):
+    rollout = Rollout(netG, update_rate=rollout_update_rate, rollout_num=rollout_num)
+
+    print('\n#####################################################')
+    print('Restarting adversarial training from epoch {}...\n'.format(epoch))
+
+    for ep in range(epoch, total_epochs):
         for step in range(g_steps):
             # train generator
-            samples = generate_samples(netG, transition_system, glove_vocab, 
-                                       seq_len, generated_num, parser)
+            samples = generate_samples(netG, seq_len, generated_num, parser)
             hyps, examples = list(zip(*samples))
             step_begin = time.time()
             pgloss = netG.pgtrain(hyps, examples, rollout, netD)
@@ -418,18 +422,17 @@ def continue_training(cfg, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=
 
         for d_step in range(d_steps):
             # train discriminator
-            _ = generate_samples(netG, transition_system, glove_vocab, 
-                                 seq_len, generated_num, parser, writeout=True)
+            _ = generate_samples(netG, seq_len, generated_num, parser, writeout=True)
             dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
                                            netG.args['sample_dir'],
-                                           glove_vocab)
+                                           netG.vocab)
         
             for k_step in range(k_steps):
                 loss = trainer.train(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
                 
-        save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
+        save_progress(trainer, netG, examples, ep, discriminator_losses, generator_losses)
 
 
 def save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses):
@@ -439,8 +442,8 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
                       'state_dict': netG.state_dict(),
                       'args': netG.args,
                       'transition_system': netG.transition_system,
-                      'vocab': netG.vocab,
-                      'prim_vocab': netG.prim_vocab,
+                      'vocab': netG.vocab.__dict__,
+                      'prim_vocab': netG.prim_vocab.__dict__,
                       'optimizer': netG.optimizer.state_dict()}
     torch.save(gen_checkpoint, gen_save)
 
@@ -496,7 +499,7 @@ if __name__ == '__main__':
                         help='Continue training from a previous checkpoint.')
     parser.add_argument('-g', '--gen_chk', required=False,
                         help='Path to Generator component checkpoint file.')
-    parser.add_argument('-d', '--disc_chk', default=False, action='store_true', 
+    parser.add_argument('-d', '--disc_chk', default=False, 
                         help='Path to Discriminator component checkpoint file.')
 
     all_args = parser.parse_known_args()
