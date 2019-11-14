@@ -5,7 +5,7 @@ from gen_pyt.asdl.lang.eng.eng_asdl_helper import asdl_ast_to_english
 from gen_pyt.model.parser import Parser
 
 from multivac.get_kg_query_params import build_network, analyze_network
-from multivac.src.rdf_graph.map_queries import predicted_object, get_con
+from multivac.src.rdf_graph.map_queries import predicted_object , get_con
 
 
 def get_query_tokens(args):
