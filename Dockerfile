@@ -13,14 +13,15 @@ COPY requirements.txt /multivac/requirements.txt
 WORKDIR /multivac
 
 # set up bdist_wheel
-RUN pip3 install wheel
+RUN pip3 install wheel --no-cache-dir
 
-RUN pip3 install setuptools
+RUN pip3 install setuptools --no-cache-dir
 
-# env setup for tensorflow
-RUN pip3 install -r requirements.txt
+# env setup
+RUN pip3 install torch==1.2.0 --no-cache-dir
+RUN pip3 install -r requirements.txt --no-cache-dir
 
-RUN git clone https://github.com/thunlp/OpenKE && cd OpenKE && sh make.sh
+RUN git clone https://github.com/thunlp/OpenKE && cd OpenKE/openke && sh make.sh
 
 COPY . /multivac
 
