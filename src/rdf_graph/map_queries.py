@@ -14,6 +14,7 @@ import re
 import sys
 import tensorflow as tf
 import torch
+from tqdm import tqdm 
 
 from datetime import datetime
 from multivac.settings import models_dir
@@ -24,7 +25,7 @@ from multivac.src.gan.utilities.vocab import Vocab
 from multivac.src.gan.utilities.utils import load_word_vectors
 from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 def get_best_score(x):
     if isinstance(x, tuple):
@@ -103,7 +104,7 @@ def avg_embed(x, glove):
 
     return np.average(np.vstack(result), axis=0)
 
-def predict_triple(con, h, t, r, threshold=None):
+def predict_triple(con, h, t, r, threshold=0.1):
     con.init_triple_classification()
 
     if con.importName != None:
@@ -237,17 +238,44 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
 
     return readable_result
 
-def predict_object(con, query, relations, entities, glove_vocab, glove_emb, num_top_rel=10, 
-                   max_digits_ent=1000, threshold=.1):
+def predict_object(con, query, relations, entities, train, glove_vocab, glove_emb, num_top_rel=10, 
+                   max_digits_ent=1000, threshold=.1, exact=True):
     top_rel = []
     net_rel = []
+    preds = pd.Series()
 
-    subj = avg_embed(query, glove_vocab, glove_emb)
-    subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
-                                                       subj))
+    if exact:
+        ent_matches = entities[entities.Ent.apply(lambda x: query in x)]
+    else:
+        subj = avg_embed_v2(query, glove_vocab, glove_emb)
+        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, 
+                                                                        glove_vocab, 
+                                                                        glove_emb), 
+                                                           subj))
+        ent_matches = entities[subj_scores>0.85]
 
-    if subj_scores.max() < threshold:
-        subj_id = -1
+    for entity in tqdm(ent_matches.Id, desc="Finding associated triples..."):
+        # get relation and tail portions assuming this is a head
+        get_rels = train[(train.Head==entity) | (train.Tail==entity)]
+        tail_preds = get_rels.Relation.apply(lambda x: (entity, con.predict_tail_entity(entity, x, 2), x))
+        tail_preds = tail_preds.apply(lambda x: (x[0], x[1][0], x[2]) if x[1][0] != entity else (x[0], x[1][1], x[2]))
+        # get relation and head portions assuming this is a tail
+        head_preds = get_rels.Relation.apply(lambda x: (con.predict_head_entity(entity, x, 2), entity, x))
+        head_preds = head_preds.apply(lambda x: (x[0][0], x[1], x[2]) if x[0][0] != entity else (x[0][1], x[1], x[2]))
+        preds = pd.concat([preds, tail_preds, head_preds], ignore_index=True)
+
+    preds = preds.drop_duplicates()
+    print("Assessing accuracies for {} triples.".format(preds.shape[0]))
+    accuracies = preds.apply(lambda x: predict_triple(con, *x, threshold))
+    results = pd.concat([preds, accuracies], ignore_index=True, axis=1)
+    results.columns = ['Triple','Accuracy']
+
+    results = results.sort_values(by='Accuracy', ascending=False).head(num_top_rel)
+    results['Text'] = results.Triple.apply(lambda x: (entities.Ent[entities.Id==x[0]].values[0], 
+                                                      entities.Ent[entities.Id==x[1]].values[0],
+                                                      relations.Rel[relations.Id==x[2]].values[0]))
+
+    return results
 
 
 def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
@@ -441,16 +469,28 @@ def run(args_dict):
             glove_vocab, glove_emb = load_word_vectors(args_dict['glove'])
 
             # identify files for use
-            files = glob.glob(os.path.join(con.in_path,'*.txt'))
-            rel_file = max([file for file in files if re.search('relation', file)],
-                           key=os.path.getctime)
-            ent_file = max([file for file in files if re.search('entity', file)],
-                           key=os.path.getctime)
+            files = [x for x in os.listdir(con.in_path) if '2id' in x]
+            rel_file = sorted([(os.path.getmtime(os.path.join(con.in_path, x)), x)
+                                    for x in files \
+                                    if 'relation' in  x])
+            rel_file = os.path.join(con.in_path, rel_file[-1][1])
+
+            ent_file = sorted([(os.path.getmtime(os.path.join(con.in_path, x)), x)
+                                    for x in files \
+                                    if 'entity' in  x])
+            ent_file = os.path.join(con.in_path, ent_file[-1][1])
+
+            trn_file = sorted([(os.path.getmtime(os.path.join(con.in_path, x)), x)
+                                    for x in files \
+                                    if 'train' in  x])
+            trn_file = os.path.join(con.in_path, trn_file[-1][1])
 
             entities = pd.read_csv(ent_file, sep='\t', 
                                    names=["Ent","Id"], skiprows=1)
             relations = pd.read_csv(rel_file, sep='\t', 
                                     names=["Rel","Id"], skiprows=1)
+            train = pd.read_csv(trn_file, sep='\t', 
+                                names=["Head","Tail","Relation"], skiprows=1)
 
             if os.path.exists(args_dict['search']):
                 queries = pd.read_csv(args_dict['search'])
