@@ -139,7 +139,7 @@ class stanford_token(object):
 
 class stanford_parse(object):
     def __init__(self, parser, sentence, deptype='basicDependencies', 
-                 noop=False, make_tree=False):
+                 noop=False, make_tree=False, sub_rdfs=False):
 
         if isinstance(sentence, str):
             self.text = sentence
@@ -149,7 +149,7 @@ class stanford_parse(object):
             self.parse = sentence
         self.tokens = []
         self.root = 0
-        self.rdfs = []
+        self.rdfs = {}
         self.deps = []
 
         if 'parse' in self.parse:
@@ -157,12 +157,6 @@ class stanford_parse(object):
         else:
             self.parse_string = ''
         
-        if 'openie' in self.parse:
-            self.store_rdfs()
-
-            if self.rdfs == []:
-                self.substitute_rdfs()
-
         if not noop:
             if deptype in self.parse:
                 self.deps = sorted(self.parse[deptype], 
@@ -204,6 +198,11 @@ class stanford_parse(object):
             if make_tree:
                 self.parse_tree = get_eng_tree(self.parse_string)
 
+            if 'openie' in self.parse:
+                self.store_rdfs()
+
+            if sub_rdfs:
+                self.substitute_rdfs()
 
     def __repr__(self):
         return ' '.join(["{}".format(t) for t in self.tokens])
@@ -232,29 +231,39 @@ class stanford_parse(object):
         if how == 'asis':
             result = self.rdfs
         elif how == 'list':
-            result = self.rdfs.copy()
+            result = list(self.rdfs.copy().values())
             
             if not use_tokens:
                 for rdf in result:
-                    rdf = ' '.join(rdf)
+                    for part in ['subject','relation','object']:
+                        rdf[part] = [x.text for x in rdf[part]]
 
-            result = [x for sl in result for x in sl]
-        else:
-            result = []
+        elif how == 'longest':
             longest = 0
             which_long = 0
 
             for rdf in self.rdfs:
+                toks = list(self.rdfs[rdf].values())
                 toks = [x for sl in toks for x in sl]
 
                 if how == 'longest' and len(toks) > longest:
                     longest = len(toks)
-                    result = toks
-                else:
-                    result += toks
+                    which_long = rdf
+
+            result = self.rdfs[which_long]
 
             if not use_tokens:
-                result = ' ::: '.join([x.text for x in result])
+                for part in ['subject','relation','object']:
+                    result[part] = [x.text for x in result[part]]
+        else:
+            result = []
+
+            for rdf in self.rdfs:
+                for part in ['subject','relation','object']:
+                    result.extend(self.rdfs[rdf][part])
+
+            if not use_tokens:
+                result = ' '.join([x.text for x in result])
 
         return result
 
@@ -293,29 +302,11 @@ class stanford_parse(object):
                 if any([child.pos_.startswith(x) for x in pos]):
                     tree_tokens.add(child)
 
-                    # TBD: is it better to stop recursing when we encounter a
-                    #      different type of POS (i.e., keep going if it's a 
-                    #      compound noun/adjective phrase, but stop at 
-                    #      prepositions/adverbs/verbs/etc. if pos=['N','J'])?
-                    #
-                    # if child.has_children:
-                    #     grandkids = self.pos_tree(child, tree_tokens, pos=pos)
-                    #     tree_tokens = tree_tokens.union(grandkids)
-
-                if child.has_children:
-                    grandkids = self.pos_tree(child, tree_tokens, pos=pos)
-                    tree_tokens = tree_tokens.union(grandkids)
+                    if child.has_children:
+                        grandkids = self.pos_tree(child, tree_tokens, pos=pos)
+                        tree_tokens = tree_tokens.union(grandkids)
 
         return sorted(list(tree_tokens))
-
-    def store_rdfs(self):
-        # Legacy code, to store 'official' RDF triples as extracted by OpenIE
-        # if we want to do that again.
-        for rdf in self.parse['openie']:
-            self.rdfs.append((rdf["subject"],
-                              rdf["relation"],
-                              rdf["object"]))
-
 
     def substitute_rdfs(self):
         # Find all nouns (and adjectives) and verbs (and adverbs)
@@ -347,7 +338,7 @@ class stanford_parse(object):
         verbs = [x for x in verbs if len(x) > 0]
 
         if len(nouns) == 1:
-            self.rdfs[0]['subject'] = [int(x.i)-1 for x in nouns[0]]
+            self.rdfs[0]['subject'] = nouns[0]
         else:
             rdfs_idx = 0
 
@@ -360,9 +351,8 @@ class stanford_parse(object):
                                                    "relation": [], 
                                                    "object": []}
 
-                    self.rdfs[rdfs_idx]['subject'] = sorted([int(x.i)-1 
-                                                             for x 
-                                                             in nounlist])
+                    self.rdfs[rdfs_idx]['subject'] = sorted(nounlist, 
+                                                            key=lambda x: x.i)
                 else:
                     if len(self.rdfs[rdfs_idx]['object']) > 0:
                         rdfs_idx += 1
@@ -371,20 +361,17 @@ class stanford_parse(object):
                                                    "relation": [], 
                                                    "object": []}
 
-                    self.rdfs[rdfs_idx]['object'] = sorted([int(x.i)-1 
-                                                            for x 
-                                                            in nounlist])
+                    self.rdfs[rdfs_idx]['object'] = sorted(nounlist, 
+                                                           key=lambda x: x.i)
 
         if len(verbs) == 1:
-            self.rdfs[0]['relation'] = [int(x.i)-1 for x in verbs[0]]
+            self.rdfs[0]['relation'] = verbs[0]
         else:
             rdfs_idx = 0
 
             for verblist in verbs:
-                subj = self.rdfs[rdfs_idx]['subject']
-                obj = self.rdfs[rdfs_idx]['object']
-                if not (self.in_children(verblist, subj) and \
-                   self.in_children(verblist, obj)):
+                if not (self.in_children(verblist, self.rdfs[rdfs_idx]['subject']) or \
+                   self.in_children(verblist, self.rdfs[rdfs_idx]['object'])):
                     rdfs_idx += 1
 
                     if rdfs_idx not in self.rdfs:
@@ -392,18 +379,26 @@ class stanford_parse(object):
                                                "relation": [], 
                                                "object": []}
 
-                self.rdfs[rdfs_idx]['relation'] = sorted([int(x.i)-1 
-                                                          for x 
-                                                          in verblist])
+                self.rdfs[rdfs_idx]['relation'] = sorted(verblist, 
+                                                         key=lambda x: x.i)
+
+    def store_rdfs(self):
+        # Legacy code, to store 'official' RDF triples as extracted by OpenIE
+        # if we want to do that again.
+        for i, rdf in enumerate(self.parse['openie']):
+            self.rdfs[i] = {"subject": rdf["subject"],
+                            "relation": rdf["relation"],
+                            "object": rdf["object"]}
+
 
     def toString(self):
         return ' '.join([t.text for t in self.tokens])
 
 
-def process_texts(parser, texts, clean=False, verbose=False, form='longest'):
+def process_texts(parser, texts, clean=False, verbose=False, form='longest', sub_rdfs=False):
     # Perform basic parsing and extraction on an iterable of sentences
     texts = clean_queries(texts, verbose)
-    sentences = [stanford_parse(parser, text) for text in texts]
+    sentences = [stanford_parse(parser, text, sub_rdfs=sub_rdfs) for text in texts]
     processed = []
 
     for sentence in sentences:
@@ -431,7 +426,8 @@ def run(args_dict):
                                         texts, 
                                         args_dict['clean'],
                                         args_dict['verbose'],
-                                        args_dict['form'])
+                                        args_dict['form'],
+                                        args_dict['sub_rdfs'])
 
         if args_dict['out_file'].upper().endswith(".CSV"):
             result = pd.concat([texts, pd.Series(contents)], axis=1)
@@ -460,6 +456,8 @@ if __name__ == '__main__':
                         help='Method for returning RDF components of queries.')
     parser.add_argument('-c', '--clean', action='store_true',
                         help='Clean queries before processing.')
+    parser.add_argument('-s', '--sub_rdfs', action='store_true',
+                        help='Use substitute RDF parsing for queries.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print verbose output on progress.')
     parser.add_argument('--just_clean', action='store_true',

@@ -2,9 +2,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import warnings
-warnings.filterwarnings("ignore")
-
 import argparse
 import glob
 import json
@@ -27,6 +24,7 @@ from multivac.src.gan.utilities.vocab import Vocab
 from multivac.src.gan.utilities.utils import load_word_vectors
 from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
 
+tf.logging.set_verbosity(tf.logging.ERROR)
 
 def get_best_score(x):
     if isinstance(x, tuple):
@@ -105,6 +103,28 @@ def avg_embed(x, glove):
 
     return np.average(np.vstack(result), axis=0)
 
+def predict_triple(con, h, t, r, threshold=None):
+    con.init_triple_classification()
+
+    if con.importName != None:
+        con.restore_tensorflow()
+
+    result = con.test_step(np.array([h]), np.array([t]), np.array([r]))
+
+    if threshold != None:
+        if result < threshold:
+            result = 0
+    else:
+        con.lib.getValidBatch(con.valid_pos_h_addr, con.valid_pos_t_addr, con.valid_pos_r_addr, con.valid_neg_h_addr, con.valid_neg_t_addr, con.valid_neg_r_addr)
+        res_pos = con.test_step(con.valid_pos_h, con.valid_pos_t, con.valid_pos_r)
+        res_neg = con.test_step(con.valid_neg_h, con.valid_neg_t, con.valid_neg_r)
+        con.lib.getBestThreshold(con.relThresh_addr, res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0])
+
+        if result < con.relThresh[r]:
+            result = 0
+
+    return result
+
 def predict(con, h, r, t, num_top_rel=10, threshold=.1):
     if sum([x == -1 for x in (h, r, t)]) > 1:
         result = [((h,r,t), np.nan)]
@@ -113,22 +133,22 @@ def predict(con, h, r, t, num_top_rel=10, threshold=.1):
         result = []
 
         for head in heads:
-            result.append(((head, r, t), con.predict_triple(head, t, r, threshold)))
+            result.append(((head, r, t), predict_triple(con, head, t, r, threshold)))
 
     elif r == -1:
         rels = con.predict_relation(h, t, num_top_rel)
         result = []
 
         for rel in rels:
-            result.append(((h, rel, t), con.predict_triple(h, t, rel, threshold)))
+            result.append(((h, rel, t), predict_triple(con, h, t, rel, threshold)))
     elif t == -1:
         tails = con.predict_tail_entity(h, r, num_top_rel)
         result = []
 
         for tail in tails:
-            result.append(((h, r, tail), con.predict_triple(h, tail, r)))
+            result.append(((h, r, tail), predict_triple(con, h, tail, r, threshold)))
     else:
-        result = [((h,r,t), con.predict_triple(h, t, r, threshold))]
+        result = [((h,r,t), predict_triple(con, h, t, r, threshold))]
 
     return result
 
@@ -157,7 +177,7 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
     top_obj  = np.ones(num_top_rel)*-1
 
     if len(query['subject']) > 0:
-        subj = avg_embed(query['subject'], glove)
+        subj = avg_embed_v2(query['subject'], glove_vocab, glove_emb)
         subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                            subj))
 
@@ -176,7 +196,7 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
         subj_id = -1
 
     if len(query['object']) > 0:
-        obj = avg_embed(query['object'], glove)
+        obj = avg_embed_v2(query['object'], glove_vocab, glove_emb)
         obj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                           obj))
 
@@ -189,7 +209,7 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
         obj_id = -1
 
     if len(query['relation']) > 0:
-        rel = avg_embed(query['relation'], glove)
+        rel = avg_embed_v2(query['relation'], glove_vocab, glove_emb)
         rel_scores = relations.Rel.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                            rel))
 
@@ -212,7 +232,7 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
         subj = entities.Ent[entities.Id==tup[0][0]].iloc[0]
         rel = relations.Rel[relations.Id==tup[0][1]].iloc[0]
         obj = entities.Ent[entities.Id==tup[0][2]].iloc[0]
-        score = float(tup[1])
+        score = float(tup[1] if tup[1] else 0)
         readable_result.append((subj, rel, obj, score))
 
     return readable_result
@@ -222,7 +242,7 @@ def predict_object(con, query, relations, entities, glove_vocab, glove_emb, num_
     top_rel = []
     net_rel = []
 
-    subj = avg_embed(query, glove)
+    subj = avg_embed(query, glove_vocab, glove_emb)
     subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                        subj))
 
@@ -391,13 +411,13 @@ def run(args_dict):
     if verbose:
         print("Initializing OpenKE system...")
                 
-    # con.init()
+    con.init()
 
-    # # set knowledge embedding model
-    # if verbose:
-    #     print("Setting model...")
-    # kem = set_model_choice(args_dict['model'])
-    # con.set_model(kem)
+    # set knowledge embedding model
+    if verbose:
+        print("Setting model...")
+    kem = set_model_choice(args_dict['model'])
+    con.set_model(kem)
 
     # determine action
     if 'fit' in args_dict['run']:
@@ -435,9 +455,8 @@ def run(args_dict):
             if os.path.exists(args_dict['search']):
                 queries = pd.read_csv(args_dict['search'])
 
-                parse = lambda z: stanford_parse(parser, z).get_rdfs(use_tokens=False, 
-                                                                     how='list')[0]
-                import pdb; pdb.set_trace()
+                parse = lambda z: stanford_parse(parser, z, sub_rdfs=True).get_rdfs(use_tokens=False, 
+                                                                     how='longest')
                 triples = queries.Query.apply(parse)
 
                 results = triples.apply(lambda x: get_answers(con, x, 
