@@ -8,7 +8,7 @@ from flask import (
 	url_for
 )
 
-from src.rdf_graph import map_queries
+from multivac.src.rdf_graph import map_queries
 
 
 app = Flask(__name__)

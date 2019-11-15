@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings("ignore")
 
 import argparse
 from corenlp import CoreNLPClient
@@ -157,8 +159,9 @@ class stanford_parse(object):
         
         if 'openie' in self.parse:
             self.store_rdfs()
-        # self.substitute_rdfs()
-        # self.expand_rdfs()
+
+            if self.rdfs == []:
+                self.substitute_rdfs()
 
         if not noop:
             if deptype in self.parse:
@@ -229,30 +232,23 @@ class stanford_parse(object):
         if how == 'asis':
             result = self.rdfs
         elif how == 'list':
-            result = self.rdfs.copy().values()
+            result = self.rdfs.copy()
+            
             if not use_tokens:
                 for rdf in result:
-                    for part in ['subject', 'relation', 'object']:
-                        rdf[part] = ' '.join([self.tokens[int(t)].text 
-                                          for t 
-                                          in rdf[part]])
+                    rdf = ' '.join(rdf)
 
-            result = [list(x.values()) for x in result]
             result = [x for sl in result for x in sl]
         else:
             result = []
             longest = 0
             which_long = 0
 
-            for idx, rdf in self.rdfs.items():
-                toks = []
-
-                for part in ['subject', 'relation', 'object']:
-                    toks += [self.tokens[int(t)] for t in rdf[part]]
+            for rdf in self.rdfs:
+                toks = [x for sl in toks for x in sl]
 
                 if how == 'longest' and len(toks) > longest:
                     longest = len(toks)
-                    which_long = idx
                     result = toks
                 else:
                     result += toks

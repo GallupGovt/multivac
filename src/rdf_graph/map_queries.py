@@ -1,24 +1,32 @@
 
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+import warnings
+warnings.filterwarnings("ignore")
+
 import argparse
 import glob
 import json
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
+import pandas as pd
 import os
 import re
-import tensorflow as tf
-
-import pandas as pd
 import sys
+import tensorflow as tf
+import torch
 
 from datetime import datetime
-from settings import models_dir
+from multivac.settings import models_dir
 from numpy import array
 from OpenKE import config, models
-from src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+
+from multivac.src.gan.utilities.vocab import Vocab
+from multivac.src.gan.utilities.utils import load_word_vectors
+from multivac.src.rdf_graph.rdf_parse import StanfordParser, stanford_parse
+
 
 def get_best_score(x):
     if isinstance(x, tuple):
@@ -64,6 +72,21 @@ def loadGloveModel(gloveFile=None, verbose=False):
         print("\rDone.             ")
 
     return model
+
+def avg_embed_v2(x, glove_vocab, glove_emb):
+    if isinstance(x, str):
+        x = x.split()
+
+    if not isinstance(x, list):
+        return np.zeros(glove_emb.size(1))
+
+    result = np.zeros((len(x), glove_emb.size(1)))
+
+    for i, word in enumerate(x):
+        if glove_vocab.getIndex(word):
+            result[i, :] = glove_emb[glove_vocab.getIndex(word),:].numpy()
+
+    return np.average(np.vstack(result), axis=0)
 
 def avg_embed(x, glove):
     if isinstance(x, str):
@@ -119,7 +142,7 @@ def cos_sim(u, v):
     
     return result
 
-def get_answers(con, query, glove, entities, relations, 
+def get_answers(con, query, glove_vocab, glove_emb, entities, relations, 
                 num_top_rel=10, threshold=.75):
 
     if 'subject' not in query:
@@ -135,7 +158,7 @@ def get_answers(con, query, glove, entities, relations,
 
     if len(query['subject']) > 0:
         subj = avg_embed(query['subject'], glove)
-        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, glove), 
+        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                            subj))
 
         if subj_scores.max() < threshold:
@@ -154,7 +177,7 @@ def get_answers(con, query, glove, entities, relations,
 
     if len(query['object']) > 0:
         obj = avg_embed(query['object'], glove)
-        obj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, glove), 
+        obj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                           obj))
 
         if obj_scores.max() < threshold:
@@ -167,7 +190,7 @@ def get_answers(con, query, glove, entities, relations,
 
     if len(query['relation']) > 0:
         rel = avg_embed(query['relation'], glove)
-        rel_scores = relations.Rel.apply(lambda x: cos_sim(avg_embed(x, glove), 
+        rel_scores = relations.Rel.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
                                                            rel))
 
         if rel_scores.max() < threshold:
@@ -193,6 +216,18 @@ def get_answers(con, query, glove, entities, relations,
         readable_result.append((subj, rel, obj, score))
 
     return readable_result
+
+def predict_object(con, query, relations, entities, glove_vocab, glove_emb, num_top_rel=10, 
+                   max_digits_ent=1000, threshold=.1):
+    top_rel = []
+    net_rel = []
+
+    subj = avg_embed(query, glove)
+    subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
+                                                       subj))
+
+    if subj_scores.max() < threshold:
+        subj_id = -1
 
 
 def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
@@ -261,9 +296,9 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
                                 if sep_tail:
                                     tail = line_tail.split()[:-1]
                                     string2 = ' '.join(tail)
-                                    print('({}, {}, {})'.format(string0,
-                                                                string1,
-                                                                string2))
+                                    # print('({}, {}, {})'.format(string0,
+                                    #                             string1,
+                                    #                             string2))
                                     acc = con.predict_triple(head_id, tail_id,
                                                              rel_id)
                                     top_rel.append((string0, string1, string2,
@@ -283,7 +318,7 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
         json.dump(nets, f)
 
 
-    print(out)
+    # print(out)
     with open(os.path.join(args_dict['out'],'prediction_{}_{}.json'
               .format(args_dict['search'].replace(' ', '-'),
                       args_dict['timestamp'])), 'w') as f:
@@ -295,15 +330,8 @@ def run(args_dict):
     timestamp = datetime.now().strftime('%d%b%Y-%H:%M:%S')
     verbose = args_dict['verbose']
 
-    if args_dict['threshold'] is None:
-        threshold = 0.1
-    else:
-        threshold = float(args_dict['threshold'])
-
-    if args_dict['num_top_rel'] is None:
-        num_top_rel = 10
-    else:
-        num_top_rel = args_dict['num_top_rel']
+    threshold = float(args_dict['threshold'])
+    num_top_rel = args_dict['num_top_rel']
 
     # check if output directory exists
     if not os.path.isdir(args_dict['out']):
@@ -322,20 +350,9 @@ def run(args_dict):
 
     # fit run-determined parameters
     if 'fit' in args_dict['run']:
-        if args_dict['traintimes'] is None:
-            traintimes = 100
-        else:
-            traintimes = int(args_dict['traintimes'])
-            
-        if args_dict['alpha'] is None:
-            alpha = 0.001
-        else:
-            alpha = float(args_dict['alpha'])
-        
-        if args_dict['nbatches'] is None:
-            nbatches = 100
-        else:
-            nbatches  = int(args_dict['nbatches'])
+        traintimes = int(args_dict['traintimes'])
+        alpha = float(args_dict['alpha'])
+        nbatches  = int(args_dict['nbatches'])
 
         con.set_train_times(traintimes)
         con.set_nbatches(nbatches)
@@ -374,13 +391,13 @@ def run(args_dict):
     if verbose:
         print("Initializing OpenKE system...")
                 
-    con.init()
+    # con.init()
 
-    # set knowledge embedding model
-    if verbose:
-        print("Setting model...")
-    kem = set_model_choice(args_dict['model'])
-    con.set_model(kem)
+    # # set knowledge embedding model
+    # if verbose:
+    #     print("Setting model...")
+    # kem = set_model_choice(args_dict['model'])
+    # con.set_model(kem)
 
     # determine action
     if 'fit' in args_dict['run']:
@@ -394,9 +411,14 @@ def run(args_dict):
         if not args_dict['search']:
             raise Exception('You need to provide a search term.')
         else:
-            parser = StanfordParser()
+            annots =  "tokenize ssplit pos depparse natlog openie ner coref",
+            props  = {"openie.triple.strict": "true",
+                      "openie.openie.resolve_coref": "true"}
 
-            glove = loadGloveModel(args_dict['glove'], verbose)
+            parser = StanfordParser(annots=annots, props=props)
+
+            # glove = loadGloveModel(args_dict['glove'], verbose)
+            glove_vocab, glove_emb = load_word_vectors(args_dict['glove'])
 
             # identify files for use
             files = glob.glob(os.path.join(con.in_path,'*.txt'))
@@ -415,9 +437,12 @@ def run(args_dict):
 
                 parse = lambda z: stanford_parse(parser, z).get_rdfs(use_tokens=False, 
                                                                      how='list')[0]
+                import pdb; pdb.set_trace()
                 triples = queries.Query.apply(parse)
 
-                results = triples.apply(lambda x: get_answers(con, x, glove, 
+                results = triples.apply(lambda x: get_answers(con, x, 
+                                                              glove_vocab, 
+                                                              glove_emb, 
                                                               entities, 
                                                               relations,
                                                               num_top_rel, 
@@ -499,22 +524,24 @@ if __name__ == '__main__':
     parser.add_argument('-r', '--run', required=True, choices=['fit', 'model'],
                         help='Identify choice of action, fitting a model or '
                         'predicting from it.')
-    parser.add_argument('-t', '--threshold', required=False, 
+    parser.add_argument('-t', '--threshold', required=False, default=0.1,
                         help='Threshold accuracy for matches; default is 0.1.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Print verbose output on progress.')
-    parser.add_argument('-n', '--num_top_rel', required=False, 
+    parser.add_argument('-n', '--num_top_rel', required=False, default=10,
                         help='Number of top matches to return; default is 10.')
     parser.add_argument('-s', '--search', required=False, 
                         help='Searches to execute. Either a path to a CSV '
                         'containing triples or a triple in the format '
                         '"subject terms ::: relation terms ::: object terms"')
-    parser.add_argument('-j', '--traintimes', required=False, 
+    parser.add_argument('-j', '--traintimes', required=False, default=100,
                         help='Number of train times (epochs); default is 100')
-    parser.add_argument('-a', '--alpha', required=False, 
+    parser.add_argument('-a', '--alpha', required=False, default=0.001,
                         help='Learning rate; default is 0.001')
-    parser.add_argument('-b', '--nbatches', required=False, 
-                        help='To split the training triples into several batches, nbatches is the number of batches; default is 100')
+    parser.add_argument('-b', '--nbatches', required=False, default=100,
+                        help='To split the training triples into several '
+                             'batches, nbatches is the number of batches; '
+                             'default is 100')
 
     args_dict = vars(parser.parse_args())
 
