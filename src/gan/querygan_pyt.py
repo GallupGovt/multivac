@@ -328,7 +328,8 @@ def run(cfg_dict):
                 
         save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
 
-def continue_training(cfg, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=None, use_cuda=False):
+def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=None, use_cuda=False):
+    args = cfg_dict['ARGS']
     gargs = cfg_dict['GENERATOR']
     dargs = cfg_dict['DISCRIMINATOR']
     gan_args = cfg_dict['GAN']

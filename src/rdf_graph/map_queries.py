@@ -153,6 +153,10 @@ def predict(con, h, r, t, num_top_rel=10, threshold=.1):
 
     return result
 
+def get_newest_file(path, files, term): 
+    tmp = sorted([(os.path.getmtime(os.path.join(path, x)), x) for x in files if term in x])
+    return os.path.join(path, tmp[-1][1])
+
 def cos_sim(u, v):
 
     if all([x==0 for x in u]) or all([x==0 for x in v]):
@@ -470,20 +474,9 @@ def run(args_dict):
 
             # identify files for use
             files = [x for x in os.listdir(con.in_path) if '2id' in x]
-            rel_file = sorted([(os.path.getmtime(os.path.join(con.in_path, x)), x)
-                                    for x in files \
-                                    if 'relation' in  x])
-            rel_file = os.path.join(con.in_path, rel_file[-1][1])
-
-            ent_file = sorted([(os.path.getmtime(os.path.join(con.in_path, x)), x)
-                                    for x in files \
-                                    if 'entity' in  x])
-            ent_file = os.path.join(con.in_path, ent_file[-1][1])
-
-            trn_file = sorted([(os.path.getmtime(os.path.join(con.in_path, x)), x)
-                                    for x in files \
-                                    if 'train' in  x])
-            trn_file = os.path.join(con.in_path, trn_file[-1][1])
+            rel_file = get_newest_file(con.in_path, files, 'relation')
+            ent_file = get_newest_file(con.in_path, files, 'entity')
+            trn_file = get_newest_file(con.in_path, files, 'train')
 
             entities = pd.read_csv(ent_file, sep='\t', 
                                    names=["Ent","Id"], skiprows=1)
