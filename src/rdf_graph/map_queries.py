@@ -72,7 +72,7 @@ def loadGloveModel(gloveFile=None, verbose=False):
 
     return model
 
-def avg_embed_v2(x, glove_vocab, glove_emb):
+def avg_embed(x, glove_vocab, glove_emb):
     if isinstance(x, str):
         x = x.split()
 
@@ -84,23 +84,6 @@ def avg_embed_v2(x, glove_vocab, glove_emb):
     for i, word in enumerate(x):
         if glove_vocab.getIndex(word):
             result[i, :] = glove_emb[glove_vocab.getIndex(word),:].numpy()
-
-    return np.average(np.vstack(result), axis=0)
-
-def avg_embed(x, glove):
-    if isinstance(x, str):
-        x = x.split()
-
-    if not isinstance(x, list):
-        return np.zeros(len(next(iter(glove.values()))))
-
-    rows = len(x)
-    cols = len(next(iter(glove.values())))
-    result = np.zeros((rows, cols))
-
-    for i, word in enumerate(x):
-        if word.lower() in glove:
-            result[i, :] = glove[word.lower()]
 
     return np.average(np.vstack(result), axis=0)
 
@@ -182,8 +165,8 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
     top_obj  = np.ones(num_top_rel)*-1
 
     if len(query['subject']) > 0:
-        subj = avg_embed_v2(query['subject'], glove_vocab, glove_emb)
-        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
+        subj = avg_embed(query['subject'], glove_vocab, glove_emb)
+        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, glove_vocab, glove_emb), 
                                                            subj))
 
         if subj_scores.max() < threshold:
@@ -201,8 +184,8 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
         subj_id = -1
 
     if len(query['object']) > 0:
-        obj = avg_embed_v2(query['object'], glove_vocab, glove_emb)
-        obj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
+        obj = avg_embed(query['object'], glove_vocab, glove_emb)
+        obj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, glove_vocab, glove_emb), 
                                                           obj))
 
         if obj_scores.max() < threshold:
@@ -214,8 +197,8 @@ def get_answers(con, query, glove_vocab, glove_emb, entities, relations,
         obj_id = -1
 
     if len(query['relation']) > 0:
-        rel = avg_embed_v2(query['relation'], glove_vocab, glove_emb)
-        rel_scores = relations.Rel.apply(lambda x: cos_sim(avg_embed_v2(x, glove_vocab, glove_emb), 
+        rel = avg_embed(query['relation'], glove_vocab, glove_emb)
+        rel_scores = relations.Rel.apply(lambda x: cos_sim(avg_embed(x, glove_vocab, glove_emb), 
                                                            rel))
 
         if rel_scores.max() < threshold:
@@ -251,8 +234,8 @@ def predict_object(con, query, relations, entities, train, glove_vocab, glove_em
     if exact:
         ent_matches = entities[entities.Ent.apply(lambda x: query in x)]
     else:
-        subj = avg_embed_v2(query, glove_vocab, glove_emb)
-        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed_v2(x, 
+        subj = avg_embed(query, glove_vocab, glove_emb)
+        subj_scores = entities.Ent.apply(lambda x: cos_sim(avg_embed(x, 
                                                                         glove_vocab, 
                                                                         glove_emb), 
                                                            subj))
@@ -348,9 +331,6 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
                                 if sep_tail:
                                     tail = line_tail.split()[:-1]
                                     string2 = ' '.join(tail)
-                                    # print('({}, {}, {})'.format(string0,
-                                    #                             string1,
-                                    #                             string2))
                                     acc = con.predict_triple(head_id, tail_id,
                                                              rel_id)
                                     top_rel.append((string0, string1, string2,
@@ -370,7 +350,6 @@ def predicted_object(con, query, num_top_rel=10, max_digits_ent=1000,
         json.dump(nets, f)
 
 
-    # print(out)
     with open(os.path.join(args_dict['out'],'prediction_{}_{}.json'
               .format(args_dict['search'].replace(' ', '-'),
                       args_dict['timestamp'])), 'w') as f:
