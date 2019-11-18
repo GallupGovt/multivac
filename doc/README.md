@@ -5,17 +5,10 @@ This page serves as an index of system design, theory, and walk through document
 - <a href='https://github.com/GallupGovt/multivac/tree/master/doc/phase_two_developments.md'>Phase II Developments</a>
 
 ## Phase I Development - System Overview
-### Data Acquisition and Parsing
-- <a href='https://github.com/GallupGovt/multivac/tree/master/src/data'>Introduction</a> and overview of initial data acquisition from online repositories and preprocessing steps. 
-### Markov Logic Network Induction
-- <a href='https://github.com/GallupGovt/multivac/tree/master/pymln'>Construction</a> of the knowledge graph representation in the form of a Markov Logic Network.
-### System Walk-Through (Jupyter Notebook)
-- <a href='https://github.com/GallupGovt/multivac/tree/master/precooked_replication.ipynb'>Piece-by-Piece Execution</a>
-### Query Mapping
-- <a href='https://github.com/GallupGovt/multivac/tree/master/prepared_output.ipynb'>Query Mapping Execution</a>
-### Phase I Lessons Learned
-- <a href='https://github.com/GallupGovt/multivac/blob/master/doc/lessons_learned.md'>Review</a> of lessons learned from implementing Phase I systems.
-<br>
+- System Walk-Through (Jupyter Notebook): <a href='https://github.com/GallupGovt/multivac/tree/master/precooked_replication.ipynb'>Piece-by-Piece Execution</a>
+- Markov Logic Network Induction: <a href='https://github.com/GallupGovt/multivac/tree/master/pymln'>Construction</a> of the knowledge graph representation in the form of a Markov Logic Network.
+- Query Mapping: <a href='https://github.com/GallupGovt/multivac/tree/master/prepared_output.ipynb'>Query Mapping Execution</a>
+- Phase I Lessons Learned: <a href='https://github.com/GallupGovt/multivac/blob/master/doc/lessons_learned.md'>Review</a> of lessons learned from implementing Phase I systems.
 
 ## ASKE Community
 - MULTIVAC in the <a href='https://github.com/GallupGovt/multivac/blob/master/doc/aske_context.md'>ASKE Context</a>
@@ -25,7 +18,6 @@ This page serves as an index of system design, theory, and walk through document
 ## Related Research and Resources
 - GANs for Text Generation: <a href='https://paperswithcode.com/search?q=gan+text'>paperswithcode.com</a>
 - Markov Logic Networks <a href='https://paperswithcode.com/search?q=markov+logic+network'>paperswithcode.com</a>
-
 
 For more information please contact Principal Investigator, Benjamin Ryan (ben_ryan@gallup.com).
 
