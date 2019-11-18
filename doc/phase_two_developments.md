@@ -1,3 +1,63 @@
+## GAN System Development
+As the central effort in Phase II, MULTIVAC will train a Generative Adversarial Network (GAN) to produce well-formed, novel expert queries without human intervention. While GAN modeling and development has historically been dominated by image generation efforts, in the past couple years there have been increasing numbers of attempts to develop GAN models for text generation. Development of GANs for sequence generation lagged behind in large part because the discrete outputs (words/tokens in a sequence) from the generative model make it difficult to pass the gradient update from the discriminative model to the generative model. The generative model wants to apply gradient loss to its outputs to improve, shifting the output incrementally in one direction or another. But where in continuous data such as images these incremental changes can still make a sort of sense, in the case of sequences of discrete tokens this approach is nonsensical. Similarly, gradient loss is typically only calculated for the entire generated sequence. 
+
+In recent years, however, several approaches have been introduced to avoid or alleviate these problems in sequence generating GANs. In one of the first published attempts at generating English language sentences, instead of using the standard objective of GANs, researchers sought to match sequence feature distributions when training their generator and used various techniques to pre-train the model and handle discrete intermediate variables.
+
+In the influential paper introducing SeqGAN, researchers tried modeling the data generator as a stochastic policy in reinforcement learning. This allowed the system to bypass the token/sequence gradient loss problem by directly performing gradient policy update. The reinforcement learning reward signal from the GAN discriminator scoring complete sequences is then passed back to the generator using Monte Carlo search. 
+
+Subsequent attempts at sequence generation have generally adopted this basic loss function approach, adding features to encourage more accurate longer sequences through “leaking” information from the discriminator to the generator, or using variational autoencoders to encourage greater variety in the generated sequences. However, sequences generated from all of these approaches still suffer from significant quality issues in terms of syntactic coherence.
+
+For MULTIVAC’s (and ASKE’s) goals, generating the kind of sequences we see above will not suffice. MULTIVAC’s output must be not only domain relevant but coherent, literate and complex if it is to be useful and interesting to advanced researchers. Our system will need to generate sequences in natural language in line with its corresponding grammar. 
+
+### Next Generation Syntax-Aware GAN System
+
+<img align="center" src="https://github.com/GallupGovt/multivac/blob/master/images/gan_design.png" alt="GAN Schematic">
+
+Our approach builds off this recent work in graph neural networks and tree-based LSTM implementations. Building in knowledge about the dependency tree structures in our training data and desired outputs helps construct syntactically correct queries. Recent work in this area has produced promising results combining source texts with context-free grammar production rule sets to generate realistic SQL or Python programming code.
+
+We begin with an architecture modeled after the recently developed TreeGAN system, employing a long short-term memory recurrent neural network system (LSTM) as our generator to produce parse trees which can then be translated to a valid English-language sequence in the given grammar. Our discriminator employs a tree-structured LSTM network to delineate generated trees from real parse trees. In the original TreeGAN system, grammar information is fed into the system by converting source Python and SQL code into their abstract syntax tree (AST) representations and then assembling a library of grammar production rules by induction. These rules then constrain the generator in the sequences it produces. 
+
+We anticipated that the compilation of English grammar production rules would prove a complex and potentially laborious task. However, on further investigation this task was not terribly complex at all. The key factor in our favor here is that our grammar production rules do not have to be necessary and sufficient to reproduce all possible English sentences, or even all possible English questions. Rather, they have to be suitably comprehensive to produce the types of questions from which they were derived, which is no more or less than our objective.
+
+To build our abridged English grammar system, we employ Stanford’s NLP engine once again to perform a constituency parse on each query in turn and represent this parse in an abstract syntax tree structure. The system then traverses the tree in a depth-first, left-to-right sequence defining each parent-child pair as a valid production rule and builds up a full set of unique production rules from the corpus of queries.
+
+<table>
+  <tr BGCOLOR=#89BC00>
+    <th>Query</th>
+    <th>Parse</th>
+    <th>Production Rules</th>
+  </tr>
+  <tr>
+    <td>What virus can lead to <br>certain cervical cancers?</td>
+    <td>(SBARQ<br>
+            &nbsp; &nbsp; (WHNP (WDT What) (NN virus))<br>
+            &nbsp; &nbsp; (SQ (MD can)<br>
+            &nbsp; &nbsp; &nbsp; &nbsp; (VP (VB lead)<br>
+            &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (PP (IN to)<br>
+            &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (NP (JJ certain) (JJ cervical) (NNS cancers)))))<br>
+            &nbsp; &nbsp; (. ?)))</td>
+    <td>(SBARQ) -> (WHNP), (SQ), (.)<br>
+        (WHNP) -> (WDT), (NN)<br>
+        (SQ) -> (MD), (VP)<br>
+        (VP) -> (VB), (PP)<br>
+        (PP) -> (IN), (NP)<br>
+        (NP) -> (JJ), (JJ), (NNS)</td>
+  </tr>
+</table>
+
+You can follow a walk-through of the QueryGAN training algorithm <a href="https://github.com/GallupGovt/multivac/blob/master/gan_training_illustration.ipynb">here</a>. 
+
+### Knowledge Graph Embeddings for Directing Query Generation
+Two other inputs are required for the generator portion of the system we are adapting, consisting of annotations (in the original TreeGAN, these were "docstrings" describing code functionality and/or outputs) and the actual target sequences. The system then performs a form of sequence-to-sequence translation, with the grammar production rules as constraints on the outputs.
+
+Our system will seek to output English language scientific queries, so our training library of queries serves as the model for our target output sequences. For the left-hand side of this equation, we aim to supply the raw semantic compnents extracted from these queries - either as subject-object-predicate triples, or as . This sets up the system to relatively straight-forwardly build correct syntax around supplied bundles of semantic concepts in order to generate queries.
+
+One persistent but unaddressed question behind the query generation task from the beginning has been how to constrain the solution space for generated queries to those that are both coherent and useful. But here, the practice of employing graph embeddings to infer missing portions of knowledge graphs comes to our rescue. If we treat any particular knowledge graph as an incomplete version of the “Platonic truth” graph that would exist in a state of perfect knowledge, we can attempt to recover those missing portions of the graph with a variety of techniques leveraging local and global graph structures. These “missing” network components can then form the complete or partial subject-predicate-object triples that feed into our query generation system, representing these automated inferences as well-formed natural language scientific questions.
+
+While this system presupposes a knowledge graph constructed along the lines of our interim system and not a MLN, all of these can be adapted to use a MLN as the underlying knowledge graph as well. Whereas our interim system employs more conceptually simplistic subject- predicate-object triples, the MLN structure is fundamentally similar, with the exception of adding weights to the edges. This informs the process of learning and inference on the network, but not the basic mechanics of parsing queries and using the semantic components as inputs to be syntactically organized by our generator. And while most work on knowledge graph embedding has focused on more standard RDF-triple based graphs, recent work points to significant improvements on benchmark dataset performance in applying these techniques to MLN knowledge graphs.
+
+You can follow a walk-through of knowledge-graph directed query generation <a href="https://github.com/GallupGovt/multivac/blob/master/pure_generation_walkthrough.ipynb">here</a>.
+
 ## Knowledge Graph Developments
 Coming out of Phase I and our Lessons Learned reviews this past summer, it was clear that reducing the complexities of our knowledge representation system could pay significant dividends for performance and inference, as well as streamline work toward developing the GAN query generation system.
 
@@ -141,70 +201,10 @@ Table 1: MULTIVAC Query Set Statistics, by method of extraction
     <td>2</td>
   </tr>
 </table>
-* Calculated as the number of words or tokens per query
-** Calculated as the number of grammatical errors per token, per query
+* Calculated as the number of words or tokens per query <br>
+** Calculated as the number of grammatical errors per token, per query<br>
 
 Using the TextRank approach does not substantially affect complexity or coherence in the queries returned compared of the original pure TF-IDF driven extraction, though this method makes more use of the complete semantic relationships in the text. However, compared to the literal queries pulled from the text, both the machine-driven methods return much less complex results (on the order of 10 words/tokens per query on average, compared with about 20 in the literal queries). They are also more likely to include grammatical errors, 60% more on average. 
 
 While these results are not terribly surprising, they do point to a significant and ongoing problem with sequence generation approaches, namely that the complex and intertwined syntactical rules and semantic relationships in natural language text are still very difficult for even advanced deep learning systems to reliably reproduce. This concern drives our focus on tree based, syntax-aware GAN approaches for MULTIVAC.
-
-## GAN System Development
-As the central effort in Phase II, MULTIVAC will train a Generative Adversarial Network (GAN) to produce well-formed, novel expert queries without human intervention. While GAN modeling and development has historically been dominated by image generation efforts, in the past couple years there have been increasing numbers of attempts to develop GAN models for text generation. Development of GANs for sequence generation lagged behind in large part because the discrete outputs (words/tokens in a sequence) from the generative model make it difficult to pass the gradient update from the discriminative model to the generative model. The generative model wants to apply gradient loss to its outputs to improve, shifting the output incrementally in one direction or another. But where in continuous data such as images these incremental changes can still make a sort of sense, in the case of sequences of discrete tokens this approach is nonsensical. Similarly, gradient loss is typically only calculated for the entire generated sequence. 
-
-In recent years, however, several approaches have been introduced to avoid or alleviate these problems in sequence generating GANs. In one of the first published attempts at generating English language sentences, instead of using the standard objective of GANs, researchers sought to match sequence feature distributions when training their generator and used various techniques to pre-train the model and handle discrete intermediate variables.
-
-In the influential paper introducing SeqGAN, researchers tried modeling the data generator as a stochastic policy in reinforcement learning. This allowed the system to bypass the token/sequence gradient loss problem by directly performing gradient policy update. The reinforcement learning reward signal from the GAN discriminator scoring complete sequences is then passed back to the generator using Monte Carlo search. 
-
-Subsequent attempts at sequence generation have generally adopted this basic loss function approach, adding features to encourage more accurate longer sequences through “leaking” information from the discriminator to the generator, or using variational autoencoders to encourage greater variety in the generated sequences. However, sequences generated from all of these approaches still suffer from significant quality issues in terms of syntactic coherence.
-
-For MULTIVAC’s (and ASKE’s) goals, generating the kind of sequences we see above will not suffice. MULTIVAC’s output must be not only domain relevant but coherent, literate and complex if it is to be useful and interesting to advanced researchers. Our system will need to generate sequences in natural language in line with its corresponding grammar. 
-
-### Next Generation Syntax-Aware GAN System
-
-<img align="center" src="images/gan_design.png" alt="GAN Schematic">
-
-Our approach builds off this recent work in graph neural networks and tree-based LSTM implementations. Building in knowledge about the dependency tree structures in our training data and desired outputs helps construct syntactically correct queries. Recent work in this area has produced promising results combining source texts with context-free grammar production rule sets to generate realistic SQL or Python programming code.
-
-We begin with an architecture modeled after the recently developed TreeGAN system, employing a long short-term memory recurrent neural network system (LSTM) as our generator to produce parse trees which can then be translated to a valid English-language sequence in the given grammar. Our discriminator employs a tree-structured LSTM network to delineate generated trees from real parse trees. In the original TreeGAN system, grammar information is fed into the system by converting source Python and SQL code into their abstract syntax tree (AST) representations and then assembling a library of grammar production rules by induction. These rules then constrain the generator in the sequences it produces. 
-
-We anticipated that the compilation of English grammar production rules would prove a complex and potentially laborious task. However, on further investigation this task was not terribly complex at all. The key factor in our favor here is that our grammar production rules do not have to be necessary and sufficient to reproduce all possible English sentences, or even all possible English questions. Rather, they have to be suitably comprehensive to produce the types of questions from which they were derived, which is no more or less than our objective.
-
-To build our abridged English grammar system, we employ Stanford’s NLP engine once again to perform a constituency parse on each query in turn and represent this parse in an abstract syntax tree structure. The system then traverses the tree in a depth-first, left-to-right sequence defining each parent-child pair as a valid production rule and builds up a full set of unique production rules from the corpus of queries.
-
-<table>
-  <tr BGCOLOR=#89BC00>
-    <th>Query</th>
-    <th>Parse</th>
-    <th>Production Rules</th>
-  </tr>
-  <tr>
-    <td>What virus can lead to <br>certain cervical cancers?</td>
-    <td>(SBARQ<br>
-            &nbsp; &nbsp; (WHNP (WDT What) (NN virus))<br>
-            &nbsp; &nbsp; (SQ (MD can)<br>
-            &nbsp; &nbsp; &nbsp; &nbsp; (VP (VB lead)<br>
-            &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (PP (IN to)<br>
-            &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; (NP (JJ certain) (JJ cervical) (NNS cancers)))))<br>
-            &nbsp; &nbsp; (. ?)))</td>
-    <td>(SBARQ) -> (WHNP), (SQ), (.)<br>
-        (WHNP) -> (WDT), (NN)<br>
-        (SQ) -> (MD), (VP)<br>
-        (VP) -> (VB), (PP)<br>
-        (PP) -> (IN), (NP)<br>
-        (NP) -> (JJ), (JJ), (NNS)</td>
-  </tr>
-</table>
-
-You can follow a walk-through of the QueryGAN training algorithm <a href="https://github.com/GallupGovt/multivac/blob/master/gan_training_illustration.ipynb">here</a>. 
-
-### Knowledge Graph Embeddings for Directing Query Generation
-Two other inputs are required for the generator portion of the system we are adapting, consisting of annotations (in the original TreeGAN, these were "docstrings" describing code functionality and/or outputs) and the actual target sequences. The system then performs a form of sequence-to-sequence translation, with the grammar production rules as constraints on the outputs.
-
-Our system will seek to output English language scientific queries, so our training library of queries serves as the model for our target output sequences. For the left-hand side of this equation, we aim to supply the raw semantic compnents extracted from these queries - either as subject-object-predicate triples, or as . This sets up the system to relatively straight-forwardly build correct syntax around supplied bundles of semantic concepts in order to generate queries.
-
-One persistent but unaddressed question behind the query generation task from the beginning has been how to constrain the solution space for generated queries to those that are both coherent and useful. But here, the practice of employing graph embeddings to infer missing portions of knowledge graphs comes to our rescue. If we treat any particular knowledge graph as an incomplete version of the “Platonic truth” graph that would exist in a state of perfect knowledge, we can attempt to recover those missing portions of the graph with a variety of techniques leveraging local and global graph structures. These “missing” network components can then form the complete or partial subject-predicate-object triples that feed into our query generation system, representing these automated inferences as well-formed natural language scientific questions.
-
-While this system presupposes a knowledge graph constructed along the lines of our interim system and not a MLN, all of these can be adapted to use a MLN as the underlying knowledge graph as well. Whereas our interim system employs more conceptually simplistic subject- predicate-object triples, the MLN structure is fundamentally similar, with the exception of adding weights to the edges. This informs the process of learning and inference on the network, but not the basic mechanics of parsing queries and using the semantic components as inputs to be syntactically organized by our generator. And while most work on knowledge graph embedding has focused on more standard RDF-triple based graphs, recent work points to significant improvements on benchmark dataset performance in applying these techniques to MLN knowledge graphs.
-
-You can follow a walk-through of knowledge-graph directed query generation <a href="https://github.com/GallupGovt/multivac/blob/master/pure_generation_walkthrough.ipynb">here</a>.
 

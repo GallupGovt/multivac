@@ -11,7 +11,7 @@ DARPA’s Information Innovation Office’s Automating Scientific Knowledge Extr
 
 ## System Documentation
 - <a href="https://github.com/GallupGovt/multivac/tree/master/doc#phase-i-development---system-overview">Phase I Development</a>
-- <a href='https://github.com/GallupGovt/multivac/tree/master/doc/phase_two_development.md'>Phase II Developments</a>
+- <a href='https://github.com/GallupGovt/multivac/tree/master/doc/phase_two_developments.md'>Phase II Developments</a>
 
 ## Conclusion
 The MULTIVAC system is still in development along several lines of effort. Subsequent to that milestone the development process will expose MULTIVAC to expert epidemiological research community for evaluation and improvement. Additionally, Gallup will explore a variety of avenues for optimization and improvements in terms of computational efficiencies, semantic representational precision and accuracy, and usability. MULTIVAC’s prototype iterations will be largely command line driven, but a more fully formed version should include web and/or graphical interfaces to encourage a broader user community across domains.
