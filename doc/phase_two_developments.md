@@ -202,9 +202,10 @@ Table 1: MULTIVAC Query Set Statistics, by method of extraction
   </tr>
 </table>
 * Calculated as the number of words or tokens per query <br>
-** Calculated as the number of grammatical errors per token, per query<br>
+* * Calculated as the number of grammatical errors per token, per query
 
-<p>Using the TextRank approach does not substantially affect complexity or coherence in the queries returned compared of the original pure TF-IDF driven extraction, though this method makes more use of the complete semantic relationships in the text. However, compared to the literal queries pulled from the text, both the machine-driven methods return much less complex results (on the order of 10 words/tokens per query on average, compared with about 20 in the literal queries). They are also more likely to include grammatical errors, 60% more on average. 
+
+<br>Using the TextRank approach does not substantially affect complexity or coherence in the queries returned compared of the original pure TF-IDF driven extraction, though this method makes more use of the complete semantic relationships in the text. However, compared to the literal queries pulled from the text, both the machine-driven methods return much less complex results (on the order of 10 words/tokens per query on average, compared with about 20 in the literal queries). They are also more likely to include grammatical errors, 60% more on average. 
 
 While these results are not terribly surprising, they do point to a significant and ongoing problem with sequence generation approaches, namely that the complex and intertwined syntactical rules and semantic relationships in natural language text are still very difficult for even advanced deep learning systems to reliably reproduce. This concern drives our focus on tree based, syntax-aware GAN approaches for MULTIVAC.
 
