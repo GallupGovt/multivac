@@ -73,11 +73,12 @@ class Parser(nn.Module):
         nn.init.xavier_normal_(self.field_embed.weight.data)
         nn.init.xavier_normal_(self.type_embed.weight.data)
 
-        # LSTMs
-
-        self.encoder_lstm = nn.LSTM(args['embed_size'], 
-                                    int(args['hidden_size'] / 2), 
-                                    bidirectional=True)
+        # Encoder CNN + Decoder LSTM
+        self.encoder_cnn = nn.Sequential(
+                    nn.Conv1d(in_channels = args['batch_size'], out_channels = args['batch_size'],  
+                        kernel_size = 3, stride = 1, padding = 65),
+                    nn.ReLU(inplace = True),
+                    nn.BatchNorm1d(args['batch_size']))
 
         # previous action
         input_dim = args['action_embed_size']
@@ -115,6 +116,8 @@ class Parser(nn.Module):
 
         # initialize the decoder's state and cells with encoder hidden states
         self.decoder_cell_init = nn.Linear(args['hidden_size'], args['hidden_size'])
+
+        
 
         # attention: dot product attention
         # project source encoding to decoder RNN's hidden space
@@ -213,19 +216,29 @@ class Parser(nn.Module):
             src_sents_var = src_sents_var * mask + (1 - mask) * self.vocab.unk
 
         src_token_embed = self.src_embed(src_sents_var)
-        packed_src_token_embed = pack_padded_sequence(src_token_embed, 
-                                                      src_sents_len)
 
-        # src_encodings: (tgt_query_len, batch_size, hidden_size)
-        src_encodings, (last_state, last_cell) = self.encoder_lstm(packed_src_token_embed)
-        src_encodings, _ = pad_packed_sequence(src_encodings)
-        # src_encodings: (batch_size, tgt_query_len, hidden_size)
+        src_encodings = self.encoder_cnn(src_token_embed)
+
         src_encodings = src_encodings.permute(1, 0, 2)
 
-        # (batch_size, hidden_size * 2)
-        last_state = torch.cat([last_state[0], last_state[1]], 1)
-        last_cell = torch.cat([last_cell[0], last_cell[1]], 1)
+        # packed_src_token_embed = pack_padded_sequence(src_token_embed, 
+        #                                               src_sents_len)
 
+        # src_encodings: (tgt_query_len, batch_size, hidden_size)
+        last_cell = src_encodings[:, -1, :]
+        last_state = src_encodings[: , -1, :]
+
+        #src_encodings, _ = pad_packed_sequence(src_encodings)
+
+
+        # src_encodings: (batch_size, tgt_query_len, hidden_size)
+        #src_encodings = src_encodings.permute(1, 0, 2)
+
+
+        # (batch_size, hidden_size * 2)
+        #last_state = torch.cat([last_state[0], last_state[1]], 1)
+        #last_cell = torch.cat([last_cell[0], last_cell[1]], 1)
+        
         return src_encodings, (last_state, last_cell)
 
     def init_decoder_state(self, enc_last_state, enc_last_cell):
@@ -233,7 +246,7 @@ class Parser(nn.Module):
 
         h_0 = self.decoder_cell_init(enc_last_cell)
         h_0 = torch.tanh(h_0)
-
+        
         return h_0, self.new_tensor(h_0.size()).zero_()
 
     def score(self, examples, return_encode_state=False):
@@ -257,11 +270,12 @@ class Parser(nn.Module):
         # (last_state, last_cell, dec_init_vec): (batch_size, hidden_size)
         src_encodings, (last_state, last_cell) = self.encode(batch.src_sents_var, 
                                                              batch.src_sents_len)
+        
         dec_init_vec = self.init_decoder_state(last_state, last_cell)
 
         # query vectors are sufficient statistics used to compute action 
         # probabilities query_vectors: (tgt_action_len, batch_size, hidden_size)
-
+        
         # if use supervised attention
         if self.args['sup_attention']:
             query_vectors, att_prob = self.decode(batch, 
@@ -270,10 +284,10 @@ class Parser(nn.Module):
         else:
             query_vectors = self.decode(batch, src_encodings, dec_init_vec)
 
+        
         # ApplyRule (i.e., ApplyConstructor) action probabilities
         # (tgt_action_len, batch_size, grammar_size)
-        apply_rule_prob = F.softmax(self.production_readout(query_vectors), 
-                                    dim=-1)
+        apply_rule_prob = F.softmax(self.production_readout(query_vectors), dim=-1)
 
         # probabilities of target (gold-standard) ApplyRule actions
         # (tgt_action_len, batch_size)
