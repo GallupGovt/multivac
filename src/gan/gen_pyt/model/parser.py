@@ -240,6 +240,7 @@ class Parser(nn.Module):
         #last_cell = torch.cat([last_cell[0], last_cell[1]], 1)
         
         return src_encodings, (last_state, last_cell)
+        
 
     def init_decoder_state(self, enc_last_state, enc_last_cell):
         """Compute the initial decoder hidden state and cell state"""
