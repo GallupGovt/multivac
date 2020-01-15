@@ -75,10 +75,10 @@ class Parser(nn.Module):
 
         # Encoder CNN + Decoder LSTM
         self.encoder_cnn = nn.Sequential(
-                    nn.Conv1d(in_channels = args['batch_size'], out_channels = args['batch_size'],  
-                        kernel_size = 3, stride = 1, padding = 65),
+                    nn.Conv1d(in_channels = args['embed_size'], out_channels = args['hidden_size'],  
+                        kernel_size = 3, stride = 1, padding = 1),
                     nn.ReLU(inplace = True),
-                    nn.BatchNorm1d(args['batch_size']))
+                    nn.BatchNorm1d(args['hidden_size']))
 
         # previous action
         input_dim = args['action_embed_size']
@@ -117,7 +117,8 @@ class Parser(nn.Module):
         # initialize the decoder's state and cells with encoder hidden states
         self.decoder_cell_init = nn.Linear(args['hidden_size'], args['hidden_size'])
 
-    
+        
+
         # attention: dot product attention
         # project source encoding to decoder RNN's hidden space
 
@@ -214,18 +215,26 @@ class Parser(nn.Module):
                     1. - self.args['word_dropout']).bernoulli().long()
             src_sents_var = src_sents_var * mask + (1 - mask) * self.vocab.unk
 
+
         src_token_embed = self.src_embed(src_sents_var)
 
-        src_encodings = self.encoder_cnn(src_token_embed)
+        src_token_embed = src_token_embed.permute(1, 2, 0)
+        
 
-        src_encodings = src_encodings.permute(1, 0, 2)
+        src_encodings = self.encoder_cnn(src_token_embed)
+        
+        src_encodings = src_encodings.permute(0, 2, 1)
 
         # packed_src_token_embed = pack_padded_sequence(src_token_embed, 
         #                                               src_sents_len)
-
         # src_encodings: (tgt_query_len, batch_size, hidden_size)
-        last_cell = src_encodings[:, -1, :]
-        last_state = src_encodings[: , -1, :]
+        last_state = torch.max(src_encodings, 1)
+
+        values, indices = torch.max(src_encodings, 1)
+        last_cell = values
+
+        # last_cell = nn.MaxPool1d(src_encodings.shape[1], kernel_size=2, stride=1, padding=0)(src_encodings)
+        # last_cell = last_cell.reshape(self.args['batch_size'], self.args['hidden_size'])
 
         #src_encodings, _ = pad_packed_sequence(src_encodings)
 
