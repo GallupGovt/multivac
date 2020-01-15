@@ -117,8 +117,7 @@ class Parser(nn.Module):
         # initialize the decoder's state and cells with encoder hidden states
         self.decoder_cell_init = nn.Linear(args['hidden_size'], args['hidden_size'])
 
-        
-
+    
         # attention: dot product attention
         # project source encoding to decoder RNN's hidden space
 
