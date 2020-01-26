@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+
 # module for childsumtreelstm
 class ChildSumTreeLSTM(nn.Module):
     def __init__(self, in_dim, mem_dim):
@@ -45,6 +46,7 @@ class ChildSumTreeLSTM(nn.Module):
         tree.state = self.node_forward(inputs[tree.idx], child_c, child_h)
         return tree.state
 
+
 class QueryGAN_Discriminator(nn.Module):
     def __init__(self, args, vocab): #vocab_size, in_dim, mem_dim, sparsity, freeze):
         super().__init__()
@@ -52,6 +54,7 @@ class QueryGAN_Discriminator(nn.Module):
         self.vocab_size = len(vocab)
         self.in_dim = self.args['input_dim']
         self.mem_dim = self.args['mem_dim']
+        self.hidden_dim = self.args['hidden_dim']
         self.sparsity = self.args['sparse']
         self.freeze = self.args['freeze_embed']
         self.emb = nn.Embedding(self.vocab_size, 
@@ -60,13 +63,19 @@ class QueryGAN_Discriminator(nn.Module):
                                 sparse=self.sparsity)
         if self.freeze:
             self.emb.weight.requires_grad = False
-        self.childsumtreelstm = ChildSumTreeLSTM(self.in_dim, self.mem_dim)
-        self.confidence = nn.Linear(self.mem_dim, 1)
+        #self.childsumtreelstm = ChildSumTreeLSTM(self.in_dim, self.mem_dim)
+        
+        self.discriminator_cnn = nn.Sequential(
+                    nn.Conv1d(in_channels = self.in_dim, out_channels = 1,  
+                        kernel_size = 1, stride = 1, padding = 1),
+                    nn.ReLU(inplace = True),
+                    nn.BatchNorm1d(1)) 
+        
 
     def forward(self, tree, inputs):
-        inputs = self.emb(inputs)
-        state, hidden = self.childsumtreelstm(tree, inputs)
-        output = torch.sigmoid(self.confidence(state))
+        inputs_embed = self.emb(inputs)      
+        inputs_unsqeeze = inputs_embed.unsqueeze_(-1)
+        inputs_cnn = inputs_embed.permute(2,1,0)
+        outputs = self.discriminator_cnn(inputs_cnn)
+        output = torch.max(outputs)
         return output
-
-
