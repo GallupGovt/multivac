@@ -26,10 +26,6 @@ class Vocab(object):
     def __contains__(self, item):
             return item in self.labelToIdx
 
-    @property
-    def size(self):
-        return len(self.idxToLabel)
-
     def __setitem__(self, key, value):
         self.labelToIdx[key] = value
 
@@ -50,6 +46,10 @@ class Vocab(object):
         return self.labelToIdx['<pad>']
 
     @property
+    def size(self):
+        return len(self.idxToLabel)
+
+    @property
     def unk(self):
         return self.labelToIdx['<unk>']
 
@@ -57,27 +57,17 @@ class Vocab(object):
     def eos(self):
         return self.labelToIdx['<eos>']
 
-    def is_unk(self, word):
-        return word not in self
+    # Add `label` in the dictionary. Use `idx` as its index if given.
+    def add(self, label):
+        label = label.lower() if self.lower else label
 
-    def size(self):
-        return len(self.idxToLabel)
-
-    # Load entries from a file.
-    def loadFile(self, filename):
-        idx = 0
-        for line in open(filename, 'r', encoding='utf8', errors='ignore'):
-            token = line.rstrip('\n')
-            self.add(token)
-            idx += 1
-
-    def getIndex(self, key, default=None):
-        key = key.lower() if self.lower else key
-
-        return self.labelToIdx.get(key, default)
-
-    def getLabel(self, idx, default=None):
-        return self.idxToLabel.get(idx, default)
+        if label in self.labelToIdx:
+            idx = self.labelToIdx[label]
+        else:
+            idx = len(self.idxToLabel)
+            self.idxToLabel[idx] = label
+            self.labelToIdx[label] = idx
+        return idx
 
     def add_from_data(self, label, idx=None):
         if idx:
@@ -98,18 +88,6 @@ class Vocab(object):
                 self.add_from_data(*label)
             else:
                 self.addSpecial(label)
-
-    # Add `label` in the dictionary. Use `idx` as its index if given.
-    def add(self, label):
-        label = label.lower() if self.lower else label
-
-        if label in self.labelToIdx:
-            idx = self.labelToIdx[label]
-        else:
-            idx = len(self.idxToLabel)
-            self.idxToLabel[idx] = label
-            self.labelToIdx[label] = idx
-        return idx
 
     # Convert `labels` to indices. Use `unkWord` if not found.
     # Optionally insert `bosWord` at the beginning and `eosWord` at the .
@@ -143,7 +121,6 @@ class Vocab(object):
 
         return labels
 
-
     @staticmethod
     def from_corpus(corpus, size=None, freq_cutoff=0):
         vocab = Vocab()
@@ -171,9 +148,28 @@ class Vocab(object):
 
     @staticmethod
     def from_dict(vocab):
-        vocab = Vocab()
+        new_vocab = Vocab()
 
         for key, value in vocab.items():
-            setattr(vocab, key, value)
+            setattr(new_vocab, key, value)
 
-        return vocab
+        return new_vocab
+
+    def getIndex(self, key, default=None):
+        key = key.lower() if self.lower else key
+
+        return self.labelToIdx.get(key, default)
+
+    def getLabel(self, idx, default=None):
+        return self.idxToLabel.get(idx, default)
+
+    def is_unk(self, word):
+        return word not in self
+
+    # Load entries from a file.
+    def loadFile(self, filename):
+        with open(filename, 'r', encoding='utf8', errors='ignore') as f:
+            [self.add(x.strip()) for x in f.readlines() if len(x.strip()) > 0]
+
+    def size(self):
+        return len(self.idxToLabel)

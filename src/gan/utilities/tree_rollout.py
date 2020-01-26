@@ -157,17 +157,12 @@ def rollout_samples(mod, src_sents, samples):
         # Variable(batch_size, mod.vocab_size)
         gen_from_vocab_prob = F.softmax(mod.tgt_token_readout(att_t), dim=-1)
 
-        if mod.args['no_copy']:
-            primitive_prob = gen_from_vocab_prob
-        else:
-            # Variable(batch_size, src_sent_len)
-            primitive_copy_prob = mod.src_pointer_net(src_encodings, None, att_t.unsqueeze(0)).squeeze(0)
-
-            # Variable(batch_size, 2)
-            primitive_predictor_prob = F.softmax(mod.primitive_predictor(att_t), dim=-1)
-
-            # Variable(batch_size, mod.vocab_size)
-            primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
+        # Variable(batch_size, src_sent_len)
+        # Variable(batch_size, 2)
+        # Variable(batch_size, mod.vocab_size)
+        primitive_copy_prob = mod.src_pointer_net(src_encodings, None, att_t.unsqueeze(0)).squeeze(0)
+        primitive_predictor_prob = F.softmax(mod.primitive_predictor(att_t), dim=-1)
+        primitive_prob = primitive_predictor_prob[:, 0].unsqueeze(1) * gen_from_vocab_prob
 
         for hyp_id, h in tqdm(enumerate(hypotheses), desc="Computing hypotheses from step {}...".format(t)):
             hyp = h.clone_and_apply_action_info(samples[hyp_id].action_infos[0])
