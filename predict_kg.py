@@ -7,13 +7,20 @@ Calls out to KromEM and KronGen to emulate and generate a hypothetical
 import argparse
 import numpy as np
 import os
+import re
 import subprocess
 import sys
 
 
 def get_network_params(network, fname, verbose):
-    vcount = len(np.unique(network))
+    out_dir, base_name = os.path.split(fname)
+    base, _ = os.path.splitext(base_name)
 
+    if not out_dir:
+        out_dir = os.getcwd()
+        fname = os.path.join(out_dir, fname)
+
+    v = vcount = len(np.unique(network))
     k = 0
 
     while vcount > 1: 
@@ -24,16 +31,22 @@ def get_network_params(network, fname, verbose):
     subprocess.call("{}/kronem/kronem -i:{} -m:R".format(snap_dir, fname),
                     shell=True)
 
-    with open("KronEM-{}".format(fname), "r") as f:
+    with open(os.path.join(out_dir, "KronEM-{}.tab".format(base)), "r") as f:
         params = f.readlines()[-1]
 
     init_mat = re.findall(r"[-+]?[.]?[\d]+(?:,\d\d\d)*[\.]?\d*(?:[eE][-+]?\d+)?", 
                           params)
     init_mat = '"{} {}; {} {}"'.format(*init_mat)
 
-    return k, init_mat, vcount
+    return k, init_mat, v
 
 def emulate_network(file, snap_dir, fname='multivac.txt', verbose=False, save=False):
+    out_dir, base_name = os.path.split(fname)
+
+    if not out_dir:
+        out_dir = os.getcwd()
+        fname = os.path.join(out_dir, fname)
+
     network = read_txt(file)
     network = np.array(network).astype(int)[:,:-1]
     np.savetxt(fname, network, fmt='%u', delimiter='\t')
@@ -41,7 +54,7 @@ def emulate_network(file, snap_dir, fname='multivac.txt', verbose=False, save=Fa
     k, init_mat, vcount = get_network_params(network, fname, verbose)
     
     if verbose: print("Projecting unobserved portion of graph...")
-    new_out = os.path.join(snap_dir, "comp_"+fname)
+    new_out = os.path.join(out_dir, "new_"+base_name)
     subprocess.call("{}/krongen/krongen -o:{} -m:{} -i:{}".format(snap_dir, 
                                                                   new_out,
                                                                   init_mat,
@@ -55,7 +68,7 @@ def emulate_network(file, snap_dir, fname='multivac.txt', verbose=False, save=Fa
     new_net = new_net[new_edges]
 
     if save:
-        np.savetxt("new_"+fname, new_net, fmt='%u', delimiter='\t')
+        np.savetxt(new_out, new_net, fmt='%u', delimiter='\t')
     else:
         return network, new_net
 
