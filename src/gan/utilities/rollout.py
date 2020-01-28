@@ -15,10 +15,9 @@ from multivac.src.gan.gen_pyt.components.decode_hypothesis import DecodeHypothes
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
 class Rollout(object):
-    def __init__(self, update_rate, rollout_num):
+    def __init__(self, rollout_num):
         #self.new_net = copy.deepcopy(net)
         self.rollout_num = rollout_num
-        self.update_rate = update_rate
         self.parser = StanfordParser(annots='tokenize ssplit pos depparse')
 
     def hyp_to_parse(self, hyp, vocab):
