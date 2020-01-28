@@ -114,7 +114,7 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
                                           seq_len))
             if oracle:
                 samps, sts = net.parse(query, return_states=True, 
-                                          beam_size=1)
+                                          beam_size=net.args['beam_size'])
             else:
                 samps = net.parse(query, beam_size=net.args['beam_size'])
 

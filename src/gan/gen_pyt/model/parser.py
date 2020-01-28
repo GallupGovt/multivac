@@ -907,7 +907,7 @@ class Parser(nn.Module):
 
         return completed_hypotheses
 
-    def sample(self, src_sent, hyp=None, states=None, beam_size=5):
+    def sample(self, src_sent, hyp=None, states=None):
         """Perform beam search to infer the target AST given a source utterance
            and optionally an incomplete Hypothesis.
 
@@ -929,7 +929,7 @@ class Parser(nn.Module):
                                   hyp=hyp, 
                                   states=states, 
                                   return_states=False, 
-                                  beam_size=beam_size, 
+                                  beam_size=1, 
                                   debug=False)
 
                 if len(hyp) > 0:
