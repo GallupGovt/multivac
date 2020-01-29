@@ -38,6 +38,9 @@ REGEXES_DICT = {k: re.compile(v) for k, v in REGEXES_DICT.items()}
 
 REGEX_SENTENCES = re.compile(r'.*[.?!]\s+(.+[.?!])$')
 
+REGEXES_LIST_FINAL = [r'^.+\([1-2][0-9]{3}\)']
+REGEXES_LIST_FINAL = [re.compile(regex) for regex in REGEXES_LIST_FINAL]
+
 
 def clean_text(text,
                min_char_len=2,
@@ -119,10 +122,20 @@ def clean_text(text,
         if sents:
             cleaned_text = sents[-1].strip()
 
+    # remove everything in the `REGEXES_LIST_FINAL`
+    for regex in REGEXES_LIST_FINAL:
+        cleaned_text = re.sub(regex, '', cleaned_text)
+
+    # check one last time, to make sure the sentence isn't too short
+    tokens = NLP(cleaned_text)
+    if len(tokens) <= min_char_len:
+        return removed_token
+
     # finally, we strip off any leading or ending white space and make
     # sure that the first letter is capitalized
     cleaned_text = cleaned_text.strip()
     cleaned_text = cleaned_text[0].upper() + cleaned_text[1:]
+
     return cleaned_text
 
 
@@ -208,8 +221,8 @@ def main():
     # otherwise, just put the cleaned questions in each row
     else:
 
-        with open(args.output_file, 'wb') as fb:
-            fb.writeline(cleaned_questions)
+        df_output = pd.DataFrame({'questions': cleaned_questions})
+        df_output.to_csv(args.output_file, index=False, header=False)
 
 
 if __name__ == '__main__':
