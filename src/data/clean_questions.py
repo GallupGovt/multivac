@@ -53,10 +53,10 @@ def clean_text(text,
         * Make sure everything is UTF-8, and replace any non-UTF-8 characters
         * Remove messy "prefix" text corresponding to certain regex patterns
         * Clean up "suffix" text (e.g. spaces before question marks) corresponding to certin regex patterns
-        * Tokenize words, and then do the following comparison:
+        * Tokenize words, and then do the following comparison (this happens twice):
           - Count the number of tokens that are alpha numeric, greater than 2 charactres and spaCy vocabulary
           - If n_tokens / n_words < 0.2, remove the text altogether
-        * If the number of words is greater than or equal to 100, just grab the last sentence.
+        * Try to grab the last "sentence", given the sentence tokenizer and some regex rules.
 
     Parameters
     ----------
