@@ -14,7 +14,7 @@ class MULTIVACDataset(data.Dataset):
         super().__init__()
         self.vocab = vocab
         self.sentences = self.read_sentences(os.path.join(path, 'text.toks'))
-        self.trees = MULTIVACDataset.read_trees(os.path.join(path, 'text.parents'))
+        #self.trees = MULTIVACDataset.read_trees(os.path.join(path, 'text.parents'))
         self.labels = MULTIVACDataset.read_labels(os.path.join(path, 'cat.txt'))
         self.size = self.labels.size(0)
 
@@ -22,11 +22,11 @@ class MULTIVACDataset(data.Dataset):
         return self.size
 
     def __getitem__(self, index):
-        tree = deepcopy(self.trees[index])
+        #tree = deepcopy(self.trees[index])
         sent = deepcopy(self.sentences[index])
         label = deepcopy(self.labels[index])
         
-        return (tree, sent, label)
+        return (sent, label)
 
     def read_sentences(self, filename):
         with open(filename, 'r') as f:
