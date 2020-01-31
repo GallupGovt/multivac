@@ -41,6 +41,27 @@ def dep_parse(filepath, parser):
             parfile.write(' '.join([str(x) for x in parents]) + '\n')
             tokfile.write(' '.join(tokens) + '\n')
 
+def gen_tokens(filepath, parser):
+    print('\nTokenizing ' + filepath)
+    dirpath = os.path.dirname(filepath)
+    filepre = os.path.splitext(os.path.basename(filepath))[0]
+
+    with open(filepath, 'r') as f:
+        examples = f.readlines()
+
+    with open(os.path.join(dirpath, 'text.toks'   ), 'w') as tokfile:
+
+        for example in tqdm(examples):
+            text = example.strip()
+
+            if not text.endswith("?"):
+                text = re.sub(r"\?","",text)
+                text += "?"
+
+            sample_parse = parser.get_parse(text)
+            tokens = [x['word'] for x in sample_parse['tokens']]
+            tokfile.write(' '.join(tokens) + '\n')
+
 def make_dirs(dirs):
     for d in dirs:
         if not os.path.exists(d):
@@ -111,26 +132,29 @@ if __name__ == '__main__':
     base_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
     data_dir = os.path.join(base_dir, 'data')
     multivac_dir = os.path.join(data_dir, 'multivac')
-    lib_dir = os.path.join(base_dir, 'lib')
-    train_dir = os.path.join(multivac_dir, 'train')
-    dev_dir = os.path.join(multivac_dir, 'dev')
-    test_dir = os.path.join(multivac_dir, 'test')
-    make_dirs([train_dir, dev_dir, test_dir])
+    # lib_dir = os.path.join(base_dir, 'lib')
+    # train_dir = os.path.join(multivac_dir, 'train')
+    # dev_dir = os.path.join(multivac_dir, 'dev')
+    # test_dir = os.path.join(multivac_dir, 'test')
+    # make_dirs([train_dir, dev_dir, test_dir])
 
-    prs = StanfordParser(annots='tokenize ssplit depparse')
+    prs = StanfordParser(annots='tokenize')
 
-    if args['data']:
-        train_dev_test_split(args['data'], multivac_dir)
+    split(os.path.join(multivac_dir, 'extracted_questions_labels.txt'), multivac_dir)
+    gen_tokens(os.path.join(multivac_dir, 'text.txt'), prs)
+
+    # if args['data']:
+    #     train_dev_test_split(args['data'], multivac_dir)
 
     # split into separate files
-    split(os.path.join(multivac_dir, 'MULTIVAC_train.txt'), train_dir)
-    split(os.path.join(multivac_dir, 'MULTIVAC_trial.txt'), dev_dir)
-    split(os.path.join(multivac_dir, 'MULTIVAC_test_annotated.txt'), test_dir)
+    # split(os.path.join(multivac_dir, 'MULTIVAC_train.txt'), train_dir)
+    # split(os.path.join(multivac_dir, 'MULTIVAC_trial.txt'), dev_dir)
+    # split(os.path.join(multivac_dir, 'MULTIVAC_test_annotated.txt'), test_dir)
 
     # parse sentences
-    dep_parse(os.path.join(train_dir, 'text.txt'), prs)
-    dep_parse(os.path.join(dev_dir, 'text.txt'), prs)
-    dep_parse(os.path.join(test_dir, 'text.txt'), prs)
+    # dep_parse(os.path.join(train_dir, 'text.txt'), prs)
+    # dep_parse(os.path.join(dev_dir, 'text.txt'), prs)
+    # dep_parse(os.path.join(test_dir, 'text.txt'), prs)
 
     # get vocabulary
     build_vocab(glob.glob(os.path.join(multivac_dir, '*/*.toks')),

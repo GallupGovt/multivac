@@ -308,8 +308,8 @@ def run(cfg_dict):
                                                lowercase=gan_args['glove_lower'])
 
     samples_data, prim_vocab, grammar = English.generate_dataset(gargs['annot_file'],
-                                                                      gargs['texts_file'],
-                                                                      grammar)
+                                                                 gargs['texts_file'],
+                                                                 grammar)
     transition_system = EnglishTransitionSystem(grammar)
 
     if gan_args['verbose']: print("Grammar and language transition system initiated.")
@@ -318,8 +318,6 @@ def run(cfg_dict):
     # Build Generator model
 
     netG = Parser(gargs, glove_vocab, prim_vocab, transition_system)
-    #netG.train()
-
     optimizer_cls = eval('torch.optim.%s' % gargs['optimizer'])
     netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'])
 
@@ -360,8 +358,7 @@ def run(cfg_dict):
 
     # pretrain discriminator
     if gan_args['verbose']: print('Loading Discriminator pretraining dataset.')
-    dis_set = MULTIVACDataset(os.path.join(netD.args['data'], "train"), 
-                              glove_vocab)
+    dis_set = MULTIVACDataset(netD.args['data'], glove_vocab)
 
     y_onehot = torch.zeros(dis_set.size, 2)
     y_onehot.scatter_(1, dis_set.labels.long().unsqueeze(1), 1)
@@ -411,7 +408,7 @@ def run(cfg_dict):
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
+            dis_set = DiscriminatorDataset(netD.args['data'], 
                                            netG.args['sample_dir'],
                                            glove_vocab)
         
@@ -517,7 +514,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
+            dis_set = DiscriminatorDataset(netD.args['data'], 
                                            netG.args['sample_dir'],
                                            netG.vocab)
         
