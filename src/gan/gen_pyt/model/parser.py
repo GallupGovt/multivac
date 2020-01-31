@@ -195,6 +195,7 @@ class Parser(nn.Module):
         if args['cuda']:
             self.new_long_tensor = torch.cuda.LongTensor
             self.new_tensor = torch.cuda.FloatTensor
+            self.to('cuda')
         else:
             self.new_long_tensor = torch.LongTensor
             self.new_tensor = torch.FloatTensor
@@ -922,19 +923,26 @@ class Parser(nn.Module):
         """
 
         if hyp is not None and hyp.completed:
-            pass
+            result = hyp
         else:
+            beam_size = 1
+
             while True:
                 result = self.parse(src_sent=src_sent, 
                                   hyp=hyp, 
                                   states=states, 
                                   return_states=False, 
-                                  beam_size=1, 
+                                  beam_size=beam_size, 
                                   debug=False)
 
                 if len(result) > 0:
                     result = result[0]
                     break
+                else:
+                    beam_size += 1
+
+                    if beam_size > 5:
+                        beam_size = 1
 
         return result
 
@@ -1000,6 +1008,10 @@ class Parser(nn.Module):
 
             for batch_examples in train_set.batch_iter(batch_size=self.args['batch_size'], 
                                                        shuffle=True):
+
+                if self.args['cuda']:
+                    batch_examples.cuda()
+
                 batch_examples = [e for e in batch_examples if \
                                     len(e.tgt_actions) <= self.args['decode_max_time_step']]
                 train_iter += 1
@@ -1008,7 +1020,7 @@ class Parser(nn.Module):
                 ret_val = self.score(batch_examples)
                 loss = -ret_val[0]
 
-                loss_val = torch.sum(loss).data.item()
+                loss_val = torch.sum(loss).to('cpu').data.item()
                 report_loss += loss_val
                 report_examples += len(batch_examples)
                 loss = torch.mean(loss)
@@ -1066,6 +1078,7 @@ class Parser(nn.Module):
                                                    self.vocab, 
                                                    verbose=self.args['verbose']))
         rewards = torch.from_numpy(rewards).float()
+        rewards = rewards.squeeze(-1)
 
         if self.args['cuda']:
             rewards = rewards.cuda()

@@ -88,8 +88,6 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             yhat = self(X).softmax(dim=-1)
 
             scores, labels = yhat.topk(1, -1, True, True)
-            labels.apply_(lambda x: self.args['labels'][x])
-
             return scores, labels
 
     def train_single_code(self, train):
@@ -113,6 +111,9 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                                                  amsgrad=True)
         #epochs_no_improve = 0
         #max_test_acc = 0
+        if self.args['device'] == 'cuda':
+            self.cuda()
+            self.optimizer.cuda()
 
         self.train()
 

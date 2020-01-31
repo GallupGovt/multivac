@@ -67,7 +67,8 @@ def DiscriminatorDataset(real_dir, fake_dir, vocab):
     combined_file.labels = y_onehot
 
     maxlen = 150 # to match CNN classifier architecture
-    sents = torch.full((combined_file.size, maxlen), combined_file.vocab.pad)
+    sents = torch.full((len(combined_file.sentences), maxlen), 
+                        combined_file.vocab.pad)
 
     for i, s in enumerate(combined_file.sentences):
         sents[i, :len(s)] = s[:150]
@@ -278,6 +279,7 @@ def run(cfg_dict):
     use_cuda = args['cuda']
 
     if not torch.cuda.is_available():
+        print("No GPU available, running on CPU.")
         use_cuda = False
 
     gargs['cuda'] = use_cuda
@@ -334,8 +336,9 @@ def run(cfg_dict):
 
     load_to_layer(netG.src_embed, glove_emb, glove_vocab)
     load_to_layer(netG.primitive_embed, glove_emb, glove_vocab, prim_vocab)
-    if gargs['cuda']: netG.cuda()
-
+    if gargs['cuda']: 
+        netG.cuda()
+        netG.optimizer.cuda()
 
     # Set up Discriminator component with given parameters
 
@@ -413,11 +416,11 @@ def run(cfg_dict):
                                            glove_vocab)
         
             for k_step in range(k_steps):
-                loss = trainer.train(dis_set)
+                loss = netD.train_single_code(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
                 
-        save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses)
+        save_progress(netD, netG, examples, epoch, discriminator_losses, generator_losses)
         
 
 def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=None, use_cuda=False):
@@ -491,10 +494,8 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
                         lr=netD.args['lr'], 
                         weight_decay=netD.args['wd'])
         optimizer.load_state_dict(disc_params['optimizer'])
-        trainer = Trainer(netD.args, netD, nn.MSELoss(), optimizer, device)
     else:
-        trainer = disc_chk
-        netD = trainer.model
+        netD = disc_chk
 
     rollout = Rollout(rollout_num=rollout_num, vocab=glove_vocab)
 
@@ -504,10 +505,10 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     for ep in range(epoch, total_epochs):
         for step in range(g_steps):
             # train generator
-            samples = generate_samples(netG, seq_len, generated_num, parser)
-            hyps, examples = list(zip(*samples))
+            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, oracle=True)
+            # hyps, examples = list(zip(*samples))
             step_begin = time.time()
-            pgloss = netG.pgtrain(hyps, examples, rollout, netD)
+            pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
             print('[Generator {}]  step elapsed {}s'.format(step, 
                                                             time.time() - step_begin))
             print('Generator adversarial loss={}'.format(pgloss))
@@ -515,20 +516,20 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
 
         for d_step in range(d_steps):
             # train discriminator
-            _ = generate_samples(netG, seq_len, generated_num, parser, writeout=True)
+            generate_samples(netG, seq_len, generated_num, parser, writeout=True)
             dis_set = DiscriminatorDataset(os.path.join(netD.args['data'], "train"), 
                                            netG.args['sample_dir'],
                                            netG.vocab)
         
             for k_step in range(k_steps):
-                loss = netD.train(dis_set)
+                loss = netD.train_single_code(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
                 
-        save_progress(netG, examples, ep, discriminator_losses, generator_losses)
+        save_progress(netD, netG, examples, ep, discriminator_losses, generator_losses)
 
 
-def save_progress(trainer, netG, examples, epoch, discriminator_losses, generator_losses):
+def save_progress(netD, netG, examples, epoch, discriminator_losses, generator_losses):
     # Save Generator model state and metadata
     gen_save = os.path.join(netG.args['output_dir'], "gen_checkpoint.pth")
     gen_checkpoint = {'epoch': epoch,
@@ -543,10 +544,9 @@ def save_progress(trainer, netG, examples, epoch, discriminator_losses, generato
     # Save Discriminator model state and metadata
     disc_save = os.path.join(netG.args['output_dir'], "disc_checkpoint.pth")
     dis_checkpoint = {'epoch': epoch,
-                      'state_dict': trainer.model.state_dict(),
-                      'args': trainer.model.args,
-                      'optimizer': trainer.optimizer.state_dict(),
-                      'criterion': trainer.criterion}
+                      'state_dict': netD.state_dict(),
+                      'args': netD.args,
+                      'optimizer': netD.state_dict()}
     torch.save(dis_checkpoint, disc_save)
 
     # Save loss histories

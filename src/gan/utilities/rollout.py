@@ -25,7 +25,7 @@ class RolloutDataset(Dataset):
     def __len__(self):
         return self.size
     def __getitem__(self, index):
-        return deepcopy(self.data[index])
+        return copy.deepcopy(self.data[index])
 
 class Rollout(object):
     def __init__(self, rollout_num, vocab):
@@ -57,11 +57,10 @@ class Rollout(object):
 
         return tree, inp
 
-    @staticmethod
-    def parse_tokens(tree):
+    def parse_tokens(self, tree):
         text = asdl_ast_to_english(tree)
-        tokens = [x for x in Tokenizer(text)]
-        result = torch.tensor(vocab.convertToIdx(tokens, '<unk>'), 
+        tokens = [x.text for x in self.tokenizer(text)]
+        result = torch.tensor(self.vocab.convertToIdx(tokens, '<unk>'), 
                               dtype=torch.long, 
                               device='cpu')
         return result
@@ -119,31 +118,23 @@ class Rollout(object):
 
             for x in tqdm(range(max_action_len), "Translating trees..."):
                 for h, hyp in enumerate(samples[x]):
-                    inputs[x][h] = parse_tokens(hyp.tree)
+                    inputs[x][h] = self.parse_tokens(hyp.tree)
 
             for j in range(max_action_len):
-                samps = torch.full((len(inputs[x]), 150), vocab.pad)
+                samps = torch.full((len(inputs[j]), 150), vocab.pad)
 
-                for idx, x in enumerate(inputs[x]):
+                for idx, x in enumerate(inputs[j]):
                     samps[idx, :len(x)] = x[:150]
 
-                samps = RolloutDataset(samps.long())
-                roll_loader = DataLoader(samps, batch_size=netD.args['batch_size'], 
-                                         shuffle=True, num_workers=4)
-                preds = []
-
-                for k, x in tqdm(enumerate(roll_loader)):
-                    if netD.args['cuda']:
-                        x = x.cuda()
-
-                    preds.append(netD.predict(x).mean().item())
+                x = samps.long().to(netD.args['device'])
+                out, _ = netD.predict(x)
 
                 if i == 0:
-                    rewards.append(sum(preds)/len(preds))
+                    rewards.append(out.numpy())
                 else:
-                    rewards[j] += sum(preds)/len(preds)
+                    rewards[j] += out.numpy()
 
-            originals = [parse_tokens(hyp.tree) for hyp in hyps]
+            originals = [self.parse_tokens(hyp.tree) for hyp in hyps]
 
             for j in tqdm(range(batch_size), desc="Rating action step {}...".format(max_action_len)):
                 samps = torch.full((len(originals), 150), vocab.pad)
@@ -151,22 +142,13 @@ class Rollout(object):
                 for idx, x in enumerate(originals):
                     samps[idx, :len(x)] = x[:150]
 
-                samps = RolloutDataset(samps.long())
-                roll_loader = DataLoader(samps, batch_size=netD.args['batch_size'], 
-                                         shuffle=True, num_workers=4)
-
-                preds = []
-
-                for k, x in tqdm(enumerate(roll_loader)):
-                    if netD.args['cuda']:
-                        x = x.cuda()
-
-                    preds.append(netD.predict(x).mean().item())
+                x = samps.long().to(netD.args['device'])
+                out, _ = netD.predict(x)
 
             if i == 0:
-                rewards.append(sum(preds)/len(preds))
+                rewards.append(out.numpy())
             else:
-                rewards[-1] += sum(preds)/len(preds)
+                rewards[-1] += out.numpy()
 
         rewards = np.array(rewards) / (1.0 * self.rollout_num)
 
