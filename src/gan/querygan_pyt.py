@@ -380,6 +380,8 @@ def run(cfg_dict):
         loss = netD.train_single_code(dis_set)
         print('Epoch {} pretrain discriminator training loss: {}'.format(epoch + 1, loss))
 
+    save_progress(netD, netG, [], -1, [], [])
+
 
     #
     # ADVERSARIAL TRAINING
@@ -474,7 +476,10 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     if isinstance(disc_chk, str):
         device = torch.device("cuda" if use_cuda else "cpu")
         disc_params = torch.load(disc_chk)
-        netD = QueryGAN_Discriminator_CNN(disc_params['args'], netG.vocab)
+        glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'], 
+                                                                gan_args['glove_file']),
+                                                   lowercase=gan_args['glove_lower'])
+        netD = QueryGAN_Discriminator_CNN(disc_params['args'], glove_vocab, glove_emb, 2)
         netD.load_state_dict(disc_params['state_dict'])
 
         if epoch == 0:
@@ -487,10 +492,10 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
         elif netD.args['optim'] == 'sgd':
             opt = optim.SGD
 
-        optimizer = opt(filter(lambda p: p.requires_grad, netD.parameters()),
-                        lr=netD.args['lr'], 
-                        weight_decay=netD.args['wd'])
-        optimizer.load_state_dict(disc_params['optimizer'])
+        netD.optimizer = opt(filter(lambda p: p.requires_grad, netD.parameters()),
+                             lr=netD.args['lr'], 
+                             weight_decay=netD.args['wd'])
+        netD.optimizer.load_state_dict(disc_params['optimizer'])
     else:
         netD = disc_chk
 
@@ -543,27 +548,28 @@ def save_progress(netD, netG, examples, epoch, discriminator_losses, generator_l
     dis_checkpoint = {'epoch': epoch,
                       'state_dict': netD.state_dict(),
                       'args': netD.args,
-                      'optimizer': netD.state_dict()}
+                      'optimizer': netD.optimizer.state_dict()}
     torch.save(dis_checkpoint, disc_save)
 
     # Save loss histories
     with open(os.path.join(netG.args['output_dir'], 
-                           "generator_losses.csv"), "w") as f:
+                           "generator_losses.csv"), "a") as f:
         for l in generator_losses:
             f.write("{},{}\n".format(epoch, l.item()))
 
     with open(os.path.join(netG.args['output_dir'], 
-                           "discriminator_losses.csv"), "w") as f:
+                           "discriminator_losses.csv"), "a") as f:
         for l in discriminator_losses:
             f.write("{},{}\n".format(epoch, l))
 
     # Save example generator outputs for qualitative assessment of progress
-    save_examples = random.sample(examples, 10)
+    if len(examples) > 0:
+        save_examples = random.sample(examples, 10)
 
-    with open(os.path.join(netG.args['output_dir'], 
-                           "samples_{}.csv".format(epoch)), "w") as f:
-        for e in save_examples:
-            f.write(e.tgt_text + '\n')
+        with open(os.path.join(netG.args['output_dir'], 
+                               "samples_{}.csv".format(epoch)), "w") as f:
+            for e in save_examples:
+                f.write(e.tgt_text + '\n')
 
 
 if __name__ == '__main__':
