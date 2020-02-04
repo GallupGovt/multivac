@@ -12,25 +12,10 @@ def run(args_dict):
     timestamp = datetime.now().strftime('%d%b%Y-%H:%M:%S')
 
     # instantiate class
-    knowledge_graph = RDFGraph()
+    knowledge_graph = RDFGraph(args_dict['sources'])
 
-    # Associate a JSON file of source documents from which to induce
-    # the knowledge graph.
-    knowledge_graph.set_source(args_dict['sources'])
-
-    print('\nExtracting relation triples from abstracts')
-    knowledge_graph.extract_raw_tuples()
-
-    # pre-process extracted tuples
-    print('\nPreprocessing raw relation triples')
-    knowledge_graph.preprocess_raw_tuples()
-
-    # cluster all entities using fast
-    # agglomerative clustering and cosine distance of averaged word embeddings
-    print('\nClustering entities from relation triples')
-    knowledge_graph.cluster_entities(args_dict['glove'])
-    print('\n{} entity clusters were found'
-          .format(len(knowledge_graph.entity_cluster_results['cluster_members'])))
+    # build knowledge graph
+    knowledge_graph.build_graph()
 
     # output text files that will be used openke for knowledge graph creation
     # and embedding output .txt files for openke output
@@ -43,8 +28,6 @@ if __name__ == '__main__':
                                      'for modeling.')
     parser.add_argument('-s', '--sources', required=True,
                         help='Select a source for article retrieval.')
-    parser.add_argument('-g', '--glove', required=True,
-                        help='Path to pickle file containing glove embeddings')
     args_dict = vars(parser.parse_args())
 
     run(args_dict)

@@ -13,7 +13,7 @@ def detect_ent_overlap(ent):
         return ent
     else:
         overlapping = [[x, y] for x in entity_spans for y in entity_spans
-                       if x is not y and x[1] > y[0] and x[0] < y[0]]
+                       if x is not y and x[1] >= y[0] and x[0] <= y[0]]
         if len(overlapping) > 0:
             return None
         else:
@@ -65,12 +65,15 @@ def run_main(input_pickle, output_dir):
 
 def train_spacy(data, iterations):
     TRAIN_DATA = data
-    nlp = spacy.blank('en')  # create blank Language class
+    nlp = spacy.load('en_core_web_sm')  # create blank Language class
     # create the built-in pipeline components and add them to the pipeline
     # nlp.create_pipe works for built-ins that are registered with spaCy
     if 'ner' not in nlp.pipe_names:
         ner = nlp.create_pipe('ner')
         nlp.add_pipe(ner, last=True)
+    # otherwise, get it so we can add labels
+    else:
+        ner = nlp.get_pipe("ner")
 
     # add labels
     for _, annotations in TRAIN_DATA:

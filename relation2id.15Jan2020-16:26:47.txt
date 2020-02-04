@@ -1,0 +1,47 @@
+46
+has part	0 
+followed by	1 
+part of	2 
+instance of	3 
+subsidiary	4 
+main subject	5 
+field of work	6 
+said to be the same as	7 
+manufacturer	8 
+mountain range	9 
+taxon rank	10 
+place served by transport hub	11 
+owned by	12 
+record label	13 
+operating system	14 
+sibling	15 
+member of	16 
+mouth of the watercourse	17 
+publisher	18 
+tributary	19 
+nominated for	20 
+licensed to broadcast to	21 
+contains administrative territorial entity	22 
+movement	23 
+developer	24 
+notable work	25 
+language of work or name	26 
+original network	27 
+father	28 
+occupation	29 
+located on terrain feature	30 
+characters	31 
+follows	32 
+distributor	33 
+member of political party	34 
+location	35 
+spouse	36 
+architect	37 
+religion	38 
+country of citizenship	39 
+country	40 
+residence	41 
+heritage designation	42 
+operator	43 
+mother	44 
+constellation	45 
