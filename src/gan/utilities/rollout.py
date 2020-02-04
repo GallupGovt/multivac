@@ -27,6 +27,10 @@ class RolloutDataset(Dataset):
     def __getitem__(self, index):
         return copy.deepcopy(self.data[index])
 
+class Engine(object):
+    def __init__(self, step=0):
+        self.step = 0
+
 class Rollout(object):
     def __init__(self, rollout_num, vocab):
         #self.new_net = copy.deepcopy(net)

@@ -105,11 +105,14 @@ class ASDLProduction(object):
                self.type == other.type and \
                self.constructor == other.constructor
 
+    def __lt__(self, other):
+        return other.__repr__() < self.__repr__()
+
     def __ne__(self, other):
         return not self.__eq__(other)
 
     def __repr__(self):
-        return '%s -> %s' % (self.type.__repr__(plain=True), self.constructor.__repr__(plain=True))
+        return self.constructor.name
 
 
 class ASDLConstructor(object):
@@ -141,10 +144,12 @@ class ASDLConstructor(object):
         return not self.__eq__(other)
 
     def __repr__(self, plain=False):
-        plain_repr = '%s(%s)' % (self.name,
+        plain_repr = '%s -> (%s)' % (self.name,
                                  ', '.join(f.__repr__(plain=True) for f in self.fields))
-        if plain: return plain_repr
-        else: return 'Constructor(%s)' % plain_repr
+        if plain: 
+            return plain_repr
+        else: 
+            return 'Constructor(%s)' % plain_repr
 
 
 class Field(object):
@@ -171,11 +176,12 @@ class Field(object):
         return not self.__eq__(other)
 
     def __repr__(self, plain=False):
-        plain_repr = '%s%s %s' % (self.type.__repr__(plain=True),
-                                  Field.get_cardinality_repr(self.cardinality),
-                                  self.name)
-        if plain: return plain_repr
-        else: return 'Field(%s)' % plain_repr
+        plain_repr = '%s%s' % (self.type.__repr__(plain=True),
+                               Field.get_cardinality_repr(self.cardinality))
+        if plain: 
+            return plain_repr
+        else: 
+            return 'Field(%s)' % plain_repr
 
     @staticmethod
     def get_cardinality_repr(cardinality):
@@ -197,8 +203,10 @@ class ASDLType(object):
 
     def __repr__(self, plain=False):
         plain_repr = self.name
-        if plain: return plain_repr
-        else: return '%s(%s)' % (self.__class__.__name__, plain_repr)
+        if plain: 
+            return plain_repr
+        else: 
+            return '%s(%s)' % (self.__class__.__name__, plain_repr)
 
 
 class ASDLCompositeType(ASDLType):

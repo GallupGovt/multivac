@@ -118,6 +118,10 @@ class English(object):
         for idx, (src_query, tgt_text) in enumerate(zip(open(annot_file), 
                                                         open(text_file))):
             query_toks = src_query.strip().split()
+
+            if len(query_toks) == 0:
+                continue
+                
             tgt_text = tgt_text.strip()
 
             tree = English.canonicalize_example(tgt_text, parser)
@@ -160,13 +164,14 @@ class English(object):
             tgt_action_infos = get_action_infos(toks, tgt_actions)
             action_len.append(len(tgt_action_infos))
 
-            all_examples.append(Example(idx=idx,
-                                        src_sent=toks,
-                                        tgt_actions=tgt_action_infos,
-                                        tgt_text=text,
-                                        tgt_ast=tree,
-                                        meta={'raw_text': text, 
-                                              'str_map': None}))
+            if len(toks) > 0:
+                all_examples.append(Example(idx=idx,
+                                            src_sent=toks,
+                                            tgt_actions=tgt_action_infos,
+                                            tgt_text=text,
+                                            tgt_ast=tree,
+                                            meta={'raw_text': text, 
+                                                  'str_map': None}))
 
         train_examples, dev_examples = train_test_split(all_examples, 
                                                         train_size=train_size)
@@ -196,18 +201,19 @@ class English(object):
 
         transition_system = EnglishTransitionSystem(grammar)
         all_examples = []
-        action_len = []
 
         for idx, example in tqdm(enumerate(processed_examples), desc='Generating Dataset... '):
         # for idx, example in enumerate(processed_examples):
             toks, text, tree = example
+
+            # if len(toks) == 0:
+            #     continue
 
             if max_query_len is not None:
                 toks = toks[:max_query_len]
 
             tgt_actions = transition_system.get_actions(tree)
             tgt_action_infos = get_action_infos(toks, tgt_actions)
-            action_len.append(len(tgt_action_infos))
 
             all_examples.append(Example(idx=idx,
                                         src_sent=toks,

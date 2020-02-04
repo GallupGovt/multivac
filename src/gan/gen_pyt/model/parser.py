@@ -378,9 +378,11 @@ class Parser(nn.Module):
         scores = torch.sum(action_prob, dim=0)
 
         returns = [scores]
+
         if self.args['sup_attention']:
             returns.append(att_prob)
-        if return_encode_state: returns.append(last_state)
+        if return_encode_state: 
+            returns.append(last_state)
 
         return returns
 
@@ -552,10 +554,15 @@ class Parser(nn.Module):
                     if t < len(example.tgt_actions):
                         action_t = example.tgt_actions[t].action
                         cand_src_tokens = AttentionUtil.get_candidate_tokens_to_attend(example.src_sent, action_t)
+
                         if cand_src_tokens:
                             att_prob = [att_weight[e_id, token_id] for token_id in cand_src_tokens]
-                            if len(att_prob) > 1: att_prob = torch.cat(att_prob).sum()
-                            else: att_prob = att_prob[0]
+
+                            if len(att_prob) > 1: 
+                                att_prob = torch.cat(att_prob).sum()
+                            else: 
+                                att_prob = att_prob[0]
+
                             att_probs.append(att_prob)
 
             history_states.append((h_t, cell_t))
@@ -566,9 +573,11 @@ class Parser(nn.Module):
             att_tm1 = att_t
 
         att_vecs = torch.stack(att_vecs, dim=0)
+
         if args['sup_attention']:
             return att_vecs, att_probs
-        else: return att_vecs
+        else: 
+            return att_vecs
 
     def parse(self, src_sent, hyp=None, states=None, return_states=False, beam_size=5, debug=False):
         """Perform beam search to infer the target AST given a source utterance
@@ -770,7 +779,6 @@ class Parser(nn.Module):
                     else:
                         # GenToken action
                         gentoken_prev_hyp_ids.append(hyp_id)
-                        hyp_copy_info = dict()  # of (token_pos, copy_prob)
                         hyp_unk_copy_info = []
                         if debug: print("GenToken", end=' :: ')
 
@@ -783,7 +791,6 @@ class Parser(nn.Module):
                                     token_id = self.prim_vocab[token]
                                     primitive_prob[hyp_id, token_id] = primitive_prob[hyp_id, token_id] + gated_copy_prob
 
-                                    hyp_copy_info[token] = (token_pos_list, gated_copy_prob.data.item())
                                 else:
                                     hyp_unk_copy_info.append({'token': token, 'token_pos_list': token_pos_list,
                                                               'copy_prob': gated_copy_prob.data.item()})
@@ -794,7 +801,6 @@ class Parser(nn.Module):
                             primitive_prob[hyp_id, self.prim_vocab.unk] = hyp_unk_copy_info[unk_i]['copy_prob']
                             gentoken_new_hyp_unks.append(token)
 
-                            hyp_copy_info[token] = (hyp_unk_copy_info[unk_i]['token_pos_list'], hyp_unk_copy_info[unk_i]['copy_prob'])
 
             new_hyp_scores = None
 
@@ -899,14 +905,17 @@ class Parser(nn.Module):
                             sorted(zip(completed_hypotheses, saved_states), 
                                    key=lambda pair: -pair[0].score)]
 
-        completed_hypotheses.sort(key=lambda hyp: -hyp.score)
+        if len(completed_hypotheses) > 0:
+            result = completed_hypotheses
+        else:
+            result = hypotheses
+
+        result.sort(key=lambda hyp: -hyp.score)
 
         if return_states:
-            return completed_hypotheses, saved_states
+            return result, saved_states
         else:
-            return completed_hypotheses
-
-        return completed_hypotheses
+            return result
 
     def sample(self, src_sent, hyp=None, states=None):
         """Perform beam search to infer the target AST given a source utterance
@@ -925,24 +934,12 @@ class Parser(nn.Module):
         if hyp is not None and hyp.completed:
             result = hyp
         else:
-            beam_size = 1
-
-            while True:
-                result = self.parse(src_sent=src_sent, 
-                                  hyp=hyp, 
-                                  states=states, 
-                                  return_states=False, 
-                                  beam_size=beam_size, 
-                                  debug=False)
-
-                if len(result) > 0:
-                    result = result[0]
-                    break
-                else:
-                    beam_size += 1
-
-                    if beam_size > 5:
-                        beam_size = 1
+            result = self.parse(src_sent=src_sent, 
+                              hyp=hyp, 
+                              states=states, 
+                              return_states=False, 
+                              beam_size=self.args['beam_size'], 
+                              debug=False)[0]
 
         return result
 
