@@ -76,19 +76,19 @@ class Parser(nn.Module):
 
         # Encoders
 
-        if self.args['encoder'] == 'lstm':
-            self.encoder_lstm = nn.LSTM(args['embed_size'],
-                                        int(args['hidden_size'] / 2),
-                                        bidirectional=True)
-        elif self.args['encoder'] == 'cnn':
+        if self.args['encoder'] == 'cnn':
             self.encoder_cnn = nn.Sequential(
                     nn.Conv1d(in_channels=args['embed_size'],
                               out_channels=args['hidden_size'],
                               kernel_size=3,
                               stride=1,
                               padding=1),
-                    nn.ReLU(inplace=True),
-                    nn.BatchNorm1d(args['hidden_size']))
+                    nn.BatchNorm1d(args['hidden_size']),
+                    nn.LeakyReLU(negative_slope=0.2))
+        else:
+            self.encoder_lstm = nn.LSTM(args['embed_size'], 
+                                        int(args['hidden_size'] / 2), 
+                                        bidirectional=True)
 
         # previous action
         input_dim = args['action_embed_size']
@@ -581,7 +581,14 @@ class Parser(nn.Module):
 
         Args:
             src_sent: list of source utterance tokens
-            context: other context used for prediction
+            hyp: Optional existing incomplete DecodeHypothesis() object
+                to complete (this is the predicted/"hypothesized" constituency 
+                parse of a complete question resulting form an input sequence 
+                of tokens).
+            states: If hyp is not None, the associated states history to
+                complete the DecodeHypothesis()
+            return_states: Whether to return the states history from the
+                parse operation
             beam_size: beam size
 
         Returns:
@@ -609,12 +616,15 @@ class Parser(nn.Module):
         for token_pos, token in enumerate(src_sent):
             aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
 
-        if hyp is None:
+        if not hyp:
+            # We're starting this parse operation from scratch
+            # We track a list of DecodeHypothesis() objects up to `beam_size`
             t = 0
             hypotheses = [DecodeHypothesis()]
             hyp_states = [[]]
             h_tm1 = self.init_decoder_state(last_state, last_cell)
         else:
+            # Let's pick up the parsing where we left off at time step `t`
             t = hyp.t
             hypotheses = [hyp]
             hyp_states = [states]
@@ -920,16 +930,16 @@ class Parser(nn.Module):
         if return_states:
             return result, saved_states
         else:
-            return result
+            return result, None
 
     def sample(self, src_sent, hyp=None, states=None):
         """Perform beam search to infer the target AST given a source utterance
            and optionally an incomplete Hypothesis.
 
         Args:
-            src_sent: list of source utterance tokens
-            hyp: incomplete hypothesis
-            states: history of decoder states for generating Hypothesis
+            src_sent: list of source utterance tokens (strings)
+            hyp: incomplete DecodeHypothesis() object
+            states: history of decoder states from generating `hyp`
             beam_size: beam size
 
         Returns:
@@ -939,12 +949,13 @@ class Parser(nn.Module):
         if hyp is not None and hyp.completed:
             result = hyp
         else:
-            result = self.parse(src_sent=src_sent,
-                                hyp=hyp,
-                                states=states,
-                                return_states=False,
-                                beam_size=self.args['beam_size'],
-                                debug=False)[0]
+            result, _ = self.parse(src_sent=src_sent, 
+                                   hyp=hyp, 
+                                   states=states, 
+                                   return_states=False, 
+                                   beam_size=1, 
+                                   debug=False)
+            result = result[0]
 
         return result
 
@@ -1072,6 +1083,7 @@ class Parser(nn.Module):
         # calculate reward
         self.optimizer.zero_grad()
         self.train()
+        netD.eval()
 
         rewards = np.array(rollout.get_tree_reward(hyps,
                                                    states,

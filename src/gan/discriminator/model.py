@@ -48,7 +48,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                           kernel_size=sz,
                           stride=1,
                           padding=0),
-                nn.ReLU(),
+                nn.LeakyReLU(negative_slope=0.2),
                 nn.MaxPool1d(kernel_size=2),
                 nn.Flatten()) for sz in self.filter_sizes]
         )
@@ -93,15 +93,20 @@ class QueryGAN_Discriminator_CNN(nn.Module):
     def train_single_code(self, train):
         criterion = nn.CrossEntropyLoss()
 
-        return self.trainer(train, criterion, self.args['early_stopping'])
+        return self.trainer(train, criterion)
 
-    def trainer(self, train, criterion, early_stopping=True,
-                n_epochs_stop=10):
 
-        trainloader = DataLoader(train, batch_size=self.args['batch_size'], shuffle=True, num_workers=4)
+    def trainer(self, train, criterion):
+        trainloader = DataLoader(train, batch_size=self.args['batch_size'], 
+                                 shuffle=True, num_workers=4)
+        steps = len(trainloader)
 
-        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()),
-                                          amsgrad=True)
+        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, 
+                                                 self.parameters()), 
+                                          betas = (self.args['beta_1'], 0.999),
+                                          lr = self.args['lr'],
+                                          weight_decay = self.args['wd'])
+
         if self.args['device'] == 'cuda':
             self.cuda()
             self.optimizer.cuda()
@@ -113,7 +118,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             labels = y.to(self.args['device'])
 
             # Forward pass
-            outputs = self.forward(verbs)
+            outputs = self(verbs)
             loss = criterion(outputs, labels.argmax(1))
 
             # Backward and optimize

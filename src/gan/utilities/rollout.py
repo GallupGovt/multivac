@@ -131,12 +131,12 @@ class Rollout(object):
                     samps[idx, :len(x)] = x[:150]
 
                 x = samps.long().to(netD.args['device'])
-                out, _ = netD.predict(x)
+                out = netD(x).softmax(dim=-1).data[:,1].numpy()
 
                 if i == 0:
-                    rewards.append(out.numpy())
+                    rewards.append(out)
                 else:
-                    rewards[j] += out.numpy()
+                    rewards[j] += out
 
             originals = [self.parse_tokens(hyp.tree) for hyp in hyps]
 
@@ -147,12 +147,12 @@ class Rollout(object):
                     samps[idx, :len(x)] = x[:150]
 
                 x = samps.long().to(netD.args['device'])
-                out, _ = netD.predict(x)
+                out = netD(x).softmax(dim=-1).data[:,1].numpy()
 
             if i == 0:
-                rewards.append(out.numpy())
+                rewards.append(out)
             else:
-                rewards[-1] += out.numpy()
+                rewards[-1] += out
 
         rewards = np.array(rewards) / (1.0 * self.rollout_num)
 
