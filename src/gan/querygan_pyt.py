@@ -39,11 +39,10 @@ def DiscriminatorDataset(DIR, fake, vocab, limit=None):
         data_file.size = data_file.labels.size(0)
 
         if limit:
-            idx = torch.tensor(np.random.choice(data_file.size, limit, replace=False))
+            idx = random.sample(range(data_file.size), limit)
             data_file.sentences = list(compress(data_file.sentences, idx))
             data_file.labels = data_file.labels[idx]
             data_file.size = data_file.labels.size(0)
-
 
     y_onehot = torch.zeros(data_file.size, 2)
     y_onehot.scatter_(1, data_file.labels.long().unsqueeze(1), 1)
