@@ -117,7 +117,6 @@ class QueryGAN_Discriminator_CNN(nn.Module):
 
         return self.trainer(train, criterion)
 
-
     def trainer(self, train, criterion):
         trainloader = DataLoader(train, batch_size=self.args['batch_size'], 
                                  shuffle=True, num_workers=4)
