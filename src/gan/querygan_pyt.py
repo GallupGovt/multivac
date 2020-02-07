@@ -26,7 +26,7 @@ from utilities.utils import load_word_vectors, deserialize_from_file
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
 
-def DiscriminatorDataset(DIR, fake, vocab):
+def DiscriminatorDataset(DIR, fake, vocab, limit=None):
     '''
     Take real examples from existing training dataset and add them to the 
     Generated dataset for adversarial training.
@@ -38,6 +38,13 @@ def DiscriminatorDataset(DIR, fake, vocab):
         data_file.sentences = list(compress(data_file.sentences, true_items))
         data_file.labels = data_file.labels[true_items]
         data_file.size = data_file.labels.size(0)
+
+        if limit:
+            idx = torch.tensor(np.random.choice(data_file.size, limit, replace=False))
+            data_file.sentences = list(compress(data_file.sentences, idx))
+            data_file.labels = data_file.labels[idx]
+            data_file.size = data_file.labels.size(0)
+
 
     y_onehot = torch.zeros(data_file.size, 2)
     y_onehot.scatter_(1, data_file.labels.long().unsqueeze(1), 1)
@@ -350,7 +357,7 @@ def run(cfg_dict):
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
@@ -461,7 +468,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
