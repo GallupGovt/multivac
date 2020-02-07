@@ -47,7 +47,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                           kernel_size=sz, 
                           stride=1, 
                           padding=0),
-                nn.ReLU(),
+                nn.LeakyReLU(negative_slope=0.2),
                 nn.MaxPool1d(kernel_size=2),
                 nn.Flatten()) for sz in self.filter_sizes
             ]
@@ -92,25 +92,21 @@ class QueryGAN_Discriminator_CNN(nn.Module):
 
     def train_single_code(self, train):
         criterion = nn.CrossEntropyLoss()
-        #acc_metric = accuracy
 
-        return self.trainer(train, criterion, 
-                     self.args['early_stopping'])
+        return self.trainer(train, criterion)
 
 
-    def trainer(self, train, criterion, early_stopping=True,
-                n_epochs_stop=10):
-
-        trainloader = DataLoader(train, batch_size=self.args['batch_size'], shuffle=True, num_workers=4)
+    def trainer(self, train, criterion):
+        trainloader = DataLoader(train, batch_size=self.args['batch_size'], 
+                                 shuffle=True, num_workers=4)
         steps = len(trainloader)
 
-        #acc = [0] * steps
         self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, 
                                                  self.parameters()), 
-                                                 #lr=0.0001,
-                                                 amsgrad=True)
-        #epochs_no_improve = 0
-        #max_test_acc = 0
+                                          betas = (self.args['beta_1'], 0.999),
+                                          lr = self.args['lr'],
+                                          weight_decay = self.args['wd'])
+
         if self.args['device'] == 'cuda':
             self.cuda()
             self.optimizer.cuda()
@@ -122,7 +118,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             labels = y.to(self.args['device'])
         
             # Forward pass
-            outputs = self.forward(verbs)
+            outputs = self(verbs)
             loss = criterion(outputs, labels.argmax(1))
             
             # Backward and optimize
@@ -131,83 +127,4 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             self.optimizer.step()
 
         return loss.item()
-
-            # self.eval()
-
-            # with torch.no_grad():
-            #     correct = 0
-            #     test_loader = DataLoader(test, 
-            #                              batch_size=self.args['batch_size'], 
-            #                              shuffle=True, num_workers=4)
-            #     test_steps = len(test_loader)
-            #     test_acc = [0] * test_steps
-            #     test_loss = [0] * test_steps
-                
-            #     if early_stopping:
-            #         min_loss = None
-
-            #     for i, (x, y) in enumerate(test_loader):
-            #         verbs = x.to(self.args['device'])
-            #         labels = y.to(self.args['device'])
-            #         outputs = self.forward(verbs)
-            #         test_loss[i] = criterion(outputs, labels.float())
-            #         test_acc[i] = acc_metric(outputs, labels, 1)
-
-            #     test_acc = sum(test_acc)/len(test_acc)
-            #     test_loss = sum(test_loss)/len(test_loss)
-
-            #     if early_stopping:
-            #         if min_loss is None:
-            #             min_loss = test_loss
-            #         elif 1 - test_loss/min_loss > 0.001:
-            #             # Save the model
-            #             self.save_checkpoint()
-            #             epochs_no_improve = 0
-            #         else:
-            #             epochs_no_improve += 1
-
-            #             # Check early stopping condition
-            #             if epochs_no_improve == n_epochs_stop:
-            #                 print('Test Loss: {:.4f}, topk_acc: '
-            #                       '{:.4f}%'.format(test_loss, 100 * test_acc))
-            #                 print('Early stopping! Reloading best weights '
-            #                       'and saving.')
-            #                 # Load in the best model
-            #                 if self.best_model_state_dict is not None:
-            #                     self.load_state_dict(self.best_model_state_dict)
-            #                     self.optimizer.load_state_dict(self.opt_dict)
-            #                     self.save_checkpoint(write=True)
-            #                 break
-
-            #     print('Test Loss: {:.4f}, topk_acc: '
-            #           '{:.4f}%'.format(test_loss, 100 * test_acc))
-    
-
-# class QueryGAN_Discriminator_CNN(nn.Module):
-#     def __init__(self, args, vocab): #vocab_size, in_dim, mem_dim, sparsity, freeze):
-#         super().__init__()
-#         self.args = args
-#         self.vocab = vocab
-#         self.vocab_size = len(vocab)
-#         self.batchsize = self.args['batch_size']
-#         self.num_epochs = self.args['num_epochs']
-
-#     def forward(self, inputs):
-#         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-#         X = inputs.sentences
-#         Y = inputs.labels
-
-#         X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=1/4, stratify=Y)
-
-#         model = CNN_Classifier(args_dict, vocab, glove_vectors, Y.shape[1])
-#         model.args['device'] = device
-#         model.to(device)
-
-#         model.train_single_code(train, test)
-
-#         probs, labels = model.predict(X)
-#         output = probs.numpy()
-#         return output
-
 

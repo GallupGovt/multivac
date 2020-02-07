@@ -26,56 +26,34 @@ from utilities.utils import load_word_vectors, deserialize_from_file
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
 
-def DiscriminatorDataset(real_dir, fake_dir, vocab):
+def DiscriminatorDataset(DIR, fake, vocab):
     '''
     Take real examples from existing training dataset and add them to the 
     Generated dataset for adversarial training.
     '''
-    real_file = MULTIVACDataset(real_dir, vocab)
-    combined_file = MULTIVACDataset(fake_dir, vocab)
+    data_file = MULTIVACDataset(DIR, vocab)
 
-    true_items = real_file.labels==1
-    real_file.sentences = list(compress(real_file.sentences, true_items))
-    #real_file.trees = list(compress(real_file.trees, true_items))
-    real_file.labels = real_file.labels[true_items]
-    real_file.size = real_file.labels.size(0)
+    if not fake:
+        true_items = data_file.labels==1
+        data_file.sentences = list(compress(data_file.sentences, true_items))
+        data_file.labels = data_file.labels[true_items]
+        data_file.size = data_file.labels.size(0)
 
-    if len(real_file) > len(combined_file):
-        indices = random.sample(range(real_file.size), combined_file.size)
-        combined_file.sentences.extend(real_file.sentences)
-        
-        # for i in indices:
-        #     combined_file.trees.append(real_file.trees[i])
-        #     combined_file.sentences.append(real_file.sentences[i])
+    y_onehot = torch.zeros(data_file.size, 2)
+    y_onehot.scatter_(1, data_file.labels.long().unsqueeze(1), 1)
 
-        labels = torch.cat((combined_file.labels, 
-                            torch.ones(len(indices))), dim=0)
-        combined_file.labels = labels
-
-    else:
-        indices = list(range(real_file.size))
-        #combined_file.trees.extend(real_file.trees)
-        combined_file.sentences.extend(real_file.sentences)
-        combined_file.labels = torch.cat((combined_file.labels, 
-                                          real_file.labels), dim=0)
-
-    combined_file.size = combined_file.labels.size(0)
-
-    y_onehot = torch.zeros(combined_file.size, 2)
-    y_onehot.scatter_(1, combined_file.labels.long().unsqueeze(1), 1)
-
-    combined_file.labels = y_onehot
+    data_file.labels = y_onehot
 
     maxlen = 150 # to match CNN classifier architecture
-    sents = torch.full((len(combined_file.sentences), maxlen), 
-                        combined_file.vocab.pad)
+    sents = torch.full((len(data_file.sentences), maxlen), 
+                        data_file.vocab.pad)
 
-    for i, s in enumerate(combined_file.sentences):
+    for i, s in enumerate(data_file.sentences):
         sents[i, :len(s)] = s[:150]
 
-    combined_file.sentences = sents.long()
+    data_file.sentences = sents.long()
 
-    return combined_file
+    return data_file
 
 def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -131,7 +109,7 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
                 samps, sts = net.parse(query, return_states=True, 
                                           beam_size=net.args['beam_size'])
             else:
-                samps = net.parse(query, beam_size=net.args['beam_size'])
+                samps, _ = net.parse(query, beam_size=net.args['beam_size'])
 
             if samps[0].completed:
                 break
@@ -161,7 +139,7 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
     if oracle:
         return samples, states, examples
     elif writeout:
-        sample_parses = parser.get_parse('?\n'.join([e.tgt_text for e in examples]))
+        sample_parses = parser.get_parse('\n'.join([e.tgt_text for e in examples]))
 
         with open(os.path.join(dst_dir, 'text.toks'   ), 'w') as tokfile, \
              open(os.path.join(dst_dir, 'cat.txt'     ), 'w') as catfile:
@@ -250,7 +228,7 @@ def run(cfg_dict):
 
     if gan_args['verbose']: print("Initializing Stanford Parser...")
 
-    parser = StanfordParser(annots="tokenize")
+    parser = StanfordParser(annots="tokenize ssplit")
 
     # Load input files for Generator: grammar and transition system, vocab,
     # word embeddings
@@ -280,7 +258,9 @@ def run(cfg_dict):
 
     netG = Parser(gargs, glove_vocab, prim_vocab, transition_system)
     optimizer_cls = eval('torch.optim.%s' % gargs['optimizer'])
-    netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'])
+    netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'], 
+                                   betas = (gargs['beta_1'], 0.999),
+                                   weight_decay=gargs['lr_decay'])
 
     if gargs['uniform_init']:
         if gan_args['verbose']: 
@@ -364,20 +344,21 @@ def run(cfg_dict):
             pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
             print('[Generator {}]  step elapsed {}s'.format(step, 
                                                             time.time() - step_begin))
-            print('Generator adversarial loss={}'.format(pgloss))
+            print('Generator adversarial loss={}, epoch={}'.format(pgloss, epoch))
             generator_losses.append(pgloss)
 
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            dis_set = DiscriminatorDataset(netD.args['data'], 
-                                           netG.args['sample_dir'],
-                                           glove_vocab)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab)
+            fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
-                loss = netD.train_single_code(dis_set)
-                print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
-                discriminator_losses.append(loss)
+                loss_r = netD.train_single_code(real_set)
+                print('D_step {}, K-step {} Discriminator loss on real set: {}'.format(d_step + 1, k_step + 1, loss_r))
+                loss_f = netD.train_single_code(fake_set)
+                print('D_step {}, K-step {} Discriminator loss on fake set: {}'.format(d_step + 1, k_step + 1, loss_f))
+                discriminator_losses.append((loss_r + loss_f)/2)
                 
         save_progress(netD, netG, examples, epoch, discriminator_losses, generator_losses)
         
@@ -480,14 +461,15 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            dis_set = DiscriminatorDataset(netD.args['data'], 
-                                           netG.args['sample_dir'],
-                                           netG.vocab)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab)
+            fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
-                loss = netD.train_single_code(dis_set)
-                print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
-                discriminator_losses.append(loss)
+                loss_r = netD.train_single_code(real_set)
+                print('D_step {}, K-step {} Discriminator loss on real set: {}'.format(d_step + 1, k_step + 1, loss_r))
+                loss_f = netD.train_single_code(fake_set)
+                print('D_step {}, K-step {} Discriminator loss on fake set: {}'.format(d_step + 1, k_step + 1, loss_f))
+                discriminator_losses.append((loss_r + loss_f)/2)
                 
         save_progress(netD, netG, examples, ep, discriminator_losses, generator_losses)
 
