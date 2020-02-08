@@ -40,9 +40,10 @@ def DiscriminatorDataset(DIR, fake, vocab, limit=None):
         data_file.size = data_file.labels.size(0)
 
         if limit:
-            idx = random.sample(range(data_file.size), limit)
-            data_file.sentences = list(compress(data_file.sentences, idx))
-            data_file.labels = data_file.labels[idx]
+            mask = torch.zeros_like(data_file.labels, dtype=torch.bool)
+            mask[random.sample(range(data_file.size), limit)] = True
+            data_file.sentences = list(compress(data_file.sentences, mask))
+            data_file.labels = data_file.labels[mask]
             data_file.size = data_file.labels.size(0)
 
     y_onehot = torch.zeros(data_file.size, 2)
@@ -356,7 +357,7 @@ def run(cfg_dict):
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num+1)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
@@ -467,7 +468,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num+1)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
