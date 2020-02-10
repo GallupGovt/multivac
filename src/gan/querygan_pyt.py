@@ -22,7 +22,6 @@ from gen_pyt.datasets.english.dataset import English
 from gen_pyt.model import nn_utils
 from gen_pyt.model.parser import Parser
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
-from multivac.src.rdf_graph.map_queries import get_newest_file
 
 
 def DiscriminatorDataset(DIR, fake, vocab, limit=None):
@@ -90,6 +89,10 @@ def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
                     lr=model.args['lr'], weight_decay=model.args['wd'])
 
     return Trainer(model.args, model, criterion, optimizer, device)
+
+def get_newest_file(path, files, term): 
+    tmp = sorted([(os.path.getmtime(os.path.join(path, x)), x) for x in files if term in x])
+    return os.path.join(path, tmp[-1][1])
 
 def load_triples(args):
     DIR = args['kg_directory']
