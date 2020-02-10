@@ -22,7 +22,6 @@ from gen_pyt.datasets.english.dataset import English
 from gen_pyt.model import nn_utils
 from gen_pyt.model.parser import Parser
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
-from multivac.src.rdf_graph.map_queries import get_newest_file
 
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 
@@ -88,6 +87,10 @@ def generate_query(ents, rels, kg):
     head_tokens = ents.iloc[head].iloc[0].split(" | ")
     tail_tokens = ents.iloc[tail].iloc[0].split(" | ")
     rel_tokens = rels.iloc[rel].iloc[0].split(" | ")
+
+def get_newest_file(path, files, term): 
+    tmp = sorted([(os.path.getmtime(os.path.join(path, x)), x) for x in files if term in x])
+    return os.path.join(path, tmp[-1][1])
 
 def load_triples(args):
     DIR = args['kg_directory']
