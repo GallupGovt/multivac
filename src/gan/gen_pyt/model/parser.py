@@ -83,8 +83,8 @@ class Parser(nn.Module):
                               kernel_size=3,
                               stride=1,
                               padding=1),
-                    nn.BatchNorm1d(args['hidden_size']),
-                    nn.LeakyReLU(negative_slope=0.2))
+                    nn.LeakyReLU(negative_slope=0.2),
+                    nn.BatchNorm1d(args['hidden_size']))
         else:
             self.encoder_lstm = nn.LSTM(args['embed_size'], 
                                         int(args['hidden_size'] / 2), 
