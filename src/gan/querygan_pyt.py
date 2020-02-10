@@ -343,10 +343,10 @@ def run(cfg_dict):
     print('\n#####################################################')
     print('Adversarial training...\n')
 
-    discriminator_losses = []
-    generator_losses = []
-
     for epoch in range(total_epochs):
+        discriminator_losses = []
+        generator_losses = []
+
         for step in range(g_steps):
             # train generator
             hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, oracle=True)
@@ -468,7 +468,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
             pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
             print('[Generator {}]  step elapsed {}s'.format(step,
                                                             time.time() - step_begin))
-            print('Generator adversarial loss={}'.format(pgloss))
+            print('Generator adversarial loss={}, epoch={}'.format(pgloss, epoch))
             generator_losses.append(pgloss)
 
         for d_step in range(d_steps):
@@ -485,6 +485,8 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
                 discriminator_losses.append((loss_r + loss_f)/2)
                 
         save_progress(netD, netG, examples, ep, discriminator_losses, generator_losses)
+        discriminator_losses = []
+        generator_losses = []
 
 
 def save_progress(netD, netG, examples, epoch, discriminator_losses, generator_losses):
