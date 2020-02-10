@@ -2,6 +2,7 @@
 import argparse
 import configparser
 import os
+import pandas as pd
 import random
 import time
 from itertools import compress
@@ -21,8 +22,7 @@ from gen_pyt.datasets.english.dataset import English
 from gen_pyt.model import nn_utils
 from gen_pyt.model.parser import Parser
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
-from utilities.rollout import Rollout
-from utilities.utils import deserialize_from_file, load_word_vectors
+from multivac.src.rdf_graph.map_queries import get_newest_file
 
 
 def DiscriminatorDataset(DIR, fake, vocab, limit=None):
@@ -91,8 +91,36 @@ def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
 
     return Trainer(model.args, model, criterion, optimizer, device)
 
+def load_triples(args):
+    DIR = args['kg_directory']
+    files = [x for x in os.listdir(DIR) if '2id' in x]
+    rel_file = get_newest_file(DIR, files, 'relation')
+    ent_file = get_newest_file(DIR, files, 'entity')
+    trn_file = get_newest_file(DIR, files, 'train')
 
-def generate_samples(net, seq_len, generated_num, parser, oracle=False,
+    entities = pd.read_csv(ent_file, sep='\t', 
+                           names=["Ent","Id"], skiprows=1)
+    relations = pd.read_csv(rel_file, sep='\t', 
+                            names=["Rel","Id"], skiprows=1)
+    train = pd.read_csv(trn_file, sep='\t', 
+                        names=["Head","Tail","Relation"], skiprows=1)
+
+    return entities, relations, train
+
+def generate_query(ents, rels, kg):
+    head, tail, rel = kg.sample().iloc[0].to_list()
+
+    head_tokens = ents.iloc[head].iloc[0].split(" | ")
+    tail_tokens = ents.iloc[tail].iloc[0].split(" | ")
+    rel_tokens = rels.iloc[rel].iloc[0].split(" | ")
+
+    head = random.choice(head_tokens).strip()
+    tail = random.choice(tail_tokens).strip()
+    rel  = random.choice(rel_tokens).strip()
+
+    return head.split() + rel.split() + tail.split()
+
+def generate_samples(net, seq_len, generated_num, parser, gan_args, oracle=False, 
                      writeout=False):
     samples = []
     examples = []
@@ -103,6 +131,8 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
     dst_dir = net.args['sample_dir']
     net.eval()
     print("Generating Samples...")
+
+    ents, rels, kg = load_triples(gan_args)
     pbar = tqdm(total=generated_num)
 
     while len(samples) < generated_num:
@@ -110,8 +140,9 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
         sts = []
 
         while True:
-            query = net.vocab.convertToLabels(random.sample(range(net.vocab.size()),
-                                              seq_len))
+            query = generate_query(ents, rels, kg)
+            # query = net.vocab.convertToLabels(random.sample(range(net.vocab.size()), 
+            #                               seq_len))
             if oracle:
                 samps, sts = net.parse(query, return_states=True,
                                        beam_size=net.args['beam_size'])
@@ -349,7 +380,7 @@ def run(cfg_dict):
 
         for step in range(g_steps):
             # train generator
-            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, oracle=True)
+            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, gan_args, oracle=True)
             # samples = generate_samples(netG, seq_len, generated_num, parser)
             # hyps, examples = list(zip(*samples))
             step_begin = time.time()
@@ -362,7 +393,7 @@ def run(cfg_dict):
 
         for d_step in range(d_steps):
             # train discriminator
-            generate_samples(netG, seq_len, generated_num, parser, writeout=True)
+            generate_samples(netG, seq_len, generated_num, parser, gan_args, writeout=True)
             real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
@@ -462,7 +493,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     for ep in range(epoch, total_epochs):
         for step in range(g_steps):
             # train generator
-            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, oracle=True)
+            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, gan_args, oracle=True)
             # hyps, examples = list(zip(*samples))
             step_begin = time.time()
             pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
@@ -473,7 +504,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
 
         for d_step in range(d_steps):
             # train discriminator
-            generate_samples(netG, seq_len, generated_num, parser, writeout=True)
+            generate_samples(netG, seq_len, generated_num, parser, gan_args, writeout=True)
             real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
