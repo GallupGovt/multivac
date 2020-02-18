@@ -2,7 +2,7 @@
 English grammar and typing system
 """
 from collections import OrderedDict
-
+from copy import deepcopy
 from multivac.src.gan.gen_pyt.asdl.lang.grammar import Grammar
 from multivac.src.gan.gen_pyt.asdl.asdl import ASDLGrammar, ASDLProduction, \
                                                Field, ASDLCompositeType, \
@@ -76,7 +76,9 @@ class EnglishASDLGrammar(ASDLGrammar):
         self._constructor_production_map = dict()
 
         if productions is not None:
-            for prod in productions:
+            english_prods = set(productions)
+
+            for prod in english_prods:
                 if prod.type not in self._productions:
                     self._productions[prod.type] = list()
                 self._productions[prod.type].append(prod)
@@ -99,7 +101,7 @@ class EnglishASDLGrammar(ASDLGrammar):
 
                     fields.append(Field(child.type, child_type, 'single'))
 
-                constructor = ASDLConstructor(str(rule), fields)
+                constructor = ASDLConstructor(rule.type, fields)
                 production  = ASDLProduction(ASDLCompositeType(rule.type), 
                                              constructor)
 

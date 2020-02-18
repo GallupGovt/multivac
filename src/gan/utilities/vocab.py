@@ -171,9 +171,9 @@ class Vocab(object):
 
     @staticmethod
     def from_dict(vocab):
-        vocab = Vocab()
+        new_vocab = Vocab()
 
         for key, value in vocab.items():
-            setattr(vocab, key, value)
+            setattr(new_vocab, key, value)
 
-        return vocab
+        return new_vocab
