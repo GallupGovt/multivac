@@ -77,40 +77,6 @@ class EnglishASDLGrammar(ASDLGrammar):
 
         if productions is not None:
             english_prods = set(productions)
-            # english_prods = set()
-            # unit_prods = set()
-
-            # for p in productions:
-            #     if len(p.constructor.fields) == 1 and \
-            #        type(p.constructor.fields[0].type) == ASDLCompositeType:
-            #         unit_prods.add(p)
-            #     else:
-            #         english_prods.add(p)
-
-            # new_unit_prods = set()
-
-            # for up_1 in unit_prods:
-            #     for up_2 in unit_prods:
-            #         if up_1.constructor.fields[0].name == up_2.type.name:
-            #             new_constructor = deepcopy(up_2.constructor)
-            #             name = up_2.constructor.name[up_2.constructor.name.index(' -> '):]
-            #             new_constructor.name = up_1.type.name + name
-            #             new_prod = ASDLProduction(up_1.type, new_constructor)
-            #             new_unit_prods.add(new_prod)
-
-            # unit_prods.update(new_unit_prods)
-            # new_english_prods = set()
-
-            # for up in unit_prods:
-            #     for ep in english_prods:
-            #         if up.constructor.fields[0].name == ep.type.name:
-            #             new_constructor = ep.constructor
-            #             name = ep.constructor.name[ep.constructor.name.index(' -> '):]
-            #             new_constructor.name = up.type.name + name
-            #             new_prod = ASDLProduction(up.type, new_constructor)
-            #             new_english_prods.add(new_prod)
-
-            # english_prods.update(new_english_prods)
 
             for prod in english_prods:
                 if prod.type not in self._productions:

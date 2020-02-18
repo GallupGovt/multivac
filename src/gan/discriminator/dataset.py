@@ -22,7 +22,6 @@ class MULTIVACDataset(data.Dataset):
         return self.size
 
     def __getitem__(self, index):
-        #tree = deepcopy(self.trees[index])
         sent = deepcopy(self.sentences[index])
         label = deepcopy(self.labels[index])
         
