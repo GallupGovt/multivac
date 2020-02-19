@@ -202,7 +202,7 @@ class Parser(nn.Module):
             self.new_tensor = torch.FloatTensor
 
     def encode(self, src_sents_var, src_sents_len):
-        """Encode the input natural language utterance
+        """Encode the input semantic components
 
         Args:
             src_sents_var: a variable of shape (src_sent_len, batch_size),
