@@ -1075,8 +1075,8 @@ class Parser(nn.Module):
 
             if epoch == self.args['pre_g_epochs']:
                 print('reached max epoch, stop!')
-                self.save(os.path.join(self.args['sample_dir'],
-                                       "pretrained_gen_model.pth"))
+                # self.save(os.path.join(self.args['sample_dir'], 
+                #                        "pretrained_gen_model.pth"))
                 break
 
     def pgtrain(self, hyps, states, examples, rollout, netD):

@@ -60,36 +60,6 @@ def DiscriminatorDataset(DIR, fake, vocab, limit=None):
 
     return data_file
 
-
-def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
-    device = torch.device("cuda" if use_cuda else "cpu")
-    criterion = nn.MSELoss()
-    emb = torch.zeros(glove_vocab.size(), glove_emb.size(1), dtype=torch.float,
-                      device=device)
-    emb.normal_(0, 0.05)
-
-    for word in glove_vocab.labelToIdx.keys():
-        if glove_vocab.getIndex(word) < glove_emb.size(0):
-            emb[glove_vocab.getIndex(word)] = glove_emb[glove_vocab.getIndex(word)]
-        else:
-            emb[glove_vocab.getIndex(word)].zero_()
-
-    # plug these into embedding matrix inside model
-    model.emb.weight.data.copy_(emb)
-    model.to(device), criterion.to(device)
-
-    if model.args['optim'] == 'adam':
-        opt = optim.Adam
-    elif model.args['optim'] == 'adagrad':
-        opt = optim.Adagrad
-    elif model.args['optim'] == 'sgd':
-        opt = optim.SGD
-
-    optimizer = opt(filter(lambda p: p.requires_grad, model.parameters()),
-                    lr=model.args['lr'], weight_decay=model.args['wd'])
-
-    return Trainer(model.args, model, criterion, optimizer, device)
-
 def get_newest_file(path, files, term): 
     tmp = sorted([(os.path.getmtime(os.path.join(path, x)), x) for x in files if term in x])
     return os.path.join(path, tmp[-1][1])
@@ -123,7 +93,7 @@ def generate_query(ents, rels, kg):
 
     return head.split() + rel.split() + tail.split()
 
-def generate_samples(net, seq_len, generated_num, parser, gan_args, oracle=False, 
+def generate_samples(net, generated_num, parser, gan_args, oracle=False, 
                      writeout=False):
     samples = []
     examples = []
@@ -144,8 +114,6 @@ def generate_samples(net, seq_len, generated_num, parser, gan_args, oracle=False
 
         while True:
             query = generate_query(ents, rels, kg)
-            # query = net.vocab.convertToLabels(random.sample(range(net.vocab.size()), 
-            #                               seq_len))
             if oracle:
                 samps, sts = net.parse(query, return_states=True,
                                        beam_size=net.args['beam_size'])
@@ -236,14 +204,14 @@ def run(cfg_dict):
     gan_args = cfg_dict['GAN']
 
     seed = gan_args['seed']
-    batch_size = gan_args['batch_size']
+    #batch_size = gan_args['batch_size']
     total_epochs = gan_args['total_epochs']
     generated_num = gan_args['generated_num']
-    vocab_size = gan_args['vocab_size']
-    seq_len = gan_args['sequence_len']
+    #vocab_size = gan_args['vocab_size']
+    #seq_len = gan_args['sequence_len']
 
     # rollout params
-    rollout_update_rate = gan_args['rollout_update_rate']
+    #rollout_update_rate = gan_args['rollout_update_rate']
     rollout_num = gan_args['rollout_num']
 
     g_steps = gan_args['g_steps']
@@ -383,9 +351,7 @@ def run(cfg_dict):
 
         for step in range(g_steps):
             # train generator
-            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, gan_args, oracle=True)
-            # samples = generate_samples(netG, seq_len, generated_num, parser)
-            # hyps, examples = list(zip(*samples))
+            hyps, states, examples = generate_samples(netG, generated_num, parser, gan_args, oracle=True)
             step_begin = time.time()
 
             pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
@@ -396,8 +362,9 @@ def run(cfg_dict):
 
         for d_step in range(d_steps):
             # train discriminator
-            generate_samples(netG, seq_len, generated_num, parser, gan_args, writeout=True)
-            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
+            generate_samples(netG, generated_num, parser, gan_args, writeout=True)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, 
+                                            vocab=glove_vocab, limit=generated_num)
             fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
         
             for k_step in range(k_steps):
@@ -417,14 +384,10 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     gan_args = cfg_dict['GAN']
 
     seed = gan_args['seed']
-    batch_size = gan_args['batch_size']
     total_epochs = gan_args['total_epochs']
     generated_num = gan_args['generated_num']
-    vocab_size = gan_args['vocab_size']
-    seq_len = gan_args['sequence_len']
 
     # rollout params
-    rollout_update_rate = gan_args['rollout_update_rate']
     rollout_num = gan_args['rollout_num']
 
     g_steps = gan_args['g_steps']
@@ -475,15 +438,22 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
             epoch = disc_params['epoch']
 
         if netD.args['optim'] == 'adam':
-            opt = optim.Adam
+            netD.optimizer = optim.Adam(filter(lambda p: p.requires_grad, 
+                                               netD.parameters()), 
+                                        betas = (netD.args['beta_1'], 0.999),
+                                        lr=netD.args['lr'], 
+                                        weight_decay=netD.args['wd'])
         elif netD.args['optim'] == 'adagrad':
-            opt = optim.Adagrad
+            netD.optimizer = optim.Adagrad(filter(lambda p: p.requires_grad, 
+                                                  netD.parameters()), 
+                                           lr=netD.args['lr'], 
+                                           weight_decay=netD.args['wd'])
         elif netD.args['optim'] == 'sgd':
-            opt = optim.SGD
+            netD.optimizer = optim.SGD(filter(lambda p: p.requires_grad, 
+                                              netD.parameters()), 
+                                       lr=netD.args['lr'], 
+                                       weight_decay=netD.args['wd'])
 
-        netD.optimizer = opt(filter(lambda p: p.requires_grad, netD.parameters()),
-                             lr=netD.args['lr'],
-                             weight_decay=netD.args['wd'])
         netD.optimizer.load_state_dict(disc_params['optimizer'])
     else:
         netD = disc_chk
@@ -496,7 +466,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     for ep in range(epoch, total_epochs):
         for step in range(g_steps):
             # train generator
-            hyps, states, examples = generate_samples(netG, seq_len, generated_num, parser, gan_args, oracle=True)
+            hyps, states, examples = generate_samples(netG, generated_num, parser, gan_args, oracle=True)
             # hyps, examples = list(zip(*samples))
             step_begin = time.time()
             pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
@@ -507,9 +477,11 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
 
         for d_step in range(d_steps):
             # train discriminator
-            generate_samples(netG, seq_len, generated_num, parser, gan_args, writeout=True)
-            real_set = DiscriminatorDataset(netD.args['data'], fake=False, vocab=glove_vocab, limit=generated_num)
-            fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, vocab=glove_vocab)
+            generate_samples(netG, generated_num, parser, gan_args, writeout=True)
+            real_set = DiscriminatorDataset(netD.args['data'], fake=False, 
+                                            vocab=glove_vocab, limit=generated_num)
+            fake_set = DiscriminatorDataset(netG.args['sample_dir'], fake=True, 
+                                            vocab=glove_vocab)
         
             for k_step in range(k_steps):
                 loss_r = netD.train_single_code(real_set)
