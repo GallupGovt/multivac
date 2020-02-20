@@ -67,11 +67,11 @@ class Parser(nn.Module):
         self.type_embed = nn.Embedding(len(transition_system.grammar.types), 
                                        args['type_embed_size'])
 
-        nn.init.xavier_normal_(self.src_embed.weight.data)
-        nn.init.xavier_normal_(self.production_embed.weight.data)
-        nn.init.xavier_normal_(self.primitive_embed.weight.data)
-        nn.init.xavier_normal_(self.field_embed.weight.data)
-        nn.init.xavier_normal_(self.type_embed.weight.data)
+        nn.init.kaiming_normal_(self.src_embed.weight.data)
+        nn.init.kaiming_normal_(self.production_embed.weight.data)
+        nn.init.kaiming_normal_(self.primitive_embed.weight.data)
+        nn.init.kaiming_normal_(self.field_embed.weight.data)
+        nn.init.kaiming_normal_(self.type_embed.weight.data)
 
         # Encoders
 

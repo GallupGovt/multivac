@@ -46,9 +46,10 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                           out_channels=self.num_filters, 
                           kernel_size=sz, 
                           stride=1, 
-                          padding=0),
+                          padding=0), 
                 nn.LeakyReLU(negative_slope=0.2),
-                nn.MaxPool1d(kernel_size=2),
+                nn.BatchNorm1d(self.num_filters),
+                nn.MaxPool1d(kernel_size=2), 
                 nn.Flatten()) for sz in self.filter_sizes
             ]
         )
