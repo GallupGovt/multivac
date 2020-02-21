@@ -49,6 +49,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                           stride=1,
                           padding=0),
                 nn.LeakyReLU(negative_slope=0.2),
+                nn.BatchNorm1d(self.num_filters),
                 nn.MaxPool1d(kernel_size=2),
                 nn.Flatten()) for sz in self.filter_sizes]
         )
@@ -164,8 +165,8 @@ class SmoothedCrossEntropy(nn.Module):
             target: Onehot Tensor indicating actual class labels of size
                     batchsize * n_classes
         '''
-        target = target * smoothing + (1 - target) * (1 - smoothing) / (n_class - 1)
-        return -(one_hot * self.softmax(output)).mean(dim=1)
+        target = target * self.smoothing + (1 - target) * (1 - self.smoothing)
+        return -(target * self.softmax(output)).mean()
 
 
 

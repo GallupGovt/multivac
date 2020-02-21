@@ -281,6 +281,9 @@ def run(cfg_dict):
         if gan_args['verbose']:
             print('use glorot initialization')
         nn_utils.glorot_init(netG.parameters())
+    elif gargs['kaiming_init']:
+        if gan_args['verbose']: print('use kaiming initialization')
+        nn_utils.kaiming_init(netG.parameters())
 
     if gan_args['verbose']:
         print("Loading GloVe vectors as Generator embeddings...")
