@@ -1,6 +1,7 @@
 # directories
-/data/
-/models/
+data/
+models/
+grobid/
 
 # pycharm files
 .idea/
