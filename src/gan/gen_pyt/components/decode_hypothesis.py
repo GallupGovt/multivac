@@ -1,8 +1,6 @@
 # coding=utf-8
 
-from multivac.src.gan.gen_pyt.asdl.asdl import *
 from multivac.src.gan.gen_pyt.asdl.hypothesis import Hypothesis
-from multivac.src.gan.gen_pyt.asdl.transition_system import *
 
 
 class DecodeHypothesis(Hypothesis):
@@ -39,4 +37,3 @@ class DecodeHypothesis(Hypothesis):
     def apply_action_info(self, action_info):
         self.apply_action(action_info.action)
         self.action_infos.append(action_info)
-

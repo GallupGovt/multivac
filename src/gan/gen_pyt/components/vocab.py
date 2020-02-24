@@ -2,7 +2,9 @@
 from collections import Counter
 from itertools import chain
 
+
 class Vocab(object):
+
     def __init__(self, filename=None, data=None, lower=False):
         self.idxToLabel = {}
         self.labelToIdx = {}
@@ -21,14 +23,10 @@ class Vocab(object):
         self.add('<eos>')
 
     def __getitem__(self, item):
-            return self.labelToIdx.get(item, self.unk)
+        return self.labelToIdx.get(item, self.unk)
 
     def __contains__(self, item):
-            return item in self.labelToIdx
-
-    @property
-    def size(self):
-        return len(self.idxToLabel)
+        return item in self.labelToIdx
 
     def __setitem__(self, key, value):
         self.labelToIdx[key] = value
@@ -40,10 +38,10 @@ class Vocab(object):
         return iter(list(self.labelToIdx.keys()))
 
     def __eq__(self, other):
-        return all([self.idxToLabel == other.idxToLabel, 
+        return all([self.idxToLabel == other.idxToLabel,
                     self.labelToIdx == other.labelToIdx,
-                    self.lower      == other.lower, 
-                    self.special    == other.special])
+                    self.lower == other.lower,
+                    self.special == other.special])
 
     @property
     def pad(self):
@@ -85,7 +83,7 @@ class Vocab(object):
             self.labelToIdx[label] = idx
         else:
             idx = self.add(label)
-        
+
     # Mark this `label` and `idx` as special
     def addSpecial(self, label):
         idx = self.add(label)
@@ -124,7 +122,6 @@ class Vocab(object):
         if bosWord is not None:
             vec += [self.getIndex(bosWord)]
 
-        
         vec += [self.getIndex(label, default=unk) for label in labels]
 
         if eosWord is not None:
@@ -142,7 +139,6 @@ class Vocab(object):
                 break
 
         return labels
-
 
     @staticmethod
     def from_corpus(corpus, size=None, freq_cutoff=0):

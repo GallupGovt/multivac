@@ -1,62 +1,66 @@
 #!usr/bin/env/python
 import argparse
 import configparser
-from itertools import compress
-import numpy as np
 import os
 import random
 import time
-from tqdm import tqdm
+from itertools import compress
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
 
-from discriminator import QueryGAN_Discriminator_CNN, MULTIVACDataset, Trainer
-from gen_pyt.datasets.english.dataset import English
-from gen_pyt.asdl.lang.eng.eng_asdl_helper import asdl_ast_to_english
-from gen_pyt.asdl.lang.eng.eng_transition_system import EnglishTransitionSystem
-from gen_pyt.components.action_info import get_action_infos
-from gen_pyt.components.dataset import Example, Dataset
-from gen_pyt.model import nn_utils
-from gen_pyt.model.parser import Parser
-from utilities.rollout import Rollout
-from utilities.utils import load_word_vectors, deserialize_from_file
-
+from multivac.src.gan.discriminator import (MULTIVACDataset,
+                                            QueryGAN_Discriminator_CNN,
+                                            Trainer)
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import \
+    asdl_ast_to_english
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_transition_system import \
+    EnglishTransitionSystem
+from multivac.src.gan.gen_pyt.components.action_info import get_action_infos
+from multivac.src.gan.gen_pyt.components.dataset import Dataset, Example
+from multivac.src.gan.gen_pyt.datasets.english.dataset import English
+from multivac.src.gan.gen_pyt.model import nn_utils
+from multivac.src.gan.gen_pyt.model.parser import Parser
+from multivac.src.gan.utilities.rollout import Rollout
+from multivac.src.gan.utilities.utils import (deserialize_from_file,
+                                              load_word_vectors)
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
 
 def DiscriminatorDataset(real_dir, fake_dir, vocab):
     '''
-    Take real examples from existing training dataset and add them to the 
+    Take real examples from existing training dataset and add them to the
     Generated dataset for adversarial training.
     '''
     real_file = MULTIVACDataset(real_dir, vocab)
     combined_file = MULTIVACDataset(fake_dir, vocab)
 
-    true_items = real_file.labels==1
+    true_items = real_file.labels == 1
     real_file.sentences = list(compress(real_file.sentences, true_items))
-    #real_file.trees = list(compress(real_file.trees, true_items))
+    # real_file.trees = list(compress(real_file.trees, true_items))
     real_file.labels = real_file.labels[true_items]
     real_file.size = real_file.labels.size(0)
 
     if len(real_file) > len(combined_file):
         indices = random.sample(range(real_file.size), combined_file.size)
         combined_file.sentences.extend(real_file.sentences)
-        
+
         # for i in indices:
         #     combined_file.trees.append(real_file.trees[i])
         #     combined_file.sentences.append(real_file.sentences[i])
 
-        labels = torch.cat((combined_file.labels, 
+        labels = torch.cat((combined_file.labels,
                             torch.ones(len(indices))), dim=0)
         combined_file.labels = labels
 
     else:
         indices = list(range(real_file.size))
-        #combined_file.trees.extend(real_file.trees)
+        # combined_file.trees.extend(real_file.trees)
         combined_file.sentences.extend(real_file.sentences)
-        combined_file.labels = torch.cat((combined_file.labels, 
+        combined_file.labels = torch.cat((combined_file.labels,
                                           real_file.labels), dim=0)
 
     combined_file.size = combined_file.labels.size(0)
@@ -66,9 +70,8 @@ def DiscriminatorDataset(real_dir, fake_dir, vocab):
 
     combined_file.labels = y_onehot
 
-    maxlen = 150 # to match CNN classifier architecture
-    sents = torch.full((len(combined_file.sentences), maxlen), 
-                        combined_file.vocab.pad)
+    maxlen = 150  # to match CNN classifier architecture
+    sents = torch.full((len(combined_file.sentences), maxlen), combined_file.vocab.pad)
 
     for i, s in enumerate(combined_file.sentences):
         sents[i, :len(s)] = s[:150]
@@ -77,10 +80,11 @@ def DiscriminatorDataset(real_dir, fake_dir, vocab):
 
     return combined_file
 
+
 def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
     device = torch.device("cuda" if use_cuda else "cpu")
     criterion = nn.MSELoss()
-    emb = torch.zeros(glove_vocab.size(), glove_emb.size(1), dtype=torch.float, 
+    emb = torch.zeros(glove_vocab.size(), glove_emb.size(1), dtype=torch.float,
                       device=device)
     emb.normal_(0, 0.05)
 
@@ -101,13 +105,13 @@ def disc_trainer(model, glove_emb, glove_vocab, use_cuda=False):
     elif model.args['optim'] == 'sgd':
         opt = optim.SGD
 
-    optimizer = opt(filter(lambda p: p.requires_grad,
-                                  model.parameters()), 
-                           lr=model.args['lr'], weight_decay=model.args['wd'])
+    optimizer = opt(filter(lambda p: p.requires_grad, model.parameters()),
+                    lr=model.args['lr'], weight_decay=model.args['wd'])
 
     return Trainer(model.args, model, criterion, optimizer, device)
 
-def generate_samples(net, seq_len, generated_num, parser, oracle=False, 
+
+def generate_samples(net, seq_len, generated_num, parser, oracle=False,
                      writeout=False):
     samples = []
     examples = []
@@ -125,11 +129,11 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
         sts = []
 
         while True:
-            query = net.vocab.convertToLabels(random.sample(range(net.vocab.size()), 
-                                          seq_len))
+            query = net.vocab.convertToLabels(random.sample(range(net.vocab.size()),
+                                              seq_len))
             if oracle:
-                samps, sts = net.parse(query, return_states=True, 
-                                          beam_size=net.args['beam_size'])
+                samps, sts = net.parse(query, return_states=True,
+                                       beam_size=net.args['beam_size'])
             else:
                 samps = net.parse(query, beam_size=net.args['beam_size'])
 
@@ -145,7 +149,7 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
         text = asdl_ast_to_english(s.tree)
         actions = net.transition_system.get_actions(s.tree)
         tgt_actions = get_action_infos(query, actions)
-        example = Example(src_sent=query, tgt_actions=tgt_actions, 
+        example = Example(src_sent=query, tgt_actions=tgt_actions,
                           tgt_text=text,  tgt_ast=s.tree, idx=len(samples))
 
         if len(example.src_sent) > max_query_len:
@@ -163,8 +167,8 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
     elif writeout:
         sample_parses = parser.get_parse('?\n'.join([e.tgt_text for e in examples]))
 
-        with open(os.path.join(dst_dir, 'text.toks'   ), 'w') as tokfile, \
-             open(os.path.join(dst_dir, 'cat.txt'     ), 'w') as catfile:
+        with open(os.path.join(dst_dir, 'text.toks'), 'w') as tokfile, \
+                open(os.path.join(dst_dir, 'cat.txt'), 'w') as catfile:
 
             for i, parse in enumerate(sample_parses['sentences']):
                 tokens = [x['word'] for x in parse['tokens']]
@@ -175,10 +179,12 @@ def generate_samples(net, seq_len, generated_num, parser, oracle=False,
     else:
         return samples, examples
 
+
 def emulate_embeddings(embeds, shape, device='cpu'):
     samples = torch.zeros(*shape, dtype=torch.float)
     samples.normal_(torch.mean(embeds), torch.std(embeds))
     return samples
+
 
 def load_to_layer(layer, embeds, vocab, words=None):
 
@@ -200,10 +206,6 @@ def load_to_layer(layer, embeds, vocab, words=None):
 
     layer.weight.requires_grad = False
 
-    # layer_rows = list(layer_rows)
-    # layer.weight[layer_rows].data = new_tensor(emulate_embeddings(embeds=embeds, 
-    #                                                               shape=(len(layer_rows), 
-    #                                                                      layer.embedding_dim)))
 
 def run(cfg_dict):
     # Set up model and training parameters based on config file and runtime
@@ -232,7 +234,6 @@ def run(cfg_dict):
     g_steps = gan_args['g_steps']
     d_steps = gan_args['d_steps']
     k_steps = gan_args['k_steps']
-    
     use_cuda = args['cuda']
 
     if not torch.cuda.is_available():
@@ -248,33 +249,37 @@ def run(cfg_dict):
     random.seed(seed)
     np.random.seed(seed)
 
-    if gan_args['verbose']: print("Initializing Stanford Parser...")
+    if gan_args['verbose']:
+        print("Initializing Stanford Parser...")
 
     parser = StanfordParser(annots="tokenize")
 
     # Load input files for Generator: grammar and transition system, vocab,
     # word embeddings
 
-    if gan_args['verbose']: print("Checking for existing grammar...")
+    if gan_args['verbose']:
+        print("Checking for existing grammar...")
 
     if gargs['grammar']:
         grammar = deserialize_from_file(gargs['grammar'])
     else:
         grammar = None
 
-    glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'], 
+    glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'],
                                                             gan_args['glove_file']),
                                                lowercase=gan_args['glove_lower'])
 
-    if gan_args['verbose']: print("Generating training dataset and grammar...")
+    if gan_args['verbose']:
+        print("Generating training dataset and grammar...")
 
     samples_data, prim_vocab, grammar = English.generate_dataset(gargs['annot_file'],
                                                                  gargs['texts_file'],
                                                                  grammar)
+    import pdb; pdb.set_trace()
     transition_system = EnglishTransitionSystem(grammar)
 
-    if gan_args['verbose']: print("Grammar and language transition system initiated.")
-
+    if gan_args['verbose']:
+        print("Grammar and language transition system initiated.")
 
     # Build Generator model
 
@@ -283,41 +288,45 @@ def run(cfg_dict):
     netG.optimizer = optimizer_cls(netG.parameters(), lr=gargs['lr'])
 
     if gargs['uniform_init']:
-        if gan_args['verbose']: 
-            print('uniformly initialize parameters [-{}, +{}]'.format(gargs['uniform_init'], 
-                                                                  gargs['uniform_init']))
+        if gan_args['verbose']:
+            print('uniformly initialize parameters [-{}, +{}]'.format(gargs['uniform_init'], gargs['uniform_init']))
         nn_utils.uniform_init(-gargs['uniform_init'], gargs['uniform_init'], netG.parameters())
     elif gargs['glorot_init']:
-        if gan_args['verbose']: print('use glorot initialization')
+        if gan_args['verbose']:
+            print('use glorot initialization')
         nn_utils.glorot_init(netG.parameters())
 
-    if gan_args['verbose']: print("Loading GloVe vectors as Generator embeddings...")
+    if gan_args['verbose']:
+        print("Loading GloVe vectors as Generator embeddings...")
 
     load_to_layer(netG.src_embed, glove_emb, glove_vocab)
     load_to_layer(netG.primitive_embed, glove_emb, glove_vocab, prim_vocab)
 
-    if gargs['cuda']: 
+    if gargs['cuda']:
         netG.cuda()
         netG.optimizer.cuda()
 
     # Set up Discriminator component with given parameters
 
-    if gan_args['verbose']: print("Loading Discriminator component...")
+    if gan_args['verbose']:
+        print("Loading Discriminator component...")
     dargs['vocab_size'] = glove_vocab.size()
 
-    netD = QueryGAN_Discriminator_CNN(dargs, glove_vocab, glove_emb, 2) # CNN classifier
+    netD = QueryGAN_Discriminator_CNN(dargs, glove_vocab, glove_emb, 2)  # CNN classifier
 
-    # 
+    #
     # PRETRAIN GENERATOR & DISCRIMINATOR
-    # 
+    #
 
-    if gan_args['verbose']: print('\nPretraining generator...\n')
+    if gan_args['verbose']:
+        print('\nPretraining generator...\n')
     # Pre-train epochs are set in config.cfg file
     netG.pretrain(Dataset(samples_data))
     rollout = Rollout(rollout_num=rollout_num, vocab=glove_vocab)
 
     # pretrain discriminator
-    if gan_args['verbose']: print('Loading Discriminator pretraining dataset.')
+    if gan_args['verbose']:
+        print('Loading Discriminator pretraining dataset.')
     dis_set = MULTIVACDataset(netD.args['data'], glove_vocab)
 
     y_onehot = torch.zeros(dis_set.size, 2)
@@ -325,27 +334,27 @@ def run(cfg_dict):
 
     dis_set.labels = y_onehot
 
-    maxlen = 150 # to match CNN classifier architecture
+    maxlen = 150  # to match CNN classifier architecture
     sents = torch.full((dis_set.size, maxlen), dis_set.vocab.pad)
 
     for i, s in enumerate(dis_set.sentences):
         sents[i, :len(s)] = s[:150]
 
     dis_set.sentences = sents.long()
-    
-    if gan_args['verbose']: print("Pretraining discriminator...")
 
-    #for i in tqdm(range(k_steps), desc='Pretraining discriminator ... '):
+    if gan_args['verbose']:
+        print("Pretraining discriminator...")
+
+    # for i in tqdm(range(k_steps), desc='Pretraining discriminator ... '):
     for epoch in range(k_steps):
         loss = netD.train_single_code(dis_set)
         print('Epoch {} pretrain discriminator training loss: {}'.format(epoch + 1, loss))
 
     save_progress(netD, netG, [], -1, [], [])
 
-
     #
     # ADVERSARIAL TRAINING
-    # 
+    #
 
     print('\n#####################################################')
     print('Adversarial training...\n')
@@ -373,14 +382,14 @@ def run(cfg_dict):
             dis_set = DiscriminatorDataset(netD.args['data'], 
                                            netG.args['sample_dir'],
                                            glove_vocab)
-        
+
             for k_step in range(k_steps):
                 loss = netD.train_single_code(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
-                
+
         save_progress(netD, netG, examples, epoch, discriminator_losses, generator_losses)
-        
+
 
 def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=None, use_cuda=False):
     args = cfg_dict['ARGS']
@@ -402,7 +411,6 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     g_steps = gan_args['g_steps']
     d_steps = gan_args['d_steps']
     k_steps = gan_args['k_steps']
-    
     use_cuda = args['cuda']
 
     if not torch.cuda.is_available():
@@ -420,7 +428,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
 
     if disc_loss is None:
         discriminator_losses = []
-    
+
     if gen_loss is None:
         generator_losses = []
 
@@ -433,7 +441,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
     else:
         netG = gen_chk
 
-    glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'], 
+    glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'],
                                                             gan_args['glove_file']),
                                                lowercase=gan_args['glove_lower'])
 
@@ -454,7 +462,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
             opt = optim.SGD
 
         netD.optimizer = opt(filter(lambda p: p.requires_grad, netD.parameters()),
-                             lr=netD.args['lr'], 
+                             lr=netD.args['lr'],
                              weight_decay=netD.args['wd'])
         netD.optimizer.load_state_dict(disc_params['optimizer'])
     else:
@@ -472,7 +480,7 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
             # hyps, examples = list(zip(*samples))
             step_begin = time.time()
             pgloss = netG.pgtrain(hyps, states, examples, rollout, netD)
-            print('[Generator {}]  step elapsed {}s'.format(step, 
+            print('[Generator {}]  step elapsed {}s'.format(step,
                                                             time.time() - step_begin))
             print('Generator adversarial loss={}'.format(pgloss))
             generator_losses.append(pgloss)
@@ -480,15 +488,15 @@ def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_
         for d_step in range(d_steps):
             # train discriminator
             generate_samples(netG, seq_len, generated_num, parser, writeout=True)
-            dis_set = DiscriminatorDataset(netD.args['data'], 
+            dis_set = DiscriminatorDataset(netD.args['data'],
                                            netG.args['sample_dir'],
                                            netG.vocab)
-        
+
             for k_step in range(k_steps):
                 loss = netD.train_single_code(dis_set)
                 print('D_step {}, K-step {} adversarial discriminator training loss: {}'.format(d_step + 1, k_step + 1, loss))
                 discriminator_losses.append(loss)
-                
+
         save_progress(netD, netG, examples, ep, discriminator_losses, generator_losses)
 
 
@@ -513,12 +521,12 @@ def save_progress(netD, netG, examples, epoch, discriminator_losses, generator_l
     torch.save(dis_checkpoint, disc_save)
 
     # Save loss histories
-    with open(os.path.join(netG.args['output_dir'], 
+    with open(os.path.join(netG.args['output_dir'],
                            "generator_losses.csv"), "a") as f:
         for l in generator_losses:
             f.write("{},{}\n".format(epoch, l.item()))
 
-    with open(os.path.join(netG.args['output_dir'], 
+    with open(os.path.join(netG.args['output_dir'],
                            "discriminator_losses.csv"), "a") as f:
         for l in discriminator_losses:
             f.write("{},{}\n".format(epoch, l))
@@ -527,7 +535,7 @@ def save_progress(netD, netG, examples, epoch, discriminator_losses, generator_l
     if len(examples) > 0:
         save_examples = random.sample(examples, 10)
 
-        with open(os.path.join(netG.args['output_dir'], 
+        with open(os.path.join(netG.args['output_dir'],
                                "samples_{}.csv".format(epoch)), "w") as f:
             for e in save_examples:
                 f.write(e.tgt_text + '\n')
@@ -546,17 +554,17 @@ if __name__ == '__main__':
                     'generator parameter "pretrain_epochs" and set this value'
                     'to "120". Valid system parts are "gan", "generator", and '
                     '"discriminator".')
-    parser.add_argument('--cuda', default=False, action='store_true', 
+    parser.add_argument('--cuda', default=False, action='store_true',
                         help='Enable GPU training.')
-    parser.add_argument('-c', '--config', required=False, 
+    parser.add_argument('-c', '--config', required=False,
                         help='Config file with updated parameters for generator;'
                              'defaults to "config.cfg" in this directory '
                              'otherwise.')
-    parser.add_argument('-o', '--continue', default=False, action='store_true', 
+    parser.add_argument('-o', '--continue', default=False, action='store_true',
                         help='Continue training from a previous checkpoint.')
     parser.add_argument('-g', '--gen_chk', required=False,
                         help='Path to Generator component checkpoint file.')
-    parser.add_argument('-d', '--disc_chk', default=False, 
+    parser.add_argument('-d', '--disc_chk', default=False,
                         help='Path to Discriminator component checkpoint file.')
 
     all_args = parser.parse_known_args()
@@ -579,7 +587,7 @@ if __name__ == '__main__':
                 i += 2
         else:
             i += 1
-    
+
     cfg = configparser.ConfigParser()
     cfgDIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -613,7 +621,7 @@ if __name__ == '__main__':
                 try:
                     section[carg] = float(section[carg])
                 except:
-                    if section[carg] in ['True','False']:
+                    if section[carg] in ['True', 'False']:
                         section[carg] = eval(section[carg])
 
     run(cfg_dict)

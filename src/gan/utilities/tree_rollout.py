@@ -1,22 +1,25 @@
 
 from collections import OrderedDict
-import numpy as np
-from tqdm import tqdm
 
+import numpy as np
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
-from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, ReduceAction, Action, GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.transition_system import (ApplyRuleAction,
+                                                             GenTokenAction,
+                                                             ReduceAction)
 from multivac.src.gan.gen_pyt.components.action_info import ActionInfo
-from multivac.src.gan.gen_pyt.components.decode_hypothesis import DecodeHypothesis
+from multivac.src.gan.gen_pyt.components.decode_hypothesis import \
+    DecodeHypothesis
 from multivac.src.gan.gen_pyt.model import nn_utils
 
 # hypotheses - batch of Hypothesis objects
 
+
 def get_hyp_states(mod, src_encodings, dec_init_vec, hyps, max_action_len):
     # hyp    :: DecodeHypothesis()
 
-    T = torch.cuda if mod.args['cuda'] else torch
     max_action_len = max([len(hyp.actions) for hyp in hyps])
 
     # (1, src_sent_len, hidden_size)
@@ -36,10 +39,10 @@ def get_hyp_states(mod, src_encodings, dec_init_vec, hyps, max_action_len):
     for i in range(max_action_len):
         if i == 0:
             if mod.args['no_parent_field_type_embed'] is False:
-                offset  = mod.args['action_embed_size']  # prev_action
-                offset += mod.args['att_vec_size']      * (not mod.args['no_input_feed'])
+                offset = mod.args['action_embed_size']  # prev_action
+                offset += mod.args['att_vec_size'] * (not mod.args['no_input_feed'])
                 offset += mod.args['action_embed_size'] * (not mod.args['no_parent_production_embed'])
-                offset += mod.args['field_embed_size']  * (not mod.args['no_parent_field_embed'])
+                offset += mod.args['field_embed_size'] * (not mod.args['no_parent_field_embed'])
 
                 x[0, offset: offset + mod.args['type_embed_size']] = \
                     mod.type_embed.weight[mod.grammar.type2id[mod.grammar.root_type]]
@@ -64,7 +67,6 @@ def get_hyp_states(mod, src_encodings, dec_init_vec, hyps, max_action_len):
             a_tm1_embeds = torch.stack(a_tm1_embeds)
 
             inputs = [a_tm1_embeds]
-
 
             if mod.args['no_input_feed'] is False:
                 inputs.append(hyp_states[i-1]['att_t'])
@@ -134,15 +136,15 @@ def rollout_samples(mod, src_sents, samples):
     computed_hyps = [[]] * max_action_len
 
     # Variable(batch_size, src_sent_len, hidden_size * 2)
-    src_sent_vars = nn_utils.to_input_variable(src_sents, 
-                                               mod.vocab, 
-                                               cuda=mod.args['cuda'], 
+    src_sent_vars = nn_utils.to_input_variable(src_sents,
+                                               mod.vocab,
+                                               cuda=mod.args['cuda'],
                                                training=False)
-    src_encodings, (last_state, last_cell) = mod.encode(src_sent_vars, 
-                                                         [len(s) for s in src_sents])
+    src_encodings, (last_state, last_cell) = mod.encode(src_sent_vars,
+                                                        [len(s) for s in src_sents])
     dec_init_vec = mod.init_decoder_state(last_state, last_cell)
-    
-    ref_hyp_states = get_hyp_states(mod, src_encodings, dec_init_vec, 
+
+    ref_hyp_states = get_hyp_states(mod, src_encodings, dec_init_vec,
                                     samples, max_action_len)
 
     print("{} steps for {} sample Hypotheses.".format(max_action_len-1, len(hypotheses)))

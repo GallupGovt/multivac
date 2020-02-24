@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-from collections import OrderedDict, Counter
+from collections import OrderedDict
 from itertools import chain
+
 
 class ASDLGrammar(object):
     """
     Collection of types, constructors and productions
     """
+
     def __init__(self, productions):
         # productions are indexed by their head types
         self._productions = OrderedDict()
@@ -124,7 +126,8 @@ class ASDLConstructor(object):
 
     def __getitem__(self, field_name):
         for field in self.fields:
-            if field.name == field_name: return field
+            if field.name == field_name:
+                return field
 
         raise KeyError
 
@@ -145,10 +148,12 @@ class ASDLConstructor(object):
 
     def __repr__(self, plain=False):
         plain_repr = '%s -> (%s)' % (self.name,
-                                 ', '.join(f.__repr__(plain=True) for f in self.fields))
-        if plain: 
+                                     ', '.join(f.__repr__(plain=True)
+                                               for f in self.fields)
+                                     )
+        if plain:
             return plain_repr
-        else: 
+        else:
             return 'Constructor(%s)' % plain_repr
 
 
@@ -178,9 +183,9 @@ class Field(object):
     def __repr__(self, plain=False):
         plain_repr = '%s%s' % (self.type.__repr__(plain=True),
                                Field.get_cardinality_repr(self.cardinality))
-        if plain: 
+        if plain:
             return plain_repr
-        else: 
+        else:
             return 'Field(%s)' % plain_repr
 
     @staticmethod
@@ -203,9 +208,9 @@ class ASDLType(object):
 
     def __repr__(self, plain=False):
         plain_repr = self.name
-        if plain: 
+        if plain:
             return plain_repr
-        else: 
+        else:
             return '%s(%s)' % (self.__class__.__name__, plain_repr)
 
 

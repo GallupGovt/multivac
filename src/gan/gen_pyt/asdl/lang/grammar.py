@@ -36,7 +36,7 @@ class Grammar(object):
         except AssertionError:
             print(root_node)
             raise AssertionError
-            
+
         self.root_node = next(iter(root_node))
 
         self.terminal_nodes = rhs_nodes - lhs_nodes

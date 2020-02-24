@@ -6,12 +6,14 @@ import argparse
 import glob
 import os
 import re
+
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
 from multivac.src.gan.discriminator import MULTIVACDataset
 from multivac.src.gan.utilities.utils import build_vocab
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
+
 
 def dep_parse(filepath, parser):
     print('\nDependency parsing ' + filepath)
@@ -41,6 +43,7 @@ def dep_parse(filepath, parser):
             parfile.write(' '.join([str(x) for x in parents]) + '\n')
             tokfile.write(' '.join(tokens) + '\n')
 
+
 def gen_tokens(filepath, parser):
     print('\nTokenizing ' + filepath)
     dirpath = os.path.dirname(filepath)
@@ -62,10 +65,12 @@ def gen_tokens(filepath, parser):
             tokens = [x['word'] for x in sample_parse['tokens']]
             tokfile.write(' '.join(tokens) + '\n')
 
+
 def make_dirs(dirs):
     for d in dirs:
         if not os.path.exists(d):
             os.makedirs(d)
+
 
 def split(filepath, dst_dir):
     '''
@@ -162,5 +167,3 @@ if __name__ == '__main__':
     build_vocab(glob.glob(os.path.join(multivac_dir, '*/*.toks')),
                 os.path.join(multivac_dir, 'vocab-cased.txt'),
                 lowercase=False)
-
-

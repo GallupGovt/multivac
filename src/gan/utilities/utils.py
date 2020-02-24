@@ -1,7 +1,6 @@
 
 import os
 import pickle
-import math
 
 import torch
 
@@ -25,6 +24,7 @@ def build_vocab(filenames, vocabfile, lowercase=True):
         for token in sorted(vocab):
             f.write(token + '\n')
 
+
 class cached_property(object):
     """ A property that is only computed once per instance and then replaces
         itself with an ordinary attribute. Deleting the attribute resets the
@@ -43,16 +43,19 @@ class cached_property(object):
         value = obj.__dict__[self.func.__name__] = self.func(obj)
         return value
 
+
 def deserialize_from_file(path):
     with open(path, 'rb') as f:
         obj = pickle.load(f)
-    
+
     return obj
 
-# loading GLOVE word vectors
-# if .pth file is found, will load that
-# else will load from .txt file & save
+
 def load_word_vectors(path, lowercase=True):
+    # loading GLOVE word vectors
+    # if .pth file is found, will load that
+    # else will load from .txt file & save
+
     if os.path.isfile(path + '.pth') and os.path.isfile(path + '.vocab'):
         print('==> File found, loading to memory')
         vectors = torch.load(path + '.pth')
@@ -73,7 +76,6 @@ def load_word_vectors(path, lowercase=True):
     # saved file not found, read from txt file
     # and create tensors for word vectors
     print('==> File not found, preparing, be patient')
-
 
     count = sum(1 for line in open(path + '.txt', 'r', encoding='utf8', errors='ignore'))
 
@@ -103,9 +105,11 @@ def load_word_vectors(path, lowercase=True):
 
     return vocab, vectors
 
+
 def serialize_to_file(obj, path, protocol=pickle.HIGHEST_PROTOCOL):
     with open(path, 'wb') as f:
         pickle.dump(obj, f, protocol=protocol)
+
 
 def typename(x):
     if isinstance(x, str):

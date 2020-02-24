@@ -1,46 +1,48 @@
 import copy
+
 import numpy as np
-import os
-from tqdm import tqdm
+import torch
 from spacy.tokenizer import Tokenizer
 from spacy.vocab import Vocab
+from torch.utils.data import Dataset
+from tqdm import tqdm
 
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-
-from discriminator import MULTIVACDataset, Tree
-from gen_pyt.asdl.lang.eng.eng_asdl_helper import asdl_ast_to_english
-from gen_pyt.model.parser import Parser
-# from .tree_rollout import rollout_samples
-from multivac.src.gan.gen_pyt.components.decode_hypothesis import DecodeHypothesis
-
+from multivac.src.gan.discriminator import MULTIVACDataset, Tree
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import \
+    asdl_ast_to_english
+from multivac.src.gan.gen_pyt.components.decode_hypothesis import \
+    DecodeHypothesis
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
+
 
 class RolloutDataset(Dataset):
     def __init__(self, data):
         super().__init__()
         self.data = data
         self.size = self.data.shape[0]
+
     def __len__(self):
         return self.size
+
     def __getitem__(self, index):
         return copy.deepcopy(self.data[index])
+
 
 class Engine(object):
     def __init__(self, step=0):
         self.step = 0
 
+
 class Rollout(object):
     def __init__(self, rollout_num, vocab):
-        #self.new_net = copy.deepcopy(net)
+
         self.vocab = vocab
         self.tokenizer = Tokenizer(Vocab(strings=list(vocab.labelToIdx.keys())))
         self.rollout_num = rollout_num
         self.parser = StanfordParser(annots='tokenize')
 
     def hyp_to_parse(self, hyp, vocab):
-        if isinstance(hyp,str):
+        if isinstance(hyp, str):
             text = hyp
         else:
             text = asdl_ast_to_english(hyp.tree)
@@ -49,11 +51,11 @@ class Rollout(object):
 
         if len(parse) > 0:
             tokens = [x['word'] for x in parse[0]['tokens']]
-            deps = sorted(parse[0]['basicDependencies'], 
+            deps = sorted(parse[0]['basicDependencies'],
                           key=lambda x: x['dependent'])
             parents = [x['governor'] for x in deps]
             tree = MULTIVACDataset.read_tree(parents)
-            inp = torch.tensor(vocab.convertToIdx(tokens, '<unk>'), 
+            inp = torch.tensor(vocab.convertToIdx(tokens, '<unk>'),
                                dtype=torch.long, device='cpu')
         else:
             tree = Tree()
@@ -64,8 +66,8 @@ class Rollout(object):
     def parse_tokens(self, tree):
         text = asdl_ast_to_english(tree)
         tokens = [x.text for x in self.tokenizer(text)]
-        result = torch.tensor(self.vocab.convertToIdx(tokens, '<unk>'), 
-                              dtype=torch.long, 
+        result = torch.tensor(self.vocab.convertToIdx(tokens, '<unk>'),
+                              dtype=torch.long,
                               device='cpu')
         return result
 
@@ -75,11 +77,11 @@ class Rollout(object):
 
         for idx, parse in enumerate(parses):
             tokens = [x['word'] for x in parse['tokens']]
-            deps = sorted(parse['basicDependencies'], 
+            deps = sorted(parse['basicDependencies'],
                           key=lambda x: x['dependent'])
             parents = [x['governor'] for x in deps]
             tree = MULTIVACDataset.read_tree(parents)
-            results[idx] = (tree, torch.tensor(vocab.convertToIdx(tokens, '<unk>'), 
+            results[idx] = (tree, torch.tensor(vocab.convertToIdx(tokens, '<unk>'),
                                                dtype=torch.long, device='cpu'))
 
         return results
@@ -94,7 +96,7 @@ class Rollout(object):
 
         return new_hyp
 
-    def get_tree_reward(self, hyps, states, examples, 
+    def get_tree_reward(self, hyps, states, examples,
                         netG, netD, vocab, verbose=False):
         batch_size = len(hyps)
         src_sents = [e.src_sent for e in examples]
@@ -104,11 +106,11 @@ class Rollout(object):
         netD.eval()
 
         for i in range(self.rollout_num):
-            if verbose: print("Rollout step {}".format(i))
+            if verbose:
+                print("Rollout step {}".format(i))
 
             samples = [[0] * batch_size] * max_action_len
-            inputs  = [[0] * batch_size] * max_action_len
-            # texts   = [[0] * batch_size] * max_action_len
+            inputs = [[0] * batch_size] * max_action_len
 
             for j in tqdm(range(1, max_action_len)):
                 for n in range(batch_size):
@@ -117,8 +119,9 @@ class Rollout(object):
                     state = states[n][:j]
                     samples[j-1][n] = netG.sample(src, hyp, state)
 
-            if verbose: print("Samples generated of shape "
-                              "({},{})".format(max_action_len, batch_size))
+            if verbose:
+                print("Samples generated of shape "
+                      "({},{})".format(max_action_len, batch_size))
 
             for x in tqdm(range(max_action_len), "Translating trees..."):
                 for h, hyp in enumerate(samples[x]):

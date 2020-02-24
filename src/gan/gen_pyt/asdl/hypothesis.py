@@ -1,8 +1,10 @@
 # coding=utf-8
 
-from multivac.src.gan.gen_pyt.asdl.asdl import *
+from multivac.src.gan.gen_pyt.asdl.asdl import ASDLCompositeType
 from multivac.src.gan.gen_pyt.asdl.asdl_ast import AbstractSyntaxTree
-from multivac.src.gan.gen_pyt.asdl.transition_system import *
+from multivac.src.gan.gen_pyt.asdl.transition_system import (ApplyRuleAction,
+                                                             GenTokenAction,
+                                                             ReduceAction)
 
 
 class Hypothesis(object):
@@ -77,19 +79,23 @@ class Hypothesis(object):
                 for field in tree_node.fields:
                     # if it's an intermediate node, check its children
                     if isinstance(field.type, ASDLCompositeType) and field.value:
-                        if field.cardinality in ('single', 'optional'): iter_values = [field.value]
-                        else: iter_values = field.value
+                        if field.cardinality in ('single', 'optional'):
+                            iter_values = [field.value]
+                        else:
+                            iter_values = field.value
 
                         for child_node in iter_values:
                             result = _find_frontier_node_and_field(child_node)
-                            if result: return result
+                            if result:
+                                return result
 
                     # now all its possible children are checked
                     if not field.finished:
                         return tree_node, field
 
                 return None
-            else: return None
+            else:
+                return None
 
         frontier_info = _find_frontier_node_and_field(self.tree)
         if frontier_info:

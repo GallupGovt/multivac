@@ -1,14 +1,16 @@
 import argparse
-import numpy as np
 import os
-import pandas as pd
 from random import shuffle
+
+import numpy as np
+import pandas as pd
+
 
 def run(args_dict):
     DIR = os.path.dirname(args_dict['file'])
     file = os.path.basename(args_dict['file'])
 
-    with open(args_dict['file']) as f:
+    with open(file) as f:
         clean_txt = f.readlines()
 
     df_clean = pd.DataFrame(clean_txt)
@@ -32,19 +34,18 @@ def run(args_dict):
     final_df.rename(columns={'index': 'id'}, inplace=True)
     final_df['query'] = final_df['query'].apply(lambda x: x.replace("\n", ""))
 
-    np.savetxt(os.path.join(DIR,"extracted_questions_labels.txt"), 
-               final_df.values, newline='\n', fmt=["%s", "%s", "%s"], 
+    np.savetxt(os.path.join(DIR, "extracted_questions_labels.txt"),
+               final_df.values, newline='\n', fmt=["%s", "%s", "%s"],
                delimiter='\t',
                header='id query label')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Create shuffled queries'
-                                    'from .txt file for GAN.')
-    parser.add_argument('-f', '--file', required=True, 
+                                                 'from .txt file for GAN.')
+    parser.add_argument('-f', '--file', required=True,
                         help='Path to source query file.')
 
     args_dict = vars(parser.parse_args())
 
     run(args_dict)
-
