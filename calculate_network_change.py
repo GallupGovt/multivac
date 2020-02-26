@@ -36,9 +36,11 @@ def build_comparison_metrics(n1, n2, mtype):
 def generate_node_changes(net):
     res = {}
     for k, v in net.items():
-        pct_change = (net[k][1] - net[k][0]) / net[k][0]
-        if not np.isnan(pct_change):
-            res.update({k: pct_change})
+        if net[k][0]:
+            pct_change = (net[k][1] - net[k][0]) / net[k][0]
+
+            if not np.isnan(pct_change):
+                res.update({k: pct_change})
 
     return res
 
