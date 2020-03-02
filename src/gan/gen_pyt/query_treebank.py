@@ -1,12 +1,14 @@
 
 import argparse
 import pickle
-import re
 
-from multivac.src.gan.gen_pyt.astnode import *
-from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishGrammar
-from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishASDLGrammar
-from multivac.src.rdf_graph.rdf_parse import clean_queries, check_parse, StanfordParser, stanford_parse
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import \
+    english_ast_to_asdl_ast
+from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import (EnglishASDLGrammar,
+                                                            EnglishGrammar)
+from multivac.src.gan.gen_pyt.astnode import ASTNode
+from multivac.src.rdf_graph.rdf_parse import (StanfordParser, check_parse,
+                                              clean_queries, stanford_parse)
 
 
 def find_match_paren(s):
@@ -21,17 +23,19 @@ def find_match_paren(s):
         if count == 0:
             return i
 
+
 def get_eng_tree(text, depth=0, debug=False):
     ''' Takes a constituency parse string of an English sentence and creates
-        an ASTNode tree from it. 
+        an ASTNode tree from it.
 
         Example input:
-        '(ROOT (SBARQ (WHADVP (WRB Why)) (SQ (VBP do) (NP (NNS birds)) (ADVP 
-        (RB suddenly)) (VP (VB appear) (SBAR (WHADVP (WRB whenever)) (S (NP 
+        '(ROOT (SBARQ (WHADVP (WRB Why)) (SQ (VBP do) (NP (NNS birds)) (ADVP
+        (RB suddenly)) (VP (VB appear) (SBAR (WHADVP (WRB whenever)) (S (NP
         (PRP you)) (VP (VBP are) (ADJP (JJ near))))))) (. ?)))'
     '''
 
-    if debug: print(("\t" * depth + "String: '{}'".format(text)))
+    if debug:
+        print(("\t" * depth + "String: '{}'".format(text)))
 
     try:
         tree_str = text[text.index("(") + 1:text.rfind(")")]
@@ -42,7 +46,8 @@ def get_eng_tree(text, depth=0, debug=False):
     next_idx = tree_str.index(" ")
 
     tree = ASTNode(tree_str[:next_idx])
-    if debug: print(("\t" * depth + "Type: '{}'".format(tree.type)))
+    if debug:
+        print(("\t" * depth + "Type: '{}'".format(tree.type)))
 
     if "(" in tree_str:
         while "(" in tree_str:
@@ -52,13 +57,14 @@ def get_eng_tree(text, depth=0, debug=False):
             tree_str = tree_str[next_idx + 1:]
     else:
         tree.value = tree_str[next_idx + 1:]
-        if debug: print(("\t" * depth + "Value: " + tree.value))
+        if debug:
+            print(("\t" * depth + "Value: " + tree.value))
 
     return tree
 
+
 def get_grammar(parse_trees, verbose=False):
     rules = set()
-    # rule_num_dist = defaultdict(int)
 
     for parse_tree in parse_trees:
         parse_tree_rules, rule_parents = parse_tree.get_productions()
@@ -73,23 +79,24 @@ def get_grammar(parse_trees, verbose=False):
 
     return grammar
 
+
 def parse_raw(parser, query):
     try:
         query = stanford_parse(parser, query)
-    except:
+    except Exception:
         print('Could not parse query: {}'.format(query))
         return None
 
     try:
         result = get_eng_tree(query.parse_string)
-    except: 
+    except Exception:
         print("Could not interpret query parse: {}".format(query.parse_string))
         return None
 
     return result
 
 
-def extract_grammar(source_file, output=None, clean=False, verbose=False, 
+def extract_grammar(source_file, output=None, clean=False, verbose=False,
                     asdl=False):
     parse_trees = list()
 
@@ -98,7 +105,7 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False,
     else:
         parse_func = get_eng_tree
 
-    parser = StanfordParser(annots = "tokenize ssplit parse")
+    parser = StanfordParser(annots="tokenize ssplit parse")
 
     with open(source_file, 'r') as f:
         queries = f.readlines()
@@ -113,14 +120,14 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False,
         if len(q) > 0:
             try:
                 query = stanford_parse(parser, q)
-            except:
+            except Exception:
                 print('Could not parse query {}: "{}"'.format(i, q))
                 continue
 
         if check_parse(query):
             try:
                 parse_trees.append(parse_func(query.parse_string))
-            except:
+            except Exception:
                 print(("Could not interpret query parse {}: '{}'".format(i, query)))
                 continue
 
@@ -140,7 +147,7 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False,
         grammar = EnglishASDLGrammar(productions=productions)
     else:
         rules = set()
-        
+
         for parse_tree in parse_trees:
             parse_tree_rules, _ = parse_tree.get_productions()
 
@@ -148,7 +155,7 @@ def extract_grammar(source_file, output=None, clean=False, verbose=False,
                 rules.add(rule)
 
         rules = list(sorted(rules, key=lambda x: x.__repr__()))
-        grammar = EnglishGrammar(rules)        
+        grammar = EnglishGrammar(rules)
 
     if verbose:
         print("Grammar induced successfully.")
@@ -177,7 +184,7 @@ if __name__ == '__main__':
     args_dict = vars(parser.parse_args())
 
     extract_grammar(args_dict['queries'],
-                    args_dict['output'], 
-                    args_dict['clean'], 
+                    args_dict['output'],
+                    args_dict['clean'],
                     args_dict['verbose'],
                     args_dict['asdl'])

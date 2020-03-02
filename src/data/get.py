@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import copy
-import feedparser
 import os
 import pickle
-import requests
 import time
-
-from bs4 import BeautifulSoup as bs
-from dotenv import load_dotenv
 from pathlib import Path
 
-from multivac import settings
+import feedparser
+import requests
+from bs4 import BeautifulSoup as bs
+from dotenv import load_dotenv
 
+from multivac import settings
 
 env_path = Path('.') / '.env'
 load_dotenv(env_path)
@@ -29,8 +28,8 @@ def collect_get_main():
     # arxiv
 
     # build query and get metadata of articles matching our search criteria
-    params = {'start': 0, 'max_results': 100, 'sortBy': 'relevance'
-             ,'sortOrder': 'descending'}
+    params = {'start': 0, 'max_results': 100, 'sortBy': 'relevance',
+              'sortOrder': 'descending'}
     li = [x.replace('-', ' ').split(' ') for x in settings.terms]
     q = 'OR'.join(['%28' + prep_terms(x) + '%29' for x in li])
     url = 'http://export.arxiv.org/api/query?search_query=' + q
@@ -64,7 +63,9 @@ def collect_get_main():
     # springer
 
     # build query to retrieve metadata
-    make_q = lambda li: '(' + ' OR '.join(['"' + s + '"' for s in li]) + ')'
+    def make_q(li):
+        return '(' + ' OR '.join(['"' + s + '"' for s in li]) + ')'
+
     q = make_q(settings.terms)
     base = 'http://api.springernature.com/openaccess/json?q='
     url = base + q
@@ -88,7 +89,7 @@ def collect_get_main():
 
     # iterate over springer metadata and download html for each article
     # we use a generator to increase wait times with each connection error
-    waits = (2**x for x in range(0,6))
+    waits = (2**x for x in range(0, 6))
     for ix, md in enumerate(springer_metadata):
         fn = md['doi'].replace('/', '-')
         if len(fn) == 0:
@@ -118,10 +119,8 @@ def collect_get_main():
     # search pubmed central for free full text articles containing selected
     # query
     # get the ids which we then use to get the xml text data
-    replace = lambda s: s.replace(' ', '+')
-    quote = lambda s: '%22' + s + '%22'
-    terms = [quote(replace(s)) for s in settings.terms]
-    term = 'term='+ '%28'+ '+OR+'.join(terms) + '%29'
+    terms = ['%22' + s.replace(' ', '+') + '%22' for s in settings.terms]
+    term = 'term=' + '%28' + '+OR+'.join(terms) + '%29'
     fulltext = 'free+fulltext%5bfilter%5d'
     retmax = 'retmax=2000'
     base = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc'
@@ -190,7 +189,8 @@ def query_api(url, terms, params, wait_time=3, verbose=False):
         else:
             metadata.extend(entries)
         time.sleep(wait_time)
-    if verbose: print('')
+    if verbose:
+        print('')
     return metadata
 
 

@@ -1,20 +1,14 @@
 # coding=utf-8
 
-import math
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils
-from torch.autograd import Variable
 from torch.nn import Parameter, init
-# from torch.nn._functions.rnn import variable_recurrent_factory, StackedRNN
 from torch.nn.modules.rnn import RNNCellBase
-from torch.nn.utils.rnn import PackedSequence
-# from torch.nn._functions.thnn import rnnFusedPointwise as fusedBackend
 
 
-    
 class ParentFeedingLSTMCell(RNNCellBase):
+
     def __init__(self, input_size, hidden_size):
         super(ParentFeedingLSTMCell, self).__init__()
 
@@ -70,7 +64,8 @@ class ParentFeedingLSTMCell(RNNCellBase):
 
     def forward(self, input, hidden_states):
         h_tm1, c_tm1, h_tm1_p, c_tm1_p = hidden_states
-        i_t = torch.sigmoid(F.linear(input, self.W_i) + F.linear(h_tm1, self.U_i) + F.linear(h_tm1_p, self.U_i_p) + self.b_i)
+        i_t = torch.sigmoid(F.linear(input, self.W_i) + F.linear(h_tm1, self.U_i) +
+                            F.linear(h_tm1_p, self.U_i_p) + self.b_i)
 
         xf_t = F.linear(input, self.W_f)
         f_t = torch.sigmoid(xf_t + F.linear(h_tm1, self.U_f) + self.b_f)
@@ -79,8 +74,8 @@ class ParentFeedingLSTMCell(RNNCellBase):
         xc_t = torch.linear(input, self.W_c) + F.linear(h_tm1, self.U_c) + F.linear(h_tm1_p, self.U_c_p) + self.b_c
         c_t = f_t * c_tm1 + f_t_p * c_tm1_p + i_t * torch.tanh(xc_t)
 
-        o_t = torch.sigmoid(F.linear(input, self.W_o) + F.linear(h_tm1, self.U_o) + F.linear(h_tm1_p, self.U_o_p) + self.b_o)
+        o_t = torch.sigmoid(F.linear(input, self.W_o) + F.linear(h_tm1, self.U_o) +
+                            F.linear(h_tm1_p, self.U_o_p) + self.b_o)
         h_t = o_t * torch.tanh(c_t)
 
         return h_t, c_t
-

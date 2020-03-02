@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import corenlp
+import argparse
 import os
 import subprocess
 
+import corenlp
+
 from multivac import settings
 from multivac.src.data.parsing import load_data
-from qgnet.test.testinput.preprocessing_pdf import (
-    create_tf_idf, preprocess_pdf
-)
-
+from qgnet.test.testinput.preprocessing_pdf import (create_tf_idf,
+                                                    preprocess_pdf)
 
 os.environ["CORENLP_HOME"] = ('{}/stanford-corenlp-full-2018-10-05'
                               .format(settings.models_dir))
@@ -38,7 +38,7 @@ def qgnet_main(args_dict):
     features, tfidf = create_tf_idf(abstracts, False)
 
     for i, abstract in enumerate(abstracts):
-        preprocess_pdf(abstract, features[i,:].toarray(), tfidf, nlp)
+        preprocess_pdf(abstract, features[i, :].toarray(), tfidf, nlp)
 
     # third, generate qg-net questions
     subprocess.call([
@@ -49,4 +49,16 @@ def qgnet_main(args_dict):
 
 
 if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(
+        description="Parser for QGNet."
+    )
+    parser.add_argument(
+        "--qgnet_path",
+        required=True,
+        help="Path to QGNet questions."
+    )
+
+    args_dict = vars(parser.parse_args())
+
     qgnet_main(args_dict)

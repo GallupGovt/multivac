@@ -1,20 +1,21 @@
 import os
-from tqdm import tqdm
+import pdb
 from copy import deepcopy
 
 import torch
 import torch.utils.data as data
+from tqdm import tqdm
 
-from multivac.src.gan.utilities.vocab import Vocab
-from .tree import Tree
+from multivac.src.gan.discriminator.tree import Tree
+
 
 # Dataset class for MULTIVAC dataset
 class MULTIVACDataset(data.Dataset):
+
     def __init__(self, path, vocab):
         super().__init__()
         self.vocab = vocab
         self.sentences = self.read_sentences(os.path.join(path, 'text.toks'))
-        #self.trees = MULTIVACDataset.read_trees(os.path.join(path, 'text.parents'))
         self.labels = MULTIVACDataset.read_labels(os.path.join(path, 'cat.txt'))
         self.size = self.labels.size(0)
 
@@ -24,7 +25,6 @@ class MULTIVACDataset(data.Dataset):
     def __getitem__(self, index):
         sent = deepcopy(self.sentences[index])
         label = deepcopy(self.labels[index])
-        
         return (sent, label)
 
     def read_sentences(self, filename):
@@ -37,8 +37,8 @@ class MULTIVACDataset(data.Dataset):
         indices = self.vocab.convertToIdx(line.split())
         try:
             result = torch.tensor(indices, dtype=torch.long, device='cpu')
-        except:
-            import pdb; pdb.set_trace()
+        except Exception:
+            pdb.set_trace()
 
         return result
 
@@ -55,7 +55,7 @@ class MULTIVACDataset(data.Dataset):
             parents = line
         else:
             parents = list(map(int, line.split()))
-        
+
         trees = dict()
         root = None
 
@@ -74,10 +74,10 @@ class MULTIVACDataset(data.Dataset):
 
                     if prev is not None:
                         tree.add_child(prev)
-                    
+
                     trees[idx - 1] = tree
                     tree.idx = idx - 1
-                    
+
                     if parent - 1 in trees.keys():
                         trees[parent - 1].add_child(tree)
                         break

@@ -4,18 +4,17 @@ import copy
 import json
 import pickle
 import re as reg
+
 import spacy
 import stanfordnlp
-
-import multivac.src.data.equationparsing as eq
-
 from interruptingcow import timeout
 
+import multivac.src.data.equationparsing as eq
 from multivac import settings
 from multivac.src.data.textparsing import clean_doc
 
 
-def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
+def create_parse_files(doc, docNum, writeFile=True, pathToFolders=''):
     """ Creates parse files and stores them in the folder passed when
         writeFile=True and pathToFolders is provided
         The following file types are created
@@ -25,29 +24,27 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
     """
 
     d_documentData = {
-        'depData' : [],
-        'posData' : [],
-        'morData' : []
+        'depData': [],
+        'posData': [],
+        'morData': []
     }
 
-    l_depSentences = [] # for dependencies
-    l_posSentences = [] # for POS tagging
-    l_morSentences = [] # for morphology/lemmatization
+    l_depSentences = []  # for dependencies
+    l_posSentences = []  # for POS tagging
+    l_morSentences = []  # for morphology/lemmatization
 
     # Loop over every sentence
     for sent in list(doc.sentences)[0:]:
 
-        l_depTokens_tuples=[]
-        l_depTokens=[]
-        l_posTokens=[]
-        l_morTokens=[]
-        l_depTokens_latex_tuples=[]
-        l_depTokens_latex=[]
-        l_posTokens_latex=[]
-        l_morTokens_latex=[]
+        l_depTokens_tuples = []
+        l_depTokens = []
+        l_posTokens = []
+        l_morTokens = []
+        l_depTokens_latex_tuples = []
+        l_depTokens_latex = []
 
         adjustedPosition = 0
-        adjustmentDictionary = {0:0}
+        adjustmentDictionary = {0: 0}
         latexInSentenceMap = {}
 
         # Loop over every word in the sentence
@@ -58,13 +55,12 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
             if 'Ltxqtn' in tokenHeadText:
                 pass
 
-            if  (token.text==' ') or token.text is None:
-                adjustedPosition= adjustedPosition-1
-                adjustmentDictionary[int(token.index)]=adjustedPosition
+            if (token.text == ' ') or token.text is None:
+                adjustedPosition = adjustedPosition-1
+                adjustmentDictionary[int(token.index)] = adjustedPosition
                 continue
 
-
-            elif 'Ltxqtn' in token.text :
+            elif 'Ltxqtn' in token.text:
                 if len(token.text) < 14:
                     print('This token is problematic: ', token.text)
 
@@ -72,59 +68,51 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
 
                 l_depTokens_latex_sub_tuples, l_posTokens_latex_sub,\
                     l_morTokens_latex_sub = eq.latexParsing(
-                         latexEquationId, int(token.index) +
-                                 adjustedPosition)
+                         latexEquationId, int(token.index) + adjustedPosition)
 
                 # Need to adjust position so that it we add all the new tokens,
                 # then subtract 1 for LateXEquation##
-                if len(l_morTokens_latex_sub)>0:
+                if len(l_morTokens_latex_sub) > 0:
                     lastAdjustedPosition = adjustedPosition
                     adjustedPosition = (adjustedPosition +
-                                        (len(l_posTokens_latex_sub) -1)
-                    )
-                    adjustmentDictionary[(int(token.index) )]=adjustedPosition
-
+                                        (len(l_posTokens_latex_sub) - 1))
+                    adjustmentDictionary[(int(token.index))] = adjustedPosition
 
                     # Go backwards and make sure all the previous ones are good
                     new_l_depTokens_tuples = []
 
                     for depSet in l_depTokens_tuples:
                         t1, t2, t3 = depSet
-                        t2=list(t2)
-                        t3=list(t3)
+                        t2 = list(t2)
+                        t3 = list(t3)
 
-                        #current position is the threshold for change
-                        if ((t2[1]-lastAdjustedPosition)>int(token.index) and
-                            t1 not in ['combine', 'compare', 'function',
-                            'transform']):
+                        # current position is the threshold for change
+                        if ((t2[1]-lastAdjustedPosition) > int(token.index) and
+                                t1 not in ['combine', 'compare', 'function', 'transform']):
                             t2[1] = t2[1]+(len(l_posTokens_latex_sub)-1)
-                        if ((t3[1]-lastAdjustedPosition)>int(token.index) and
-                            t1 not in ['combine', 'compare', 'function',
-                            'transform']):
+                        if ((t3[1]-lastAdjustedPosition) > int(token.index) and
+                                t1 not in ['combine', 'compare', 'function', 'transform']):
                             t3[1] = t3[1]+(len(l_posTokens_latex_sub)-1)
 
-                        adjustedTuple = (t1,tuple(t2),tuple(t3))
+                        adjustedTuple = (t1, tuple(t2), tuple(t3))
                         new_l_depTokens_tuples.append(adjustedTuple)
 
                     l_depTokens_tuples = new_l_depTokens_tuples
 
-
                     # Now add the original dependency
-                    headTokenPosition =  token.governor
+                    headTokenPosition = token.governor
                     childTokenPosition = int(token.index)
                     l_depTokens_tuples.append(
                         (
-                            token.dependency_relation.replace(":",""),
+                            token.dependency_relation.replace(":", ""),
                             (tokenHeadText,
                              headTokenPosition +
                              get_adjustment_position(headTokenPosition,
-                                                     adjustmentDictionary)
-                            ),
+                                                     adjustmentDictionary)),
                             (token.text,
                              childTokenPosition +
                              get_adjustment_position(childTokenPosition,
-                                                     adjustmentDictionary)
-                            )
+                                                     adjustmentDictionary))
                         )
                     )
 
@@ -136,46 +124,42 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                     l_morTokens = l_morTokens + l_morTokens_latex_sub
 
                     # For keeping track of latex tokens and their tag IDs
-                    eq.LATEXMAPTOKENS[latexEquationId]= ' '.join(l_morTokens_latex_sub)
+                    eq.LATEXMAPTOKENS[latexEquationId] = ' '.join(l_morTokens_latex_sub)
 
                     # Use this to replace the Ltxqtn tag when it's a head
 
-                    latexInSentenceMap[token.text]= {
-                        'tokenIndex': token.index ,
-                        'tokenHead' : l_morTokens_latex_sub[0]
+                    latexInSentenceMap[token.text] = {
+                        'tokenIndex': token.index,
+                        'tokenHead': l_morTokens_latex_sub[0]
                     }
                 # This is for when the the latex parser errors out and can't
                 # find it. It adds the actual latexequation marker
                 else:
 
-                    headTokenPosition =  token.governor
+                    headTokenPosition = token.governor
                     childTokenPosition = int(token.index)
-                    l_depTokens_tuples.append( 
-                        (token.dependency_relation.replace(":","") ,
-                            (tokenHeadText, headTokenPosition + 
-                            get_adjustment_position(
-                                headTokenPosition,
+                    l_depTokens_tuples.append(
+                        (token.dependency_relation.replace(":", ""),
+                            (tokenHeadText, headTokenPosition +
+                             get_adjustment_position(
+                                 headTokenPosition,
+                                 adjustmentDictionary
+                             )),
+                            (token.text, childTokenPosition +
+                             get_adjustment_position(
+                                childTokenPosition,
                                 adjustmentDictionary
-                                )
-                            ), 
-                            (token.text, childTokenPosition + 
-                            get_adjustment_position(
-                                childTokenPosition, 
-                                adjustmentDictionary
-                                )
-                            ) 
-                        )
-                    )
+                             ))))
                     l_posTokens.append("{0}_{1}".format(token.text, token.upos))
                     l_morTokens.append(token.text)
                     adjustedPosition = adjustedPosition+1
 
             else:
-                ## For all other types of words
+                # For all other types of words
 
-                ## Create dependency trees
+                # Create dependency trees
                 childTokenPosition = int(token.index)
-                headTokenPosition =  token.governor
+                headTokenPosition = token.governor
                 headAdjustment = get_adjustment_position(headTokenPosition,
                                                          adjustmentDictionary)
                 childAdjustment = get_adjustment_position(childTokenPosition,
@@ -185,7 +169,7 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
 
                     l_depTokens_tuples.append(
                         (
-                            token.dependency_relation.replace(":",""),
+                            token.dependency_relation.replace(":", ""),
                             (
                                 tokenHeadText,
                                 headTokenPosition + headAdjustment
@@ -197,17 +181,16 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                         )
                     )
 
-                ## Create POS (input)
+                # Create POS (input)
                 l_posTokens.append("{0}_{1}".format(token.text, token.upos))
 
-                ## Create Morphologies
+                # Create Morphologies
                 if token.lemma is None:
                     l_morTokens.append(token.text)
                 else:
                     l_morTokens.append(token.lemma)
 
-
-        ## Need to Parse out DEPTokens from tuples out to text
+        # Need to Parse out DEPTokens from tuples out to text
         for depSet in l_depTokens_tuples:
             t1, t2, t3 = depSet
             headToken = t2[0]
@@ -215,18 +198,18 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
             if 'Ltxqtn' in headToken:
                 try:
                     headToken = latexInSentenceMap[headToken]['tokenHead']
-                except:
+                except Exception:
                     pass
 
             if 'Ltxqtn' in childToken:
                 try:
                     childToken = latexInSentenceMap[childToken]['tokenHead']
-                except:
+                except Exception:
                     pass
 
             l_depTokens.append(
                 "{0}({1}-{2}, {3}-{4})".format(t1,
-                                               headToken,t2[1],
+                                               headToken, t2[1],
                                                childToken,
                                                t3[1])
             )
@@ -241,16 +224,13 @@ def create_parse_files(doc, docNum, writeFile = True, pathToFolders=''):
                                                t3[1])
             )
 
-
         l_depSentences.append("\n".join(l_depTokens + l_depTokens_latex))
         l_posSentences.append("\n".join(l_posTokens))
         l_morSentences.append("\n".join(l_morTokens))
 
-
     d_documentData['depData'].append(l_depSentences)
     d_documentData['posData'].append(l_posSentences)
     d_documentData['morData'].append(l_morSentences)
-
 
     if writeFile:
         with open(pathToFolders+'{0:04d}.dep'.format(docNum),
@@ -271,43 +251,43 @@ def get_adjustment_position(tokenPosition, adjustmentDictionary):
     '''This determines the adjustment position for DEP files, because things
        get reordered when there are equations
     '''
-    if len(adjustmentDictionary)>1:
+    if len(adjustmentDictionary) > 1:
         for key, val in sorted(list(adjustmentDictionary.items()),
-                               key=lambda x:x, reverse=True):
-            if tokenPosition>key:
+                               key=lambda x: x, reverse=True):
+            if tokenPosition > key:
                 return val
     return 0
 
 
 def get_token_governor(token, sent):
-    if token.governor==0:
+    if token.governor == 0:
         govWord = 'ROOT'
     else:
-        govWord = sent.words[token.governor-1].text
+        govWord = sent.words[token.governor - 1].text
     return govWord
 
 
-def load_data(jsonPath, picklePath = None):
+def load_data(jsonPath, picklePath=None):
     """Load data - if picklePath is specified, load the pickle. Else, try
        json file.
        This returns the JSON file as well as a list of document texts
     """
     if picklePath is not None:
-        l_docs = pickle.load(open(picklePath, "rb" ))
+        l_docs = pickle.load(open(picklePath, "rb"))
     else:
 
-        ## Read JSON data into the datastore variable - this comes from
-        ## other team members effort.
+        # Read JSON data into the datastore variable - this comes from
+        # other team members effort.
         with open(jsonPath, 'r') as f:
             datastore = json.load(f)
 
-        ## These were some bad files - nothing substantive in them, or they
-        ## were retrieved in bad format
+        # These were some bad files - nothing substantive in them, or they
+        # were retrieved in bad format
         bad_files = ['1805.10677v1', '0911.5378v1']
         datastore = {k: v for k, v in datastore.items() if k not in bad_files}
 
-        ## Extract texts
-        l_docs = [value['text'] for key,value in
+        # Extract texts
+        l_docs = [value['text'] for key, value in
                   list(datastore.items())[0:] if value['text']]
 
     print('# of documents: ', len(l_docs))
@@ -319,43 +299,41 @@ def nlp_parse_main(args_dict):
     ''' Main run file that orchestrates everything
     '''
 
-    ## Load NLP engines
+    # Load NLP engines
     spacynlp = spacy.load('en_core_web_sm')
     nlp = stanfordnlp.Pipeline(models_dir=settings.stanf_nlp_dir,
                                treebank='en_ewt', use_gpu=False,
                                pos_batch_size=3000)
 
-    ## Load documents
+    # Load documents
     jsonObj, allDocs = load_data(settings.processed_dir / 'data.json')
 
-    ## Process and Clean documents
+    # Process and Clean documents
     try:
         allDocsClean = pickle.load(open('allDocsClean.pkl', "rb" ))
         print('Loaded pickle!')
     except FileNotFoundError:
         print('Starting from scratch')
-        allDocsClean= []
+        allDocsClean = []
         for i, doc in enumerate(allDocs):
-            if i%10==0:
+            if i % 10 == 0:
                 print(i)
             allDocsClean.append(clean_doc(doc, spacynlp))
 
         with open('allDocsClean.pkl', 'wb') as f:
             pickle.dump(allDocsClean, f)
 
-
     allDocs2 = [eq.extract_and_replace_latex(doc) for docNum, doc in
                 enumerate(allDocsClean)]
     print('Number of LateX Equations parsed: {}'.format(len(eq.LATEXMAP)))
 
-
-    ## Put equations back into text - this will be fed to glove embedding
+    # Put equations back into text - this will be fed to glove embedding
     if args_dict['nlp_newjson']:
         print('***************\nBuilding JSON file for glove embedding...')
         allDocs3 = []
         percentCompletedMultiple = int(len(allDocs2)/10)
         for i, doc in enumerate(allDocs2[0:]):
-            if i%percentCompletedMultiple == 0:
+            if i % percentCompletedMultiple == 0:
                 print('{}% completed'.format(round(i/(len(allDocs2))*100, 0)))
             newDoc = reg.sub(r'Ltxqtn[a-z]{8}', eq.put_equation_tokens_in_text,
                              doc)
@@ -366,16 +344,15 @@ def nlp_parse_main(args_dict):
 
         for key, value in list(jsonObj2.items()):
             if value['text']:
-                jsonObj2[key]['text']=allDocs3[allDocs3Counter]
+                jsonObj2[key]['text'] = allDocs3[allDocs3Counter]
                 allDocs3Counter = allDocs3Counter+1
 
         with open('{}/articles-with-equations.json'.format(settings.data_dir),
                   'w', encoding='utf8') as fp:
             json.dump(jsonObj2, fp)
 
-
-    ## Parse files into DIM
-    startPoint=-1
+    # Parse files into DIM
+    startPoint = -1
     if args_dict['nlp_bp'] is not None:
         startPoint = args_dict['nlp_bp']
 
@@ -388,7 +365,7 @@ def nlp_parse_main(args_dict):
             try:
                 with timeout(300, exception=RuntimeError):
                     nlpifiedDoc = nlp(doc)
-                    thisDocumentData = create_parse_files(
+                    create_parse_files(
                         nlpifiedDoc, i, True, settings.data_dir
                     )
             except RuntimeError:

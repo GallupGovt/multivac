@@ -1,8 +1,9 @@
 import argparse
-import bs4
 import datetime
 import json
 import os
+
+import bs4
 
 
 def get_abstract(soup):
@@ -111,12 +112,14 @@ def run(args_dict):
             # comes in as list, combine to full text
             tmp_content = get_content(soup)
             content = ' '.join(tmp_content)
-            raw_content = '////'.join(tmp_content)
 
             # cleaning fluff from main content
-            for ref in references: content = content.replace(ref, '')
-            for frm in formulas: content = content.replace(frm, '')
-            for atr in authors: content = content.replace(atr, '')
+            for ref in references:
+                content = content.replace(ref, '')
+            for frm in formulas:
+                content = content.replace(frm, '')
+            for atr in authors:
+                content = content.replace(atr, '')
             content = content.replace(abstract, '')
 
             structure = {

@@ -2,10 +2,8 @@
 
 import torch
 import torch.nn as nn
-import torch.nn.utils
-from torch.autograd import Variable
 import torch.nn.functional as F
-from torch.nn.utils.rnn import pad_packed_sequence, pack_padded_sequence
+import torch.nn.utils
 
 
 class PointerNet(nn.Module):

@@ -8,21 +8,20 @@ def clean_doc(doc, spacynlp):
     Clean individual documents and remove citations, URLs, emails, other
     trivial content. Returns cleaned doc
     '''
-    ### Regex for cleaning
-    re_citationsNumeric = reg.compile('(\[\d+)(,\s*\d+)*]')
-    re_url= reg.compile(r'((http|ftp|https):\/\/)?[-a-zA-Z0-9@:%._\+~#=]{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)')
-    author = r"(?:[A-Z][A-Za-z'`-]+)"
-    etal = r"(?:et al.?)"
-    additional = r"(?:,? (?:(?:and |& )?" + author + "|" + etal + "))"
-    year_num = r"(?:19|20)[0-9][0-9]"
-    page_num = r"(?:, p.? [0-9]+)?"
-    year = "(?:, *"+year_num+page_num+"| *\("+year_num+page_num+"\))"
-    re_intextcite = reg.compile(r"((?:[A-Za-z][A-Za-z'`-éü-]+)(?:,? (?:(?:and |& )?(?:[A-Za-z][A-Za-z'`-éü-]+)|(?:et al.?)))*(?:,* *((?:19|20)[0-9][0-9][a-z]*)(\s*&\s*[0-9]*[a-z]*)*(, (\d+))*(?:, p.? [0-9]+)?| *\\((?:19|20)[0-9][0-9][a-z](\s*&)(?:, p.? [0-9]+)?\\)))")
+    # Regex for cleaning
+    re_citationsNumeric = reg.compile(r'(\[\d+)(,\s*\d+)*]')
+    re_url = reg.compile(r'((http|ftp|https):\/\/)?[-a-zA-Z0-9@:%._\+~#=]"'
+                         r'{2,256}\.[a-z]{2,6}\b([-a-zA-Z0-9@:%_\+.~#?&//=]*)')
+    re_intextcite = reg.compile(r"((?:[A-Za-z][A-Za-z'`-éü-]+)(?:,? (?:(?:and |& )"
+                                r"?(?:[A-Za-z][A-Za-z'`-éü-]+)|(?:et al.?)))*(?:,* "
+                                r"*((?:19|20)[0-9][0-9][a-z]*)(\s*&\s*[0-9]*[a-z]*)"
+                                r"*(, (\d+))*(?:, p.? [0-9]+)?| *\\((?:19|20)[0-9]"
+                                r"[0-9][a-z](\s*&)(?:, p.? [0-9]+)?\\)))")
 
     re_emptyCite = reg.compile(r"\(([\s]*[;]+[\s]*)+\)")
     re_emptyEg = reg.compile(r'\(e.g.[\s*;\s*]*[,]*\s*\)')
     re_clickHere = reg.compile(r'Click here[^.]*\.')
-    re_cid=reg.compile(r"\(cid:\d+\)")
+    re_cid = reg.compile(r"\(cid:\d+\)")
     re_email = reg.compile(r"[\w.-]+@[\w.-]+")
     re_emptyParens = reg.compile(r"\(\s*\)")
     re_emptySee = reg.compile(r"\(see(\s)*\)")
@@ -31,7 +30,7 @@ def clean_doc(doc, spacynlp):
     re_vixraHeader = reg.compile(r"^(\s?.?\s)+(v i X r a)")
     re_hyphenatedWords = reg.compile(r'\S(?=\S*[-]\s)([a-zA-Z-]+)(\s)[A-za-z]+')
 
-    #Actual cleaning
+    # Actual cleaning
     doc = reg.sub(re_cid, ' ', doc)
     doc = reg.sub(re_citationsNumeric, ' NumericCitation ', doc)
     doc = reg.sub(re_url, ' ', doc)
@@ -47,16 +46,15 @@ def clean_doc(doc, spacynlp):
 
     # This work supported by --> all the way to end of document
     # Only remove this when it appears in the second half of the article
-    removeSupported = False
     for m in reg.finditer(re_sponsors, doc):
-        if m.start()>(len(doc)/2):
+        if m.start() > (len(doc)/2):
             doc = reg.sub(re_sponsors, ' ', doc)
 
-    #Handling hyphens - 2-28-2018
+    # Handling hyphens - 2-28-2018
     for m in reg.finditer(re_hyphenatedWords, doc):
-        match=m.group(0)
+        match = m.group(0)
 
-        mergedWord = match.replace(' ', '').replace('-','')
+        mergedWord = match.replace(' ', '').replace('-', '')
         if mergedWord in spacynlp.vocab:
 
             doc = doc.replace(match, mergedWord)
@@ -65,15 +63,15 @@ def clean_doc(doc, spacynlp):
             for i in match.replace(' ', '').split('-'):
                 allWords = allWords and (i in spacynlp.vocab)
             if allWords:
-                doc = doc.replace(match,(match.replace(' ', '')) )
+                doc = doc.replace(match, (match.replace(' ', '')))
             else:
                 doc = doc.replace(match, mergedWord)
 
-    #De-dup for PUBMED articles, where the main text is sometimes duplicated
+    # De-dup for PUBMED articles, where the main text is sometimes duplicated
     sliceText = doc[0:500]
     count = doc.count(sliceText)
 
-    if count>1:
+    if count > 1:
         posDup = doc.find(sliceText, 1)
         doc = doc[0:posDup-1]
 

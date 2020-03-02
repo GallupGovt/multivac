@@ -8,8 +8,9 @@ centrality but can be extended to include additional network centrality
 measures.
 """
 import argparse
-import networkx as nx
 import sys
+
+import networkx as nx
 
 
 def analyze_network(net, args_dict):
@@ -63,8 +64,8 @@ if __name__ == '__main__':
                         'files -- entities then train -- that are parsed to '
                         'create a network.')
     parser.add_argument('-m', '--measure', required=False,
-                        default='eigenvector', choices=['degree',
-                        'eigenvector'], help='Select which network centrality '
+                        default='eigenvector', choices=['degree', 'eigenvector'],
+                        help='Select which network centrality '
                         'measure is required.')
     parser.add_argument('-n', '--num_results', required=False, default=10,
                         type=int, help='Number of results to return from '

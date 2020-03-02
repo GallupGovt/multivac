@@ -1,19 +1,19 @@
 # coding=utf-8
+import pickle
 from collections import OrderedDict
 
-import torch
 import numpy as np
-import pickle
-
+import torch
 from torch.autograd import Variable
 
-from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, ReduceAction
-from multivac.src.gan.utilities.utils import cached_property
-
+from multivac.src.gan.gen_pyt.asdl.transition_system import (ApplyRuleAction,
+                                                             ReduceAction)
 from multivac.src.gan.gen_pyt.model import nn_utils
+from multivac.src.gan.utilities.utils import cached_property
 
 
 class Dataset(object):
+
     def __init__(self, examples):
         self.examples = examples
 
@@ -53,6 +53,7 @@ class Dataset(object):
 
 
 class Example(object):
+
     def __init__(self, src_sent, tgt_actions, tgt_text, tgt_ast, idx=0, meta=None):
         self.src_sent = src_sent        # query_tokens
         self.tgt_text = tgt_text        # text
@@ -64,6 +65,7 @@ class Example(object):
 
 
 class Batch(object):
+
     def __init__(self, examples, grammar, vocab, prim_vocab=None, copy=True, cuda=False):
         self.examples = examples
         self.max_action_num = max(len(e.tgt_actions) for e in self.examples)
@@ -123,7 +125,8 @@ class Batch(object):
         self.primitive_idx_matrix = []
         self.gen_token_mask = []
         self.primitive_copy_mask = []
-        self.primitive_copy_token_idx_mask = np.zeros((self.max_action_num, len(self), max(self.src_sents_len)), dtype='float32')
+        self.primitive_copy_token_idx_mask = np.zeros((self.max_action_num, len(self), max(self.src_sents_len)),
+                                                      dtype='float32')
 
         for t in range(self.max_action_num):
             app_rule_idx_row = []
@@ -189,7 +192,8 @@ class Batch(object):
         self.gen_token_mask = Variable(T.FloatTensor(self.gen_token_mask))
         self.primitive_copy_mask = Variable(T.FloatTensor(self.primitive_copy_mask))
         self.primitive_copy_token_idx_mask = Variable(torch.from_numpy(self.primitive_copy_token_idx_mask))
-        if self.cuda: self.primitive_copy_token_idx_mask = self.primitive_copy_token_idx_mask.cuda()
+        if self.cuda:
+            self.primitive_copy_token_idx_mask = self.primitive_copy_token_idx_mask.cuda()
 
     @property
     def primitive_mask(self):
@@ -214,5 +218,3 @@ class Batch(object):
             aggregated_primitive_tokens = OrderedDict()
             for token_pos, token in enumerate(e.src_sent):
                 aggregated_primitive_tokens.setdefault(token, []).append(token_pos)
-
-

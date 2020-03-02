@@ -1,6 +1,5 @@
-from tqdm import tqdm
-
 import torch
+from tqdm import tqdm
 
 
 class Trainer(object):
@@ -23,7 +22,7 @@ class Trainer(object):
         for idx in tqdm(range(len(dataset)), desc='Training epoch ' + str(self.epoch + 1) + ''):
             tree, inputs, label = dataset[indices[idx]]
             inputs = inputs.to(self.device)
-            label = label.to(self.device).view(1,1)
+            label = label.to(self.device).view(1, 1)
             output = self.model(tree, inputs)
             loss = self.criterion(output, label)
             total_loss += loss.item()
@@ -43,11 +42,10 @@ class Trainer(object):
         with torch.no_grad():
             total_loss = 0.0
             predictions = torch.zeros(len(dataset), dtype=torch.float, device=self.device)
-            indices = torch.arange(0, 2, dtype=torch.float, device=self.device)
 
             for idx in tqdm(range(len(dataset)), desc='Testing epoch  ' + str(self.epoch) + ''):
                 tree, inputs, label = dataset[idx]
-                inputs, label = inputs.to(self.device), label.to(self.device).view(1,1)
+                inputs, label = inputs.to(self.device), label.to(self.device).view(1, 1)
                 output = self.model(tree, inputs)
                 loss = self.criterion(output, label)
                 total_loss += loss.item()
