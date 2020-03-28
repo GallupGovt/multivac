@@ -17,32 +17,44 @@ from tqdm import tqdm
 from stanfordcorenlp import StanfordCoreNLP
 from textacy.extract import subject_verb_object_triples
 
-REGEX_PCT = re.compile(r'\s%')
-REGEX_SPACE = re.compile(r'\s+')
-CHARS_TO_REMOVE = ['(', ')', '"', '‘', ',', '.']
+NORM_REGEX_CHARS1 = re.compile(r'[\(\)\"\‘\,\.\%\{\}\`\\\:\[\]\“\•]+')
+NORM_REGEX_CHARS2 = re.compile(r'^([\-\—\–]|(’s)|(’))\s?')
 
-REGEX_ABSTRACT = re.compile(r'^conclusions|methods|results'
-                            r'abstract|conclusion|objective'
-                            r'([a-z\s]+)',
-                            re.IGNORECASE)
+ABS_REGEX_BREAK = re.compile(r'\n+')
+ABS_REGEX_LATEX = re.compile(r'\$.+\$')
+ABS_REGEX_SPACE = re.compile(r'\s+')
+ABS_REGEX_VARIABLE = re.compile(r'\\\\\w')
+ABS_REGEX_PRECEDING = re.compile((r'^(conclusions|conclusion|methods|results'
+                                  r'|background|abstract|objective|discussion)+'),
+                                 flags=re.IGNORECASE)
 
 
-def clean_abstract_rdf(triple):
+def preprocess_abstract(abstract, nlp):
     """
     Helper function to clean abstract.
+
+    Parameters
+    ----------
+    abstract : str
+        The text of the abstract
+    nlp : spacy
+        The SpaCy object.
     """
-    sub, pred, obj = triple
-    sub = re.sub(REGEX_ABSTRACT, r'\1', sub)
-    return (sub, pred, obj)
+    abstract = re.sub(ABS_REGEX_BREAK, ' ', abstract)
+    abstract = re.sub(ABS_REGEX_LATEX, '', abstract)
+    abstract = re.sub(ABS_REGEX_VARIABLE, 'variable', abstract)
+    abstract = re.sub(ABS_REGEX_SPACE, ' ', abstract)
+    abstract = ' '.join([re.sub(ABS_REGEX_PRECEDING, '', sent.text.strip()).strip()
+                         for sent in nlp(abstract).sents])
+    return abstract.strip()
 
 
-def clean_full_document_rdf(triple):
+def preprocess_full_document(doc, nlp=None):
     """
     TODO :: Add some post-processing logic
-    for full documents. Will do this once
-    the initial PR is reviewed.
+    for full documents.
     """
-    return triple
+    return doc
 
 
 class StanfordServer:
@@ -318,12 +330,8 @@ class RDFExtractor:
         - 'any' = remove triples with *any* numeric characters
     """
 
-    try:
-        nlp = spacy.load('en_core_web_lg')
-    except OSError:
-        raise OSError('The model `en_core_web_lg` must be downloaded.')
-
     def __init__(self,
+                 nlp,
                  min_sub_char_len=3,
                  min_obj_char_len=3,
                  lowercase=True,
@@ -338,6 +346,7 @@ class RDFExtractor:
             raise ValueError("The `lemmatize` parameter must be boolean or "
                              "'pred', not {}.".format(lemmatize))
 
+        self.nlp = nlp
         self.num_ignore = False if remove_numeric else True
         self.num_check_any = True if remove_numeric == 'any' else False
 
@@ -367,6 +376,31 @@ class RDFExtractor:
             return
         return list(self._triples)
 
+    @triples.setter
+    def triples(self, new_triples):
+        """
+        A list of the unique RDF triples.
+        """
+        self._triples = new_triples
+
+    @property
+    def sentences_and_triples(self):
+        """
+        A list of sentences and RDF triples (not unique)
+        """
+        if not self._is_extracted:
+            return
+        return self._results
+
+    @sentences_and_triples.setter
+    def sentences_and_triples(self, new_results):
+        """
+        A list of sentences and RDF triples (not unique)
+        """
+        if not self._is_extracted:
+            return
+        self._results = new_results
+
     @property
     def n_triples(self):
         """
@@ -377,23 +411,14 @@ class RDFExtractor:
         return len(self._triples)
 
     @property
-    def sentences_and_triples(self):
-        """
-        A list of sentences and RDF triples (not unique)
-        """
-        if not self._is_extracted:
-            return
-        return [(res['SENT'], res['RDF']) for res in self._results]
-
-    @property
     def entities(self):
         """
         A list of all unique entities.
         """
         if not self._is_extracted:
             return
-        entities = ([' '.join(i[0]) for i in self._triples] +
-                    [' '.join(i[2]) for i in self._triples])
+        entities = ([i[0] for i in self._triples] +
+                    [i[2] for i in self._triples])
         entities = sorted(list(set(entities)))
         return entities
 
@@ -404,7 +429,7 @@ class RDFExtractor:
         """
         if not self._is_extracted:
             return
-        relations = [' '.join(i[1]) for i in self._triples]
+        relations = [i[1] for i in self._triples]
         relations = sorted(list(set(relations)))
         return relations
 
@@ -415,7 +440,7 @@ class RDFExtractor:
         """
         if not self._is_extracted:
             return
-        return self._entity_to_id
+        return self.to_id(self.entities)
 
     @property
     def relation_ids(self):
@@ -424,7 +449,7 @@ class RDFExtractor:
         """
         if not self._is_extracted:
             return
-        return self._relation_to_id
+        return self.to_id(self.relations)
 
     @staticmethod
     def to_id(a):
@@ -603,10 +628,8 @@ class RDFExtractor:
         string : str
             The string to check
         """
-        string = re.sub(REGEX_PCT, "%", string)
-        string = ''.join([char for char in string
-                          if char not in CHARS_TO_REMOVE])
-        string = re.sub(REGEX_SPACE, ' ', string)
+        string = re.sub(NORM_REGEX_CHARS1, '', string)
+        string = re.sub(NORM_REGEX_CHARS2, '', string)
         return string.strip()
 
     def extract(self, doc, raw=False):
@@ -719,8 +742,69 @@ class RDFExtractor:
             print('Number failed: ', failed)
 
         self._is_extracted = True
-        self._entity_to_id = self.to_id(self.entities)
-        self._relation_to_id = self.to_id(self.relations)
+
+    @staticmethod
+    def _create_type_constraint(train2id):
+        """
+        This is modified from here ::
+          "https://github.com/thunlp/OpenKE/blob/"
+          "OpenKE-PyTorch/benchmarks/FB15K/n-n.py"
+
+        Parameters
+        ----------
+        train2id list of lists
+            A list of triple lists
+
+        Returns
+        -------
+        rel_left : dict of dicts
+            The subject-relation types
+        rel_right : dict of dicts
+            The object-relation types
+        """
+
+        rel_left = {}
+        rel_right = {}
+
+        for triple in train2id[1:]:
+            if not triple:
+                continue
+
+            sub, obj, rel = triple
+
+            if rel not in rel_left:
+                rel_left[rel] = {}
+            if rel not in rel_right:
+                rel_right[rel] = {}
+
+            rel_left[rel][sub] = 1
+            rel_right[rel][obj] = 1
+
+        return rel_left, rel_right
+
+    def package_entities_and_relations(self):
+        """
+        Package the entities and relations into a format
+        usable by OpenKE.
+        """
+        entity_dict = {v: k for k, v in self.entity_ids.items()}
+        relation_dict = {v: k for k, v in self.relation_ids.items()}
+
+        entity2relation = [[len(self.entities)]]
+        for triple in self.triples:
+            entity2relation.append([entity_dict[triple[0]],
+                                    entity_dict[triple[2]],
+                                    relation_dict[triple[1]]])
+        entity2id = [[rel, i] for rel, i in entity_dict.items()]
+        relation2id = [[rel, i] for rel, i in relation_dict.items()]
+
+        rel_left, rel_right = self._create_type_constraint(entity2relation)
+
+        return (entity2id,
+                relation2id,
+                entity2relation,
+                rel_left,
+                rel_right)
 
 
 def main():
@@ -778,19 +862,35 @@ def main():
                         type=int,
                         help="The Stanford host timeout (e.g. 15000).",
                         default=15000)
-    parser.add_argument('-pp', '--postprocessing',
-                        help="Post-processing to perform.",
-                        default='abstract',
-                        choices=['none', 'abstract', 'full_document'])
 
     parser.add_argument('-rc', '--resolve_coreferences',
                         action='store_true',
                         help="Resolve the co-references.")
 
+    parser.add_argument('-pp', '--preprocess',
+                        default='abstract',
+                        choices=['abstract', 'document', 'none'],
+                        help="Preprocess the document or abstract.")
+
+    parser.add_argument('-pe', '--package_entities',
+                        action='store_true',
+                        help="Package the entities.")
+
     args = parser.parse_args()
+
+    # initialize the spaCy object
+    try:
+        nlp = spacy.load('en_core_web_lg')
+    except OSError:
+        raise OSError('The model `en_core_web_lg` must be downloaded.')
 
     with open(args.json_input) as fb:
         docs = json.load(fb)
+
+    if args.preprocess == 'abstract':
+        docs = [preprocess_abstract(doc, nlp) for doc in docs]
+    elif args.preprocess == 'document':
+        docs = [preprocess_full_document(doc, nlp) for doc in docs]
 
     if args.stanford_dir is not None and args.resolve_coreferences:
         server = StanfordServer(args.stanford_dir,
@@ -809,7 +909,8 @@ def main():
         docs = resolver.resolve_all(docs)
 
     print("Extracting triples...")
-    extractor = RDFExtractor(min_sub_char_len=args.min_sub_char_len,
+    extractor = RDFExtractor(nlp,
+                             min_sub_char_len=args.min_sub_char_len,
                              min_obj_char_len=args.min_obj_char_len,
                              lemmatize=args.lemmatize,
                              remove_numeric=args.remove_numeric)
@@ -817,14 +918,51 @@ def main():
 
     with open(args.json_output, 'w') as fb:
         triples = extractor.triples
-        if args.postprocessing == 'abstract':
-            triples = [clean_abstract_rdf(triple) for triple in triples]
-        elif args.postprocessing == 'full_document':
-            triples = [clean_full_document_rdf(triple) for triple in triples]
         json.dump(triples, fb)
 
     if args.stanford_dir is not None and args.resolve_coreferences:
         server.stop()
+
+    if args.package_entities:
+
+        (entity2id,
+         relation2id,
+         train2id,
+         rel_left,
+         rel_right) = extractor.package_entities_and_relations()
+
+        directory = os.path.dirname(args.json_output)
+        with open(os.path.join(directory, 'entity2id.txt'), 'w') as fb:
+            len_entity = len(entity2id)
+            for i, row in enumerate(entity2id, start=1):
+                sep = '\n' if i < len_entity else ''
+                fb.write('\t'.join([str(v) for v in row]) + sep)
+
+        with open(os.path.join(directory, 'relation2id.txt'), 'w') as fb:
+            len_relation = len(relation2id)
+            for i, row in enumerate(relation2id):
+                sep = '\n' if i < len_relation else ''
+                fb.write('\t'.join([str(v) for v in row]) + sep)
+
+        with open(os.path.join(directory, 'train2id.txt'), 'w') as fb:
+            len_train = len(train2id)
+            for row in train2id:
+                sep = '\n' if i < len_train else ''
+                fb.write('\t'.join([str(v) for v in row]) + sep)
+
+        with open(os.path.join(directory, 'type_constraint.txt'), 'w') as fb:
+            fb.write('{}\n'.format(len(rel_left)))
+            for i in rel_left:
+
+                fb.write('{}\t{}'.format(i, len(rel_left[i])))
+                for j in rel_left[i]:
+                    fb.write('\t{}'.format(j))
+
+                fb.write('\n')
+                fb.write('{}\t{}'.format(i, len(rel_right[i])))
+                for j in rel_right[i]:
+                    fb.write('\t{}'.format(j))
+                fb.write('\n')
 
 
 if __name__ == '__main__':
