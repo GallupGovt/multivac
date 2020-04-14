@@ -1,12 +1,10 @@
 import os
-import pdb
 from copy import deepcopy
 
 import torch
 import torch.utils.data as data
-from tqdm import tqdm
-
 from multivac.src.gan.discriminator.tree import Tree
+from tqdm import tqdm
 
 
 # Dataset class for MULTIVAC dataset
@@ -35,10 +33,7 @@ class MULTIVACDataset(data.Dataset):
 
     def read_sentence(self, line):
         indices = self.vocab.convertToIdx(line.split())
-        try:
-            result = torch.tensor(indices, dtype=torch.long, device='cpu')
-        except Exception:
-            pdb.set_trace()
+        result = torch.tensor(indices, dtype=torch.long, device='cpu')
 
         return result
 
