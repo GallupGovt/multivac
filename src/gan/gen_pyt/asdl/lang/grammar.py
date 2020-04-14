@@ -5,6 +5,7 @@ from multivac.src.gan.utilities.utils import typename
 
 
 class Grammar(object):
+
     def __init__(self, rules):
         """
         instantiate a grammar with a set of production rules of type Rule
@@ -36,7 +37,7 @@ class Grammar(object):
         except AssertionError:
             print(root_node)
             raise AssertionError
-            
+
         self.root_node = next(iter(root_node))
 
         self.terminal_nodes = rhs_nodes - lhs_nodes

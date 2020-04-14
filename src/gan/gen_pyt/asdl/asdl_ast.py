@@ -1,9 +1,10 @@
 # coding=utf-8
 
-from multivac.src.gan.gen_pyt.asdl.asdl import *
+from multivac.src.gan.gen_pyt.asdl.asdl import ASDLCompositeType, Field
 
 
 class AbstractSyntaxTree(object):
+
     def __init__(self, production, realized_fields=None):
         self.production = production
 
@@ -31,7 +32,8 @@ class AbstractSyntaxTree(object):
 
     def __getitem__(self, field_name):
         for field in self.fields:
-            if field.name == field_name: return field
+            if field.name == field_name:
+                return field
         raise KeyError
 
     def sanity_check(self):
@@ -70,12 +72,10 @@ class AbstractSyntaxTree(object):
         return productions
 
     def to_string(self, sb=None, pretty=False, depth=0):
-        is_root = False
 
         tab_depth = '\t' * depth
 
         if sb is None:
-            is_root = True
             sb = ''
         elif pretty:
             sb += '\n' + tab_depth
@@ -131,7 +131,8 @@ class AbstractSyntaxTree(object):
             return False
 
         for i in range(len(self.fields)):
-            if self.fields[i] != other.fields[i]: return False
+            if self.fields[i] != other.fields[i]:
+                return False
 
         return True
 
@@ -148,12 +149,14 @@ class AbstractSyntaxTree(object):
             for val in field.as_value_list:
                 if isinstance(val, AbstractSyntaxTree):
                     node_num += val.size
-                else: node_num += 1
+                else:
+                    node_num += 1
 
         return node_num
 
 
 class RealizedField(Field):
+
     """wrapper of field realized with values"""
     def __init__(self, field, value=None, parent=None):
         super(RealizedField, self).__init__(field.name, field.type, field.cardinality)
@@ -173,7 +176,8 @@ class RealizedField(Field):
         else:
             self.value = None
             # note the value could be 0!
-            if value is not None: self.add_value(value)
+            if value is not None:
+                self.add_value(value)
 
         # properties only used in decoding, record if the field is finished generating
         # when card in [optional, multiple]
@@ -191,20 +195,27 @@ class RealizedField(Field):
     @property
     def as_value_list(self):
         """get value as an iterable"""
-        if self.cardinality == 'multiple': return self.value
-        elif self.value is not None: return [self.value]
-        else: return []
+        if self.cardinality == 'multiple':
+            return self.value
+        elif self.value is not None:
+            return [self.value]
+        else:
+            return []
 
     @property
     def finished(self):
         if self.cardinality == 'single':
-            if self.value is None: return False
-            else: return True
+            if self.value is None:
+                return False
+            else:
+                return True
         elif self.cardinality == 'optional' and self.value is not None:
             return True
         else:
-            if self._not_single_cardinality_finished: return True
-            else: return False
+            if self._not_single_cardinality_finished:
+                return True
+            else:
+                return False
 
     def set_finish(self):
         # assert self.cardinality in ('optional', 'multiple')
@@ -212,7 +223,11 @@ class RealizedField(Field):
 
     def __eq__(self, other):
         if super(RealizedField, self).__eq__(other):
-            if type(other) == Field: return True  # FIXME: hack, Field and RealizedField can compare!
-            if self.value == other.value: return True
-            else: return False
-        else: return False
+            if type(other) == Field:
+                return True  # FIXME: hack, Field and RealizedField can compare!
+            if self.value == other.value:
+                return True
+            else:
+                return False
+        else:
+            return False

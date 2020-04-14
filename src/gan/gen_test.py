@@ -1,8 +1,9 @@
 import argparse
-import random
 
-from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import asdl_ast_to_english
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import \
+    asdl_ast_to_english
 from multivac.src.gan.gen_pyt.model.parser import Parser
+
 
 def run(args):
     '''
@@ -28,7 +29,7 @@ def run(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', 
+    parser.add_argument('-m', '--model',
                         help='Path to model checkpoint file.')
     parser.add_argument('-q', '--query', nargs='+', required=False,
                         help='Query tokens for generating a question.')

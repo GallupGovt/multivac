@@ -1,10 +1,11 @@
-from collections import namedtuple
-from collections import Iterable, OrderedDict, defaultdict
+from collections import Iterable, OrderedDict
 from io import StringIO
 
 from multivac.src.gan.utilities.utils import typename
 
+
 class ASTNode(object):
+
     def __init__(self, node_type, label=None, value=None, children=None):
         self.type = node_type
         self.label = label
@@ -149,7 +150,8 @@ class ASTNode(object):
     def pretty_print_helper(self, sb, depth, new_line=False):
         if new_line:
             sb.write('\n')
-            for i in range(depth): sb.write(' ')
+            for i in range(depth):
+                sb.write(' ')
 
         sb.write('(')
         sb.write(typename(self.type))
@@ -169,7 +171,8 @@ class ASTNode(object):
             child.pretty_print_helper(sb, depth + 2, new_line)
 
         sb.write('\n')
-        for i in range(depth): sb.write(' ')
+        for i in range(depth):
+            sb.write(' ')
         sb.write(')')
 
     def get_leaves(self):
@@ -253,6 +256,7 @@ class ASTNode(object):
 
 
 class DecodeTree(ASTNode):
+
     def __init__(self, node_type, label=None, value=None, children=None, t=-1):
         super().__init__(node_type, label, value, children)
 
@@ -293,4 +297,3 @@ class Rule(ASTNode):
             parent += '{val=%s}' % self.value
 
         return '%s -> %s' % (parent, ', '.join([repr(c) for c in self.children]))
-

@@ -1,11 +1,9 @@
 import configparser
 import os
-
-from dotenv import load_dotenv
 from pathlib import Path
 
+from dotenv import load_dotenv
 from multivac.src import utilities
-
 
 cfg = configparser.ConfigParser()
 cfgDIR = Path(__file__).resolve().parent

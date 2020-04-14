@@ -4,14 +4,14 @@ import copy
 import json
 import os
 import pickle
-import pubmed_parser
-import slate
-
-from bs4 import BeautifulSoup as bs
 from collections import OrderedDict
 
-from multivac.src import utilities
+import pubmed_parser
+from bs4 import BeautifulSoup as bs
+
+import slate
 from multivac import settings
+from multivac.src import utilities
 
 
 def aggregate_pubmed(srcs, verbose=False):
@@ -35,7 +35,7 @@ def aggregate_pubmed(srcs, verbose=False):
                 pubmed_data[k] = temp
                 pubmed_metadata[k] = metadata
             print(src)
-        except:
+        except Exception:
             if verbose:
                 print('Error: %s' % src)
             pass
@@ -87,7 +87,6 @@ def parse_articles_data(source, data_raw_dir, verbose=False):
     # we'll just add the text to a new arxiv object, an ordered dict keyed on
     # doi or other id
     data = OrderedDict()
-    srcs = [data_raw_dir / x for x in os.listdir(data_raw_dir)]
     for ix, article_metadata in enumerate(metadata_):
 
         # initialize temp dictionary
@@ -103,11 +102,12 @@ def parse_articles_data(source, data_raw_dir, verbose=False):
         if source == 'arxiv':
             k = article_metadata['fn'].strip('.pdf')
             temp['text'] = parse_pdf(src)
-        elif source =='springer':
+        elif source == 'springer':
             k = article_metadata['doi']
             temp['text'] = parse_html(src)
         elif source == 'pubmed':
-            raise ValueError('pubmed not supported. Only "arxiv" and "springer" supported. Try "parse_pubmed() function"')
+            raise ValueError('pubmed not supported. Only "arxiv" and "springer" supported. '
+                             'Try "parse_pubmed() function"')
         else:
             raise ValueError('Only "arxiv" and "springer" supported as sources.')
 
@@ -142,14 +142,13 @@ def parse_pdf(src):
 
         # get text: strip out newlines and extra spaces
         doc = ' '.join([' '.join(x.split()) for x in doc])
-        text = (doc
-            .split(' Abstract ')[-1]
-            .split(' Acknowledgments ')[0]
-            .split(' ∗ ∗ ∗ ')[0]
-            .strip()
-        )
+        text = (doc.split(' Abstract ')[-1]
+                   .split(' Acknowledgments ')[0]
+                   .split(' ∗ ∗ ∗ ')[0]
+                   .strip()
+                )
 
-    except:  #  PDFSyntaxError
+    except Exception:
         text = None
 
     return text

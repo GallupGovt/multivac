@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 
 class QueryGAN_Discriminator_CNN(nn.Module):
+
     def __init__(self, args, vocab, vectors, output_shape):
         super(QueryGAN_Discriminator_CNN, self).__init__()
 
@@ -15,12 +16,12 @@ class QueryGAN_Discriminator_CNN(nn.Module):
         self.dropout_prob1 = self.args['dropout_prob1']
         self.dropout_prob2 = self.args['dropout_prob2']
         self.num_classes = output_shape
-        self.channels_out = sum([((150-(k-1))//2)*self.num_filters \
-                                   for k in self.filter_sizes])
+        self.channels_out = sum([((150-(k-1))//2)*self.num_filters
+                                 for k in self.filter_sizes])
         self.vocab = vocab
 
         self.emb = nn.Embedding(vocab.size(), vectors.size(1))
-        emb = torch.zeros(vocab.size(), vectors.size(1), dtype=torch.float, 
+        emb = torch.zeros(vocab.size(), vectors.size(1), dtype=torch.float,
                           device=args['device'])
         emb.normal_(0, 0.05)
 
@@ -32,7 +33,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
 
         self.emb.weight.data.copy_(emb)
         del emb
-        
+
         self.emb.weight.requires_grad = False
         self.dropout1 = nn.Dropout(self.dropout_prob1)
 
@@ -42,15 +43,14 @@ class QueryGAN_Discriminator_CNN(nn.Module):
 
         self.conv_blocks = nn.ModuleList(
             [nn.Sequential(
-                nn.Conv1d(in_channels=vectors.shape[1], 
-                          out_channels=self.num_filters, 
-                          kernel_size=sz, 
-                          stride=1, 
+                nn.Conv1d(in_channels=vectors.shape[1],
+                          out_channels=self.num_filters,
+                          kernel_size=sz,
+                          stride=1,
                           padding=0),
                 nn.ReLU(),
                 nn.MaxPool1d(kernel_size=2),
-                nn.Flatten()) for sz in self.filter_sizes
-            ]
+                nn.Flatten()) for sz in self.filter_sizes]
         )
 
         self.out = nn.Sequential(
@@ -58,7 +58,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                         nn.Linear(self.channels_out, self.hidden_dims),
                         nn.Linear(self.hidden_dims, self.num_classes)
                       )
-        
+
         for block in self.conv_blocks:
             block.apply(self.init_weights)
 
@@ -67,7 +67,7 @@ class QueryGAN_Discriminator_CNN(nn.Module):
     def init_weights(self, m):
         if type(m) in (nn.Linear, nn.Conv1d):
             nn.init.kaiming_uniform_(m.weight)
-            
+
             if m.bias is not None:
                 nn.init.constant_(m.bias, 0)
 
@@ -93,19 +93,15 @@ class QueryGAN_Discriminator_CNN(nn.Module):
     def train_single_code(self, train):
         criterion = nn.CrossEntropyLoss()
 
-        return self.trainer(train, criterion, 
-                     self.args['early_stopping'])
-
+        return self.trainer(train, criterion, self.args['early_stopping'])
 
     def trainer(self, train, criterion, early_stopping=True,
                 n_epochs_stop=10):
 
         trainloader = DataLoader(train, batch_size=self.args['batch_size'], shuffle=True, num_workers=4)
-        steps = len(trainloader)
 
-        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, 
-                                                 self.parameters()), 
-                                                 amsgrad=True)
+        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()),
+                                          amsgrad=True)
         if self.args['device'] == 'cuda':
             self.cuda()
             self.optimizer.cuda()
@@ -115,11 +111,11 @@ class QueryGAN_Discriminator_CNN(nn.Module):
         for i, (x, y) in enumerate(tqdm(trainloader)):
             verbs = x.to(self.args['device'])
             labels = y.to(self.args['device'])
-        
+
             # Forward pass
             outputs = self.forward(verbs)
             loss = criterion(outputs, labels.argmax(1))
-            
+
             # Backward and optimize
             self.optimizer.zero_grad()
             loss.backward()

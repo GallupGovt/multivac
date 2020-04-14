@@ -1,10 +1,10 @@
 # coding=utf-8
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
-import numpy as np
 
 
 def dot_prod_attention(h_t, src_encoding, src_encoding_att_linear, mask=None):
@@ -88,6 +88,7 @@ def to_input_variable(sequences, vocab, cuda=False, training=True, append_bounda
 
     return sents_var
 
+
 def uniform_init(lower, upper, params):
     for p in params:
         p.data.uniform_(lower, upper)
@@ -110,7 +111,8 @@ class LabelSmoothing(nn.Module):
     """
 
     def __init__(self, smoothing, tgt_vocab_size, ignore_indices=None):
-        if ignore_indices is None: ignore_indices = []
+        if ignore_indices is None:
+            ignore_indices = []
 
         super(LabelSmoothing, self).__init__()
 
@@ -128,9 +130,6 @@ class LabelSmoothing(nn.Module):
         dim = list(model_prob.size())[:-1] + [1]
         true_dist = self.one_hot.repeat(*dim)
         true_dist.scatter_(-1, target.unsqueeze(-1), self.confidence)
-        # true_dist = model_prob.data.clone()
-        # true_dist.fill_(self.smoothing / (model_prob.size(1) - 1))  # FIXME: no label smoothing for <pad> <s> and </s>
-        # true_dist.scatter_(1, target.data.unsqueeze(1), self.confidence)
 
         return self.criterion(model_prob, true_dist).sum(dim=-1)
 

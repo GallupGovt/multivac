@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import json
+
 import numpy as np
 import pandas as pd
-
-from rpy2.robjects import r, pandas2ri, numpy2ri
 from scipy.stats import zscore
 from sklearn.cross_decomposition import CCA
 from unidecode import unidecode
 
 from multivac import settings
+from rpy2.robjects import numpy2ri, pandas2ri, r
 
 
 def domain_adapted_CCA(DG_embed, DS_embed, NC=100):
@@ -38,7 +38,7 @@ def glove_main():
     # The "unidecode" step simplifies non-ASCII chars which
     # mess up the R GloVe engine.
     texts_df = pd.Series(texts).apply(lambda x: unidecode(x))
-    texts_df = pd.DataFrame({'text':texts_df})
+    texts_df = pd.DataFrame({'text': texts_df})
 
     # Source all the functions contained in the 'trainEmbeddings' R file
     r("source('{}/trainEmbeddings.R'.format('src/data'))")
@@ -79,18 +79,18 @@ def glove_main():
 
     # Sort and subset domain-specific array to match indices of domain-general
     # array
-    DS_embeddings_subset = DS_embeddings[indices_spec,:].copy()
-    DG_embeddings_subset = DG_embeddings[indices_gen,:].copy()
+    DS_embeddings_subset = DS_embeddings[indices_spec, :].copy()
+    DG_embeddings_subset = DG_embeddings[indices_gen, :].copy()
 
     # fit cca model
     cca_res, DA_embeddings = domain_adapted_CCA(DG_embeddings_subset,
                                                 DS_embeddings_subset, NC=100)
 
-    DS_embeddings_notinDG = DS_embeddings[indices_spec_notDG,:]
+    DS_embeddings_notinDG = DS_embeddings[indices_spec_notDG, :]
     DS_embeddings_notinDG_norm = zscore(DS_embeddings_notinDG)
 
     DA_notinDG_embeddings = cca_res.y_weights_.T @ DS_embeddings_notinDG_norm.T
-    DA_embeddings_final = np.append(DA_embeddings,DA_notinDG_embeddings.T,
+    DA_embeddings_final = np.append(DA_embeddings, DA_notinDG_embeddings.T,
                                     axis=0)
 
     # write data to disk
@@ -99,7 +99,7 @@ def glove_main():
 
 
 def loadGloveModel(gloveFile, vocab):
-    f = open(gloveFile,' r')
+    f = open(gloveFile, ' r')
 
     model = {}
     for line in f:

@@ -6,10 +6,10 @@ centrality measure of real and estimated networks.
 """
 import argparse
 import json
+from datetime import datetime
+
 import networkx as nx
 import numpy as np
-
-from datetime import datetime
 
 from get_kg_query_params import build_network, read_txt
 
@@ -91,8 +91,8 @@ if __name__ == '__main__':
                         'files -- the real network then estimated network -- '
                         'over which to calculate differences.')
     parser.add_argument('-m', '--measure', required=False,
-                        default='eigenvector', choices=['degree',
-                        'eigenvector'], help='Select which network centrality '
+                        default='eigenvector', choices=['degree', 'eigenvector'],
+                        help='Select which network centrality '
                         'measure is required.')
     parser.add_argument('-n', '--num_results', required=False, default=10,
                         type=int, help='Number of results to return from '

@@ -1,6 +1,6 @@
 # coding=utf-8
 from multivac.src.gan.gen_pyt.asdl.hypothesis import Hypothesis
-from multivac.src.gan.gen_pyt.asdl.transition_system import ApplyRuleAction, GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.transition_system import GenTokenAction
 
 
 class ActionInfo(object):
@@ -19,9 +19,10 @@ class ActionInfo(object):
 
     def __repr__(self, verbose=False):
         repr_str = '%s (t=%d, p_t=%d, frontier_field=%s)' % (repr(self.action),
-                                                         self.t,
-                                                         self.parent_t,
-                                                         self.frontier_field.__repr__(True) if self.frontier_field else 'None')
+                                                             self.t,
+                                                             self.parent_t,
+                                                             self.frontier_field.__repr__(True)
+                                                             if self.frontier_field else 'None')
 
         if verbose:
             verbose_repr = 'action_prob=%.4f, ' % self.action_prob
@@ -47,24 +48,28 @@ def get_action_infos(src_query, tgt_actions, force_copy=False, verbose=False):
         action_info = ActionInfo(action)
         action_info.t = t
 
-        if verbose: print(action)
+        if verbose:
+            print(action)
 
         if hyp.frontier_node:
             action_info.parent_t = hyp.frontier_node.created_time
             action_info.frontier_prod = hyp.frontier_node.production
             action_info.frontier_field = hyp.frontier_field.field
 
-            if verbose: print("Frontier node: {} :: {}".format(action_info.frontier_prod, action_info.frontier_field))
+            if verbose:
+                print("Frontier node: {} :: {}".format(action_info.frontier_prod, action_info.frontier_field))
 
         if isinstance(action, GenTokenAction):
-            if verbose: print("GenToken: {}".format(str(action.token)))
-            
+            if verbose:
+                print("GenToken: {}".format(str(action.token)))
+
             try:
                 tok_src_idx = src_query.index(str(action.token))
                 action_info.copy_from_src = True
                 action_info.src_token_position = tok_src_idx
             except ValueError:
-                if force_copy: raise ValueError('cannot copy primitive token %s from source' % action.token)
+                if force_copy:
+                    raise ValueError('cannot copy primitive token %s from source' % action.token)
 
         hyp.apply_action(action)
         action_infos.append(action_info)

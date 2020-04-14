@@ -1,13 +1,14 @@
 # coding=utf-8
 
-from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper \
-    import asdl_ast_to_english, english_ast_to_asdl_ast
-from multivac.src.rdf_graph.rdf_parse import tokenize_text, StanfordParser
-from multivac.src.gan.gen_pyt.asdl.transition_system \
-    import TransitionSystem, GenTokenAction
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import (
+    asdl_ast_to_english, english_ast_to_asdl_ast)
+from multivac.src.gan.gen_pyt.asdl.transition_system import (GenTokenAction,
+                                                             TransitionSystem)
+from multivac.src.rdf_graph.rdf_parse import tokenize_text
 
 
 class EnglishTransitionSystem(TransitionSystem):
+
     def __init__(self, grammar):
         super().__init__(grammar)
 
@@ -52,6 +53,6 @@ class EnglishTransitionSystem(TransitionSystem):
             hyp_text = self.ast_to_surface_text(hyp.tree)
             new_tree = self.surface_text_to_ast(hyp_text, parser)
             assert hyp.tree == new_tree
-        except:
+        except Exception:
             return False
         return True

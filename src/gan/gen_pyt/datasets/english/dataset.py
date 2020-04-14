@@ -1,25 +1,27 @@
 # coding=utf-8
 
+import os
 import re
+
 import numpy as np
-import pickle
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 
-from multivac.src.gan.gen_pyt.asdl.hypothesis import *
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper import \
+    english_ast_to_asdl_ast
+from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_transition_system import \
+    EnglishTransitionSystem
 from multivac.src.gan.gen_pyt.asdl.lang.eng.grammar import EnglishASDLGrammar
-from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_asdl_helper \
-    import english_ast_to_asdl_ast
-from multivac.src.gan.gen_pyt.asdl.lang.eng.eng_transition_system \
-    import EnglishTransitionSystem
-from multivac.src.gan.gen_pyt.components.action_info \
-    import ActionInfo, get_action_infos
+from multivac.src.gan.gen_pyt.components.action_info import get_action_infos
 from multivac.src.gan.gen_pyt.components.dataset import Example
-from multivac.src.gan.utilities.vocab import Vocab
 from multivac.src.gan.utilities.utils import serialize_to_file
-from multivac.src.rdf_graph.rdf_parse import tokenize_text, StanfordParser, stanford_parse
+from multivac.src.gan.utilities.vocab import Vocab
+from multivac.src.rdf_graph.rdf_parse import (StanfordParser, stanford_parse,
+                                              tokenize_text)
+
 
 class English(object):
+
     @staticmethod
     def canonicalize_example(text, parser, verbose=False):
         '''
@@ -27,16 +29,11 @@ class English(object):
         '''
         try:
             parse = stanford_parse(parser, text)
-        except:
+        except Exception:
             print('Could not parse query: {}'.format(text))
             return None
 
-        # try:
         parse_tree = english_ast_to_asdl_ast(parse.parse_string)
-        # except: 
-        #     print("Could not interpret query parse: {}".format(parse.parse_string))
-        #     return None
-
         return parse_tree
 
     @staticmethod
@@ -72,8 +69,8 @@ class English(object):
             query = query[query.index(re.split(r"[\.\!\?]\s+", query)[-1]):]
 
             # Remove non-alphabetic characters at the start of the string
-            query = re.sub(r"^(?!\()[^a-zA-Z]+","", query)
-            query = re.sub(r"^(\(.*\))?\W+","", query)
+            query = re.sub(r"^(?!\()[^a-zA-Z]+", "", query)
+            query = re.sub(r"^(\(.*\))?\W+", "", query)
 
             # Remove whitespace preceding right-hand-side punctuation and
             #  following left-hand-side puncuation. I.e., "( we like it )"
@@ -110,18 +107,18 @@ class English(object):
 
     @staticmethod
     def preprocess_dataset(annot_file, text_file, verbose=False):
-        parser = StanfordParser(annots = "tokenize ssplit parse")
+        parser = StanfordParser(annots="tokenize ssplit parse")
 
         processed_examples = []
         productions = set()
 
-        for idx, (src_query, tgt_text) in enumerate(zip(open(annot_file), 
+        for idx, (src_query, tgt_text) in enumerate(zip(open(annot_file),
                                                         open(text_file))):
             query_toks = src_query.strip().split()
 
             if len(query_toks) == 0:
                 continue
-                
+
             tgt_text = tgt_text.strip()
 
             tree = English.canonicalize_example(tgt_text, parser)
@@ -139,7 +136,7 @@ class English(object):
                               max_query_len=70, vocab_freq_cutoff=1,
                               train_size=.8, dev_size=.1, test_size=.1):
 
-        processed_examples, productions = English.preprocess_dataset(annot_file, 
+        processed_examples, productions = English.preprocess_dataset(annot_file,
                                                                      text_file)
 
         if grammar is None:
@@ -147,8 +144,8 @@ class English(object):
 
         transition_system = EnglishTransitionSystem(grammar)
 
-        serialize_to_file(grammar, 
-                          os.path.join(os.path.dirname(annot_file), 
+        serialize_to_file(grammar,
+                          os.path.join(os.path.dirname(annot_file),
                                        "eng.grammar.pkl"))
 
         all_examples = []
@@ -170,10 +167,10 @@ class English(object):
                                             tgt_actions=tgt_action_infos,
                                             tgt_text=text,
                                             tgt_ast=tree,
-                                            meta={'raw_text': text, 
+                                            meta={'raw_text': text,
                                                   'str_map': None}))
 
-        train_examples, dev_examples = train_test_split(all_examples, 
+        train_examples, dev_examples = train_test_split(all_examples,
                                                         train_size=train_size)
         test_examples, dev_examples = train_test_split(dev_examples,
                                                        train_size=test_size/(dev_size+test_size))
@@ -193,7 +190,7 @@ class English(object):
     @staticmethod
     def generate_dataset(annot_file, text_file, grammar=None, max_query_len=None,
                          vocab_freq_cutoff=1, verbose=False):
-        processed_examples, productions = English.preprocess_dataset(annot_file, 
+        processed_examples, productions = English.preprocess_dataset(annot_file,
                                                                      text_file,
                                                                      verbose)
         if grammar is None:
@@ -203,11 +200,7 @@ class English(object):
         all_examples = []
 
         for idx, example in tqdm(enumerate(processed_examples), desc='Generating Dataset... '):
-        # for idx, example in enumerate(processed_examples):
             toks, text, tree = example
-
-            # if len(toks) == 0:
-            #     continue
 
             if max_query_len is not None:
                 toks = toks[:max_query_len]
@@ -220,7 +213,7 @@ class English(object):
                                         tgt_actions=tgt_action_infos,
                                         tgt_text=text,
                                         tgt_ast=tree,
-                                        meta={'raw_text': text, 
+                                        meta={'raw_text': text,
                                               'str_map': None}))
 
         # generate vocabulary for the tgt_text tokens!
@@ -228,6 +221,7 @@ class English(object):
         vocab = Vocab.from_corpus(tokens, freq_cutoff=vocab_freq_cutoff)
 
         return all_examples, vocab, grammar
+
 
 if __name__ == '__main__':
     English.parse_english_dataset()

@@ -1,23 +1,25 @@
-import sys
-import os
-import io
-import json
-import argparse
-import time
-import concurrent.futures
-from grobid.client import ApiClient
-import ntpath
-import requests
-
-
-'''
+""""
 This version uses the standard ProcessPoolExecutor for parallelizing the concurrent calls to the GROBID services.
 Given the limits of ThreadPoolExecutor (input stored in memory, blocking Executor.map until the whole input
 is acquired), it works with batches of PDF of a size indicated in the config.json file (default is 1000 entries).
 We are moving from first batch to the second one only when the first is entirely processed - which means it is
 slightly sub-optimal, but should scale better. However acquiring a list of million of files in directories would
 require something scalable too, which is not implemented for the moment.
-'''
+"""
+
+import argparse
+import concurrent.futures
+import io
+import json
+import os
+import time
+
+import requests
+
+import ntpath
+from grobid.client import ApiClient
+
+
 class grobid_client(ApiClient):
 
     def __init__(self, config_path='./config.json'):
@@ -101,8 +103,6 @@ class grobid_client(ApiClient):
             force,
             teiCoordinates):
         print(len(pdf_files), "PDF files to process")
-        # with concurrent.futures.ThreadPoolExecutor(max_workers=n) as
-        # executor:
         results = []
         with concurrent.futures.ProcessPoolExecutor(max_workers=n) as executor:
             for pdf_file in pdf_files:
