@@ -4,29 +4,39 @@ Extract RDF triples from documents.
 import argparse
 import json
 import os
+import pickle
 import re
-import shlex
-import signal
-import subprocess
 from collections import defaultdict
+from string import ascii_lowercase
 
+import fastcluster
+import numpy as np
 import spacy
+from bs4 import UnicodeDammit
+from corenlp import CoreNLPClient
 from nltk.tokenize.treebank import TreebankWordDetokenizer
+from scipy.cluster.hierarchy import fcluster
+from scipy.spatial.distance import pdist
+from textacy.extract import subject_verb_object_triples
 from tqdm import tqdm
 
-from stanfordcorenlp import StanfordCoreNLP
-from textacy.extract import subject_verb_object_triples
+OBJECTS_TO_REPLACE = ['that', 'which']
 
 NORM_REGEX_CHARS1 = re.compile(r'[\(\)\"\‘\,\.\%\{\}\`\\\:\[\]\“\•]+')
 NORM_REGEX_CHARS2 = re.compile(r'^([\-\—\–]|(’s)|(’))\s?')
 
-ABS_REGEX_BREAK = re.compile(r'\n+')
+REGEX_BREAK = re.compile(r'\n+')
+REGEX_SPACE = re.compile(r'\s+')
+
 ABS_REGEX_LATEX = re.compile(r'\$.+\$')
-ABS_REGEX_SPACE = re.compile(r'\s+')
 ABS_REGEX_VARIABLE = re.compile(r'\\\\\w')
 ABS_REGEX_PRECEDING = re.compile((r'^(conclusions|conclusion|methods|results'
                                   r'|background|abstract|objective|discussion)+'),
                                  flags=re.IGNORECASE)
+
+DOC_REGEX_PARENTS = re.compile(r'\(\)[\s,]*')
+DOC_REGEX_BRACKET = re.compile(r'\[\][\s,]*')
+DOC_REGEX_ELIPSES = re.compile(r'\.\s\.\s\.')
 
 
 def preprocess_abstract(abstract, nlp):
@@ -40,10 +50,10 @@ def preprocess_abstract(abstract, nlp):
     nlp : spacy
         The SpaCy object.
     """
-    abstract = re.sub(ABS_REGEX_BREAK, ' ', abstract)
+    abstract = re.sub(REGEX_BREAK, ' ', abstract)
     abstract = re.sub(ABS_REGEX_LATEX, '', abstract)
     abstract = re.sub(ABS_REGEX_VARIABLE, 'variable', abstract)
-    abstract = re.sub(ABS_REGEX_SPACE, ' ', abstract)
+    abstract = re.sub(REGEX_SPACE, ' ', abstract)
     abstract = ' '.join([re.sub(ABS_REGEX_PRECEDING, '', sent.text.strip()).strip()
                          for sent in nlp(abstract).sents])
     return abstract.strip()
@@ -51,91 +61,216 @@ def preprocess_abstract(abstract, nlp):
 
 def preprocess_full_document(doc, nlp=None):
     """
-    TODO :: Add some post-processing logic
-    for full documents.
-    """
-    return doc
-
-
-class StanfordServer:
-    """
-    A simple class to launch the Stanford server from a JAR file.
-    This is just for convenience, since Stanford CoreNLP wrappers
-    do not always handle stopping and starting the server very well.
-
-    Obviously, we'll also have the server running if we run this from
-    within our docker environment, but that means we always have to
-    use docker, use a specific version of the CoreNLP library, etc.
+    Helper function to clean document.
 
     Parameters
     ----------
-    path : str or None, optional
-        The path to the Stanford CoreNLP directory.
-        Optionally, you can set the 'CORENLP_HOME'
-        environment variable. If None, assume that
-        you are currently in the proper directory.
+    doc : str
+        The text of the document
+    nlp : spacy
+        The SpaCy object.
+    """
+    doc = UnicodeDammit(doc, smart_quotes_to='ascii').unicode_markup
+
+    doc = re.sub(DOC_REGEX_PARENTS, '', doc)
+    doc = re.sub(DOC_REGEX_BRACKET, '', doc)
+    doc = re.sub(DOC_REGEX_ELIPSES, '...', doc)
+
+    doc = re.sub(REGEX_BREAK, ' ', doc)
+    doc = re.sub(REGEX_SPACE, ' ', doc)
+
+    return doc
+
+
+def postprocess_triples(extractor,
+                        embeddings_path=None,
+                        cluster_entities=False,
+                        cluster_relations=False):
+    """
+    Post-process the triples.
+
+    Parameters
+    ----------
+    extractor : RDFExtractor
+        A fitted RDF extractor object.
+    embeddings_path : str
+        The path to the embeddings.
         Defaults to None.
-    port : int, optional
-        The port to use for the server.
-        Defaults to 9000.
-    timeout : int, optional
-        The max timeout for processing a document.
-        Defaults to 15000.
-    memory : str, optional
-        The maximum amount of memory to allocate, in gigabytes.
-        The default value is six gigabytes.
-        Defaults to 'mx6g'
+    cluster_entities : bool
+        Whether to cluster the entities.
+        Defaults to False.
+    cluster_relations : bool
+        Whether to cluster the relations.
+        Defaults to False.
     """
 
-    def __init__(self, path=None, port=9000, timeout=15000, memory='mx6g'):
-        self.path = path
-        self.path = os.environ.get('CORENLP_HOME', path)
-        self.port = port
-        self.timeout = timeout
-        self.memory = memory
-        self.server = None
+    # get the triples, relations, and entities
+    triples = extractor.triples
+    relations = extractor.relations
+    entities = extractor.entities
 
-    def start(self):
-        """
-        Start the server.
-        """
-        path = '*' if self.path is None else os.path.join(self.path, '*')
-        jar = 'edu.stanford.nlp.pipeline.StanfordCoreNLPServer'
-        command = (f'java -{self.memory} -cp "{path}" {jar} '
-                   f'-port {self.port} -timeout {self.timeout}')
-        self.server = subprocess.Popen(shlex.split(command),
-                                       stdout=subprocess.PIPE)
+    # should we cluster the entities?
+    entities_dict = {}
+    if cluster_entities and embeddings_path:
+        clusterer = Clusterer()
+        entities_dict = clusterer.cluster(embeddings_path, entities)
 
-    def stop(self):
-        """
-        Stop the server.
-        """
-        os.kill(self.server.pid, signal.SIGKILL)
+    # should we cluster the relations?
+    relations_dict = {}
+    if cluster_relations and embeddings_path:
+        clusterer = Clusterer()
+        relations_dict = clusterer.cluster(embeddings_path, relations)
+
+    # make sure entities and relations start with an actual character
+    good_rels = [r for r in relations
+                 if any(r.lower().startswith(l) for l in ascii_lowercase)]
+    good_ents = [e for e in entities
+                 if any(e.lower().startswith(l) for l in ascii_lowercase)]
+
+    # remove anything that isn't in the lists above
+    final_triples = []
+    for t in tqdm(triples):
+        if (t[0] in good_ents and t[2] in good_ents and t[1] in good_rels):
+            t_new = (entities_dict.get(t[0], t[0]),
+                     entities_dict.get(t[2], t[2]),
+                     relations_dict.get(t[1], t[1]))
+            if t_new not in final_triples:
+                final_triples.append(t_new)
+
+    extractor.triples = final_triples
+    return extractor
 
 
-class StanfordCorefernceResolution:
+class Clusterer:
+
+    def __init__(self,  clust_dist_thres=0.2, verbose=False):
+
+        self.clust_dist_thres = clust_dist_thres
+        self.verbose = verbose
+
+    def load_embeddings(self, embedding_path, entities):
+        """
+        Load the embeddings (`DA_glove_embeddings_300.pkl`)
+        from a pickle file and compute the average embedding
+        for each entity.
+
+        Parameters
+        ----------
+        embedding_path : str
+            The path to the embeddings file.
+        entities : list
+            The list of unique entities
+        """
+        with open(embedding_path, 'rb') as fb:
+            embed = pickle.load(fb)
+
+        # create the embeddings dictionary
+        embed_dict = {token: vector for token, vector in zip(embed['vocab'],
+                                                             embed['embeddings'])}
+
+        # compute the average embedding for each entity
+        entity_embed = {}
+        for entity in tqdm(entities):
+
+            entity_split = entity.split()
+            entity_split_embed = [embed_dict[token] for token in entity_split
+                                  if token in embed_dict]
+
+            if len(entity_split_embed) == 1:
+                entity_embed.update({entity: np.squeeze(np.array(entity_split_embed))})
+            elif len(entity_split_embed) > 1:
+                entity_embed.update({entity: np.mean(np.array(entity_split_embed), axis=0)})
+
+        return entity_embed
+
+    @staticmethod
+    def get_representatives(cluster_members, char_limit=100):
+        """
+        Get the representative mentions for each cluster.
+
+        Parameters
+        ----------
+        cluster_members : list
+            The cluster members
+        char_limit : int, optional
+            The maximum number of characters for any
+            entity to be included.
+            Defaults to 120.
+        """
+        cluster_key = {}
+        for cluster in cluster_members:
+
+            if len(''.join(cluster)) > char_limit:
+                cluster_key.update({entity: cluster[0]
+                                    for entity in cluster})
+            else:
+                cluster_key.update({entity: ' | '.join(cluster)
+                                    for entity in cluster})
+        return cluster_key
+
+    def cluster(self,
+                embedding_path,
+                entities,
+                link_method='average'):
+        """
+        Cluster the entities using agglomerative clustering.
+
+        Parameters
+        ----------
+        embedding_path : str
+            The path to the embeddings file.
+        entities : list
+            The list of unique entities
+        link_method : str, optional
+            The link method used by `fastcluster`
+            Defaults to 'average'
+        """
+        embedding_dict = self.load_embeddings(embedding_path, entities)
+        embeddings = np.array([embedding for embedding in embedding_dict.values()])
+        entities_list = np.array([entity for entity in embedding_dict.keys()])
+
+        # create distance matrix using cosine similarity between all entity strings
+        dist_vec = pdist(embeddings, 'cosine')
+
+        # cluster distance matrix to find co-referring entities
+        linkage_matrix = fastcluster.linkage(dist_vec, method=link_method)
+        cluster_labels = fcluster(linkage_matrix, t=self.clust_dist_thres, criterion='distance')
+        cluster_members_all = []
+        for clus_label in tqdm(np.unique(cluster_labels)):
+            clus_indx = cluster_labels == clus_label
+            cluster_members = list(entities_list[clus_indx])
+            cluster_members_all.append(cluster_members)
+
+        output = self.get_representatives(cluster_members_all)
+
+        return output
+
+
+class StanfordCoreferenceResolution:
     """
     Stanford CoreNLP co-reference.
 
     Parameters
     ----------
-    host : str
-        The Stanford CoreNLP Server URL.
-        Defaults to 'http://localhost'
-    port : int, optional
-        The Stanford CoreNLP Server port.
-        Defaults to 9000.
+    timeout : int
+        The timeout for the parser
+        Defaults to 30000
+    memory : str
+        The memory allocation.
+        Defaults to '6G'
+
     """
 
-    def __init__(self, host='http://localhost', port=9000):
+    def __init__(self, timeout=30000, memory='6G'):
 
         self.detok = TreebankWordDetokenizer()
-        self.client = StanfordCoreNLP(host, port=port)
-        self.properties = {'annotators': 'tokenize,ssplit,dcoref',
-                           'pipelineLanguage': 'en',
-                           'outputFormat': 'json'}
 
-    def resolve(self, doc, raise_errors=False):
+        self.client = CoreNLPClient(annotators=['tokenize', 'ssplit', 'dcoref'],
+                                    output_format='json',
+                                    timeout=timeout,
+                                    memory=memory)
+
+    def resolve(self, doc, raise_errors=True):
         """
         Resolve the co-references for a single document.
 
@@ -145,7 +280,7 @@ class StanfordCorefernceResolution:
             A document whose co-references will be resolved.
         raise_errors : bool, optional
             Whether to raise errors.
-            Defaults to False.
+            Defaults to True.
 
         Returns
         -------
@@ -155,15 +290,14 @@ class StanfordCorefernceResolution:
             then `None` will be returned.
         """
         try:
-            parsed = self.client.annotate(doc, properties=self.properties)
-            parsed = json.loads(parsed)
+            parsed = self.client.annotate(doc)
         except Exception as error:
             if raise_errors:
                 raise error
             return
         return self.replace_coreferences(parsed)
 
-    def resolve_all(self, docs, raise_errors=False):
+    def resolve_all(self, docs, raise_errors=True):
         """
         Resolve co-references for all the documents.
 
@@ -595,8 +729,6 @@ class RDFExtractor:
         the subject. If neither of these are true, then we stick with the
         subject.
 
-        TODO :: This really needs to be improved.
-
         Parameters
         ----------
         span : SpaCy span object
@@ -609,7 +741,7 @@ class RDFExtractor:
         span or chunk : SpaCy span object
             The noun phrase chunk or original span.
         """
-        if span.text.lower().strip() in ['that', 'which']:
+        if span.text.lower().strip() in OBJECTS_TO_REPLACE:
             try:
                 span = self._get_preceding_chunk(span, chunks)
             except Exception:
@@ -650,7 +782,6 @@ class RDFExtractor:
         -------
         results : list of dict
             A list of dictionaries, which include:
-            - 'SENT'  = Full text of the sentence (SpaCy object)
             - 'RDF'   = The RDF triple (tuple of str)
             - 'NOUNS' = All noun phrases extracted from the sentence
             - 'VERBS' = All verbs extracted from the sentence
@@ -695,8 +826,7 @@ class RDFExtractor:
                     sub = self._normalize(sub)
                     obj = self._normalize(obj)
 
-                    results.append({'SENT': sentence,
-                                    'RDF': (sub, pred, obj),
+                    results.append({'RDF': (sub, pred, obj),
                                     'NOUNS': nouns,
                                     'VERBS': verbs})
 
@@ -838,30 +968,12 @@ def main():
                         type=bool_or_str,
                         help="Whether to remove numeric subjects and objects.")
 
-    parser.add_argument('-rw', '--raw', action='store_true',
-                        help="Whether to get raw tokens.")
+    parser.add_argument('-ep', '--embeddings_path',
+                        help="The path to the embeddings.")
 
     parser.add_argument('-sd', '--stanford_dir',
                         help="The directory with Stanford JAR files.",
                         default=None)
-
-    parser.add_argument('-sh', '--stanford_host',
-                        help="The Stanford host (e.g. 'http://localhost').",
-                        default=None)
-
-    parser.add_argument('-sp', '--stanford_port',
-                        type=int,
-                        help="The Stanford host port (e.g. 9000).",
-                        default=9000)
-
-    parser.add_argument('-sm', '--stanford_memory',
-                        help="The Stanford host memory (e.g. 'mx6g').",
-                        default='mx6g')
-
-    parser.add_argument('-st', '--stanford_timeout',
-                        type=int,
-                        help="The Stanford host timeout (e.g. 15000).",
-                        default=15000)
 
     parser.add_argument('-rc', '--resolve_coreferences',
                         action='store_true',
@@ -875,6 +987,14 @@ def main():
     parser.add_argument('-pe', '--package_entities',
                         action='store_true',
                         help="Package the entities.")
+
+    parser.add_argument('-ce', '--cluster_entities',
+                        action='store_true',
+                        help="Cluster the entities.")
+
+    parser.add_argument('-cr', '--cluster_relations',
+                        action='store_true',
+                        help="Cluster the relations.")
 
     args = parser.parse_args()
 
@@ -893,19 +1013,9 @@ def main():
         docs = [preprocess_full_document(doc, nlp) for doc in docs]
 
     if args.stanford_dir is not None and args.resolve_coreferences:
-        server = StanfordServer(args.stanford_dir,
-                                args.stanford_port,
-                                args.stanford_timeout,
-                                args.stanford_memory)
-        server.start()
-
-    if args.resolve_coreferences:
         print("Resolving co-references...")
-        host = ('http://localhost'
-                if args.stanford_host is None or args.stanford_dir
-                else args.stanford_host)
-        resolver = StanfordCorefernceResolution(host,
-                                                args.stanford_port)
+        os.environ['CORENLP_HOME'] = args.stanford_dir
+        resolver = StanfordCoreferenceResolution()
         docs = resolver.resolve_all(docs)
 
     print("Extracting triples...")
@@ -914,14 +1024,19 @@ def main():
                              min_obj_char_len=args.min_obj_char_len,
                              lemmatize=args.lemmatize,
                              remove_numeric=args.remove_numeric)
-    extractor.extract_all(docs, raw=args.raw)
+    extractor.extract_all(docs)
+
+    if args.stanford_dir is not None and args.resolve_coreferences:
+        resolver.client.stop()
+
+    extractor = postprocess_triples(extractor,
+                                    args.embeddings_path,
+                                    args.cluster_entities,
+                                    args.cluster_relations)
 
     with open(args.json_output, 'w') as fb:
         triples = extractor.triples
         json.dump(triples, fb)
-
-    if args.stanford_dir is not None and args.resolve_coreferences:
-        server.stop()
 
     if args.package_entities:
 
