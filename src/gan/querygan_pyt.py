@@ -23,6 +23,7 @@ from gen_pyt.model import nn_utils
 from gen_pyt.model.parser import Parser
 from multivac.src.rdf_graph.rdf_parse import StanfordParser
 
+from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
 
 def DiscriminatorDataset(DIR, fake, vocab, limit=None):
     '''
@@ -195,6 +196,9 @@ def run(cfg_dict):
     # arguments
 
     args = cfg_dict['ARGS']
+
+    if args['test']:
+        test_system(cfg_dict, args['gen_chk'])
 
     if args['continue']:
         continue_training(cfg_dict, args['gen_chk'], args['disc_chk'])
@@ -378,6 +382,61 @@ def run(cfg_dict):
                 discriminator_losses.append((loss_r + loss_f)/2)
                 
         save_progress(netD, netG, examples, epoch, discriminator_losses, generator_losses)
+        
+def test_system(cfg_dict, gen_chk):
+    args = cfg_dict['ARGS']
+    gargs = cfg_dict['GENERATOR']
+    gan_args = cfg_dict['GAN']
+    use_cuda = args['cuda']
+    seed = gan_args['seed']
+
+    if not torch.cuda.is_available():
+        use_cuda = False
+
+    gargs['cuda'] = use_cuda
+    gargs['verbose'] = gan_args['verbose']
+
+    random.seed(seed)
+    np.random.seed(seed)
+
+    parser = StanfordParser(annots="depparse")
+
+    if isinstance(gen_chk, str):
+        gen_params = torch.load(gen_chk)
+        netG = Parser.load(gen_chk)
+        optimizer_cls = eval('torch.optim.%s' % netG.args['optimizer'])
+        netG.optimizer = optimizer_cls(netG.parameters(), lr=netG.args['lr'])
+        netG.optimizer.load_state_dict(gen_params['optimizer'])
+    else:
+        netG = gen_chk
+
+    grammar = None # netG.transition_system.grammar
+
+    glove_vocab, glove_emb = load_word_vectors(os.path.join(gan_args['glove_dir'], 
+                                                            gan_args['glove_file']),
+                                               lowercase=gan_args['glove_lower'])
+
+    if gan_args['verbose']: print("Generating training dataset and grammar...")
+
+    samples_data, prim_vocab, grammar = English.generate_dataset(gargs['annot_file'],
+                                                                 gargs['texts_file'],
+                                                                 grammar)
+    training_library = Dataset(samples_data)
+
+    scores = np.zeros((len(training_library), 5))
+
+    for i, example in tqdm(enumerate(training_library)):
+        src = example.src_sent
+        tgt = example.tgt_text
+        hyps, _ = netG.parse(src)
+        gen = asdl_ast_to_english(hyps[0].tree)
+
+        for j in range(1, 6):
+            weight = tuple((1. / j for _ in range(j)))
+            scores[i,j-1] = sentence_bleu(tgt, gen, weight, 
+                                        smoothing_function=SmoothingFunction().method1)
+
+    import pdb; pdb.set_trace()
 
 
 def continue_training(cfg_dict, gen_chk, disc_chk, epoch=0, gen_loss=None, disc_loss=None, use_cuda=False):
@@ -564,6 +623,9 @@ if __name__ == '__main__':
                         help='Path to Generator component checkpoint file.')
     parser.add_argument('-d', '--disc_chk', default=False,
                         help='Path to Discriminator component checkpoint file.')
+    parser.add_argument('-t', '--test', default=False, action='store_true', 
+                        help='Test Generator for performance.')
+
 
     all_args = parser.parse_known_args()
     args = vars(all_args[0])
