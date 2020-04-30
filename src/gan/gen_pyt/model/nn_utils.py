@@ -94,6 +94,12 @@ def uniform_init(lower, upper, params):
         p.data.uniform_(lower, upper)
 
 
+def kaiming_init(params):
+    for p in params:
+        if len(p.data.size()) > 1:
+            init.kaiming_normal_(p.data)
+
+
 def glorot_init(params):
     for p in params:
         if len(p.data.size()) > 1:

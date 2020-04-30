@@ -48,7 +48,8 @@ class QueryGAN_Discriminator_CNN(nn.Module):
                           kernel_size=sz,
                           stride=1,
                           padding=0),
-                nn.ReLU(),
+                nn.LeakyReLU(negative_slope=0.2),
+                nn.BatchNorm1d(self.num_filters),
                 nn.MaxPool1d(kernel_size=2),
                 nn.Flatten()) for sz in self.filter_sizes]
         )
@@ -63,6 +64,23 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             block.apply(self.init_weights)
 
         self.out.apply(self.init_weights)
+
+        if self.args['optim'] == 'adam':
+            self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, 
+                                               self.parameters()), 
+                                        betas = (self.args['beta_1'], 0.999),
+                                        lr=self.args['lr'], 
+                                        weight_decay=self.args['wd'])
+        elif self.args['optim'] == 'adagrad':
+            self.optimizer = torch.optim.Adagrad(filter(lambda p: p.requires_grad, 
+                                                  self.parameters()), 
+                                           lr=self.args['lr'], 
+                                           weight_decay=self.args['wd'])
+        elif self.args['optim'] == 'sgd':
+            self.optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, 
+                                              self.parameters()), 
+                                       lr=self.args['lr'], 
+                                       weight_decay=self.args['wd'])
 
     def init_weights(self, m):
         if type(m) in (nn.Linear, nn.Conv1d):
@@ -91,17 +109,20 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             return scores, labels
 
     def train_single_code(self, train):
-        criterion = nn.CrossEntropyLoss()
 
-        return self.trainer(train, criterion, self.args['early_stopping'])
+        if self.args['label_smoothing']:
+            criterion = SmoothedCrossEntropy(self.args['label_smoothing'])
+        else:
+            criterion = nn.CrossEntropyLoss()
 
-    def trainer(self, train, criterion, early_stopping=True,
-                n_epochs_stop=10):
+        return self.trainer(train, criterion)
 
-        trainloader = DataLoader(train, batch_size=self.args['batch_size'], shuffle=True, num_workers=4)
 
-        self.optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()),
-                                          amsgrad=True)
+    def trainer(self, train, criterion):
+        trainloader = DataLoader(train, batch_size=self.args['batch_size'], 
+                                 shuffle=True, num_workers=4)
+        steps = len(trainloader)
+
         if self.args['device'] == 'cuda':
             self.cuda()
             self.optimizer.cuda()
@@ -113,12 +134,39 @@ class QueryGAN_Discriminator_CNN(nn.Module):
             labels = y.to(self.args['device'])
 
             # Forward pass
-            outputs = self.forward(verbs)
-            loss = criterion(outputs, labels.argmax(1))
+            outputs = self(verbs)
 
+            if not self.args['label_smoothing']:
+                labels = labels.argmax(1)
+
+            loss = criterion(outputs, labels)
+            
             # Backward and optimize
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()
 
         return loss.item()
+
+class SmoothedCrossEntropy(nn.Module):
+    '''
+    Adapted from https://github.com/jadore801120/attention-is-all-you-need-pytorch/blob/master/train.py#L38
+    '''
+    def __init__(self, smoothing):
+        super(SmoothedCrossEntropy, self).__init__()
+
+        self.smoothing = smoothing
+        self.softmax = nn.LogSoftmax(dim=1)
+
+    def forward(self, output, target):
+        '''
+            output: Tensor of predictions for class labels of size 
+                    batchsize * n_classes
+            target: Onehot Tensor indicating actual class labels of size
+                    batchsize * n_classes
+        '''
+        target = target * self.smoothing + (1 - target) * (1 - self.smoothing)
+        return -(target * self.softmax(output)).mean()
+
+
+

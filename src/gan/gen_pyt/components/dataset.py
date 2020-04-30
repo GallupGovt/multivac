@@ -65,13 +65,16 @@ class Example(object):
 
 
 class Batch(object):
-
-    def __init__(self, examples, grammar, vocab, prim_vocab=None, copy=True, cuda=False):
+    def __init__(self, examples, grammar, vocab, prim_vocab=None, copy=True, cuda=False, sort_batch=True):
         self.examples = examples
+
+        if sort_batch:
+            self.examples = sorted(self.examples, key=lambda x: len(x.src_sent), reverse=True)
+
         self.max_action_num = max(len(e.tgt_actions) for e in self.examples)
 
         self.src_sents = [e.src_sent for e in self.examples]
-        self.src_sents_len = [len(e.src_sent) for e in self.examples]
+        self.src_sents_len = [len(s) for s in self.src_sents]
 
         self.grammar = grammar
         self.vocab = vocab

@@ -3,6 +3,7 @@ warnings.filterwarnings("ignore")
 
 import argparse
 from corenlp import CoreNLPClient
+from itertools import chain
 import pandas as pd
 import re
 
@@ -47,6 +48,9 @@ def clean_queries(queries, verbose=False):
 
             if sum(tok_chk)/len(tok_chk) < 2:
                 continue
+
+            if not query.endswith('?'):
+                query += '?'
 
             query = query[0].upper() + query[1:]
             clean.append(query)
@@ -397,7 +401,9 @@ class stanford_parse(object):
 
 def process_texts(parser, texts, clean=False, verbose=False, form='longest', sub_rdfs=False):
     # Perform basic parsing and extraction on an iterable of sentences
-    texts = clean_queries(texts, verbose)
+    if clean:
+        texts = clean_queries(texts, verbose)
+
     sentences = [stanford_parse(parser, text, sub_rdfs=sub_rdfs) for text in texts]
     processed = []
 
@@ -422,6 +428,9 @@ def run(args_dict):
     if args_dict['just_clean']:
         texts = clean_queries(texts, args_dict['verbose'])
     else:
+        if not args_dict['form']:
+            args_dict['form'] = 'longest'
+
         contents, texts = process_texts(parser, 
                                         texts, 
                                         args_dict['clean'],
@@ -435,10 +444,8 @@ def run(args_dict):
             result.to_csv(args_dict['out_file'], index=False)
         else:
             with open(args_dict['out_file'], "w") as f:
-                try:
-                    f.write('\n'.join([','.join(x) for x in contents]))
-                except:
-                    print(contents[0])
+                f.write('\n'.join([' '.join(chain(*x.values())) for x in contents]))
+
 
     with open(args_dict['text_file']+"_cleaned.txt", "w") as f:
         f.write('\n'.join(texts))
