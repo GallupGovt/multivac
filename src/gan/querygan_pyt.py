@@ -88,6 +88,33 @@ def generate_query(ents, rels, kg):
     tail_tokens = ents.iloc[tail].iloc[0].split(" | ")
     rel_tokens = rels.iloc[rel].iloc[0].split(" | ")
 
+def get_newest_file(path, files, term): 
+    tmp = sorted([(os.path.getmtime(os.path.join(path, x)), x) for x in files if term in x])
+    return os.path.join(path, tmp[-1][1])
+
+def load_triples(args):
+    DIR = args['kg_directory']
+    files = [x for x in os.listdir(DIR) if '2id' in x]
+    rel_file = get_newest_file(DIR, files, 'relation')
+    ent_file = get_newest_file(DIR, files, 'entity')
+    trn_file = get_newest_file(DIR, files, 'train')
+
+    entities = pd.read_csv(ent_file, sep='\t', 
+                           names=["Ent","Id"], skiprows=1)
+    relations = pd.read_csv(rel_file, sep='\t', 
+                            names=["Rel","Id"], skiprows=1)
+    train = pd.read_csv(trn_file, sep='\t', 
+                        names=["Head","Tail","Relation"], skiprows=1)
+
+    return entities, relations, train
+
+def generate_query(ents, rels, kg):
+    head, tail, rel = kg.sample().iloc[0].to_list()
+
+    head_tokens = ents.iloc[head].iloc[0].split(" | ")
+    tail_tokens = ents.iloc[tail].iloc[0].split(" | ")
+    rel_tokens = rels.iloc[rel].iloc[0].split(" | ")
+
     head = random.choice(head_tokens).strip()
     tail = random.choice(tail_tokens).strip()
     rel  = random.choice(rel_tokens).strip()
@@ -115,6 +142,7 @@ def generate_samples(net, generated_num, parser, gan_args, oracle=False,
 
         while True:
             query = generate_query(ents, rels, kg)
+
             if oracle:
                 samps, sts = net.parse(query, return_states=True,
                                        beam_size=net.args['beam_size'])

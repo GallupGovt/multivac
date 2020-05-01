@@ -6,21 +6,31 @@ centrality measure of real and estimated networks.
 """
 import argparse
 import json
-from datetime import datetime
-
 import networkx as nx
 import numpy as np
+import os
 
-from get_kg_query_params import build_network, read_txt
+from datetime import datetime
 
+from multivac.get_kg_query_params import build_network, read_txt
 
 def build_comparison_metrics(n1, n2, mtype):
     if 'degree' in mtype:
         n1x = nx.degree_centrality(n1)
         n2x = nx.degree_centrality(n2)
     else:
-        n1x = nx.eigenvector_centrality(n1)
-        n2x = nx.eigenvector_centrality(n2)
+        tol = 1.0e-6
+
+        while True:
+            try:
+                n1x = nx.eigenvector_centrality(n1, tol=tol)
+                n2x = nx.eigenvector_centrality(n2, tol=tol)
+                break
+            except:
+                tol *= 10
+                print("Increasing tolerance to {}".format(tol))
+                continue
+
     net = {**n1x, **n2x}
     for k, v in net.items():
         if k in n1x and k in n2x:
@@ -36,11 +46,10 @@ def build_comparison_metrics(n1, n2, mtype):
 def generate_node_changes(net):
     res = {}
     for k, v in net.items():
-        if net[k][0]:
-            pct_change = (net[k][1] - net[k][0]) / net[k][0]
+        pct_change = (net[k][1] - net[k][0]) / (net[k][0] + 1)
 
-            if not np.isnan(pct_change):
-                res.update({k: pct_change})
+        if not np.isnan(pct_change):
+            res.update({k: pct_change})
 
     return res
 
@@ -55,6 +64,73 @@ def generate_result_lists(net, num, ctype=['top', 'bottom']):
         res.update({key: net[key]})
 
     return res
+
+def get_items(fpath):
+    items = {}
+
+    for item, idx in read_txt(fpath):
+        items[int(idx)] = item
+
+    return items
+
+def triple_to_labels(triple, ents, rels):
+    head, tail, rel = trip
+    return " ".join([ents[head], rels[rel], ents[tail]])
+
+
+def get_top_triples(ofile, nfile, kg_dir, measure='eigenvector', num_results=100, out=None):
+    ents = get_items(os.path.join(kg_dir, 'entity2id.txt'))
+    rels = get_items(os.path.join(kg_dir, 'relation2id.txt'))
+    triples = read_txt(os.path.join(kg_dir, 'train2id.txt'))
+    triples = np.array(triples).astype(int)
+
+    # read in new file for comparison
+    new = read_txt(nfile)
+
+    # create networks
+    neto = build_network(triples)
+    netn = build_network(triples + new)
+    net = build_comparison_metrics(neto, netn, measure)
+
+    # calculate node changes
+    result = generate_node_changes(net)
+    result = {k: v for k, v in sorted(result.items(),
+                                      key=lambda item: item[1])}
+
+    # generate results of interest
+    gains = generate_result_lists(result, len(result), 'top')
+
+    trip_scores = np.zeros(triples.shape[0])
+
+    for i, trip in enumerate(triples):
+        headgain = tailgain = 0
+        head, tail, _ = trip
+        trip_scores[i] = gains.get(str(head), 0) + gains.get(str(tail), 0)
+
+    idxs = trip_scores.argsort()[::-1]
+    top = triples[idxs,][:num_results,:]
+
+    results = {}
+
+    for i, t in enumerate(top):
+        triple_id = idxs[i]
+        h, t, r = t
+        score = trip_scores[triple_id]
+
+        try:
+            label = " ".join([ents[h], rels[r], ents[t]])
+        except:
+            label = "missing RDF-triple"
+    
+        results[triple_id] = {'label': label, 'score': score}
+
+    if out:
+        with open('{}/key_triples.json'.format(out), 'w') as f:
+            json.dump(results, f)
+
+        return True
+    else:
+        return results
 
 
 def run(args_dict):
@@ -91,8 +167,8 @@ if __name__ == '__main__':
                         'files -- the real network then estimated network -- '
                         'over which to calculate differences.')
     parser.add_argument('-m', '--measure', required=False,
-                        default='eigenvector', choices=['degree', 'eigenvector'],
-                        help='Select which network centrality '
+                        default='eigenvector', choices=['degree',
+                        'eigenvector'], help='Select which network centrality '
                         'measure is required.')
     parser.add_argument('-n', '--num_results', required=False, default=10,
                         type=int, help='Number of results to return from '
@@ -102,3 +178,4 @@ if __name__ == '__main__':
     args_dict = vars(parser.parse_args())
 
     run(args_dict)
+
