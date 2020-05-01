@@ -1,6 +1,9 @@
 # MULTIVAC Documentation and References
 This page serves as an index of system design, theory, and walk through documentation for Gallup’s Meta-model Unification Learned Through Inquiry Vectorization and Automated Comprehension (MULTIVAC). DARPA’s Information Innovation Office’s Automating Scientific Knowledge Extraction (ASKE) program seeks to develop approaches to make it easier for scientists to build, maintain and reason over rich models of complex systems — which could include physical, biological, social, engineered or hybrid systems. MULTIVAC supports these goals by developing a system that absorbs scientific knowledge — in the form of facts, relationships, models and equations — from a particular domain corpus into a Markov Logic Network (MLN) ontology and learns to query that ontology in order to accelerate scientific exploration within the target domain. 
 
+## Key Innovations
+- <a href='https://github.com/GallupGovt/multivac/tree/master/doc/innovations.md'>Key Innovations</a>
+
 ## Phase II Developments
 - <a href='https://github.com/GallupGovt/multivac/tree/master/doc/phase_two_developments.md'>Phase II Developments</a>
 
