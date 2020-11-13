@@ -10,7 +10,7 @@ interruptingcow==0.8
 tqdm==4.34.0
 torch==1.2.0
 pandas==0.24.2
-tensorflow==1.15.2
+tensorflow==2.3.1
 Unidecode==1.0.23
 fastcluster==1.1.25
 git+https://github.com/titipata/pubmed_parser.git
