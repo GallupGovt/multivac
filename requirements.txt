@@ -3,7 +3,7 @@ networkx==2.3
 numpy==1.16.2
 matplotlib==3.1.1
 nltk==3.4.5
-Flask==1.1.1
+Flask==2.3.2
 scipy==1.2.1
 -e git://github.com/pgr-gallup/slate.git#egg=slate==0.5.2
 interruptingcow==0.8
